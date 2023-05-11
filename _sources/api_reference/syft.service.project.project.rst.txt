@@ -1,0 +1,59 @@
+syft.service.project.project
+============================
+
+.. automodule:: syft.service.project.project
+
+   
+   
+   
+
+   
+   
+   .. rubric:: Functions
+
+   .. autosummary::
+   
+      add_shareholders_as_owners
+      calculate_final_hash
+      check_permissions
+      elect_leader
+      metadata_to_node_identity
+      new_projectsubmit_to_project
+      projectsubmit_to_project
+      submit_changes
+   
+   
+
+   
+   
+   .. rubric:: Classes
+
+   .. autosummary::
+   
+      ConsensusModel
+      DemocraticConsensusModel
+      NewProject
+      NewProjectSubmit
+      NodeIdentity
+      ObjectPermissionChange
+      Project
+      ProjectEvent
+      ProjectEventAddLink
+      ProjectEventAddObject
+      ProjectMessage
+      ProjectSubmit
+   
+   
+
+   
+   
+   .. rubric:: Exceptions
+
+   .. autosummary::
+   
+      EventAlreadyAddedException
+   
+   
+
+
+
