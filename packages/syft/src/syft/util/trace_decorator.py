@@ -3,53 +3,57 @@
 
 # stdlib
 import asyncio
+from collections.abc import Callable
 from functools import wraps
 import inspect
-from typing import Callable
-from typing import Dict
-from typing import Optional
+import threading
+from typing import Any
+from typing import ClassVar
 from typing import TypeVar
-from typing import Union
 
 # third party
 from opentelemetry import trace
 from opentelemetry.semconv.trace import SpanAttributes
 from opentelemetry.trace import Tracer
+from opentelemetry.trace.span import Span
+
+__all__ = ["instrument"]
+
+T = TypeVar("T", bound=Callable | type)
 
 
 class TracingDecoratorOptions:
     class NamingSchemes:
         @staticmethod
-        def function_qualified_name(func: Callable):
+        def function_qualified_name(func: Callable) -> str:
             return func.__qualname__
 
         default_scheme = function_qualified_name
 
-    naming_scheme: Callable[[Callable], str] = NamingSchemes.default_scheme
-    default_attributes: Dict[str, str] = {}
+    naming_scheme: ClassVar[Callable[[Callable], str]] = NamingSchemes.default_scheme
+    default_attributes: ClassVar[dict[str, str]] = {}
 
-    @staticmethod
-    def set_naming_scheme(naming_scheme: Callable[[Callable], str]):
-        TracingDecoratorOptions.naming_scheme = naming_scheme
+    @classmethod
+    def set_naming_scheme(cls, naming_scheme: Callable[[Callable], str]) -> None:
+        cls.naming_scheme = naming_scheme
 
-    @staticmethod
-    def set_default_attributes(attributes: Dict[str, str] = None):
-        for att in attributes:
-            TracingDecoratorOptions.default_attributes[att] = attributes[att]
-
-
-T = TypeVar("T", bound=Optional[Union[Callable, type]])
+    @classmethod
+    def set_default_attributes(cls, attributes: dict[str, str] | None = None) -> None:
+        if attributes is not None:
+            for att in attributes:
+                cls.default_attributes[att] = attributes[att]
 
 
 def instrument(
-    _func_or_class: T = None,
+    _func_or_class: T | None = None,
+    /,
     *,
     span_name: str = "",
     record_exception: bool = True,
-    attributes: Optional[Dict[str, str]] = None,
-    existing_tracer: Optional[Tracer] = None,
-    ignore=False,
-):
+    attributes: dict[str, str] | None = None,
+    existing_tracer: Tracer | None = None,
+    ignore: bool = False,
+) -> T:
     """
     A decorator to instrument a class or function with an OTEL tracing span.
     :param cls: internal, used to specify scope of instrumentation
@@ -75,10 +79,11 @@ def instrument(
                         name,
                         staticmethod(
                             instrument(
+                                method,
                                 record_exception=record_exception,
                                 attributes=attributes,
                                 existing_tracer=existing_tracer,
-                            )(method)
+                            )
                         ),
                     )
                 else:
@@ -86,23 +91,20 @@ def instrument(
                         cls,
                         name,
                         instrument(
+                            method,
                             record_exception=record_exception,
                             attributes=attributes,
                             existing_tracer=existing_tracer,
-                        )(method),
+                        ),
                     )
 
         return cls
 
-    # Check if this is a span or class decorator
-    if inspect.isclass(_func_or_class):
-        return decorate_class(_func_or_class)
-
     def span_decorator(func_or_class: T) -> T:
-        if inspect.isclass(func_or_class):
+        if ignore:
+            return func_or_class
+        elif inspect.isclass(func_or_class):
             return decorate_class(func_or_class)
-
-        # sig = inspect.signature(func_or_class)
 
         # Check if already decorated (happens if both class and function
         # decorated). If so, we keep the function decorator settings only
@@ -111,23 +113,28 @@ def instrument(
             # We have already decorated this function, override
             return func_or_class
 
-        setattr(func_or_class, "__tracing_unwrapped__", func_or_class)
+        func_or_class.__tracing_unwrapped__ = func_or_class  # type: ignore
 
         tracer = existing_tracer or trace.get_tracer(func_or_class.__module__)
 
-        def _set_semantic_attributes(span, func: Callable):
+        def _set_semantic_attributes(span: Span, func: Callable) -> None:
+            thread = threading.current_thread()
             span.set_attribute(SpanAttributes.CODE_NAMESPACE, func.__module__)
             span.set_attribute(SpanAttributes.CODE_FUNCTION, func.__qualname__)
             span.set_attribute(SpanAttributes.CODE_FILEPATH, func.__code__.co_filename)
             span.set_attribute(SpanAttributes.CODE_LINENO, func.__code__.co_firstlineno)
+            span.set_attribute(SpanAttributes.THREAD_ID, thread.ident)
+            span.set_attribute(SpanAttributes.THREAD_NAME, thread.name)
 
-        def _set_attributes(span, attributes_dict):
-            if attributes_dict:
+        def _set_attributes(
+            span: Span, attributes_dict: dict[str, str] | None = None
+        ) -> None:
+            if attributes_dict is not None:
                 for att in attributes_dict:
                     span.set_attribute(att, attributes_dict[att])
 
         @wraps(func_or_class)
-        def wrap_with_span_sync(*args, **kwargs):
+        def wrap_with_span_sync(*args: Any, **kwargs: Any) -> Any:
             name = span_name or TracingDecoratorOptions.naming_scheme(func_or_class)
             with tracer.start_as_current_span(
                 name, record_exception=record_exception
@@ -138,7 +145,7 @@ def instrument(
                 return func_or_class(*args, **kwargs)
 
         @wraps(func_or_class)
-        async def wrap_with_span_async(*args, **kwargs):
+        async def wrap_with_span_async(*args: Any, **kwargs: Any) -> Callable:
             name = span_name or TracingDecoratorOptions.naming_scheme(func_or_class)
             with tracer.start_as_current_span(
                 name, record_exception=record_exception
@@ -148,19 +155,20 @@ def instrument(
                 _set_attributes(span, attributes)
                 return await func_or_class(*args, **kwargs)
 
-        if ignore:
-            return func_or_class
-
-        wrapper = (
+        span_wrapper = (
             wrap_with_span_async
             if asyncio.iscoroutinefunction(func_or_class)
             else wrap_with_span_sync
         )
-        wrapper.__signature__ = inspect.signature(func_or_class)
+        span_wrapper.__signature__ = inspect.signature(func_or_class)
 
-        return wrapper
+        return span_wrapper  # type: ignore
 
-    if _func_or_class is None:
-        return span_decorator
-    else:
+    # decorator factory on a class or func
+    # @instrument or @instrument(span_name="my_span", ...)
+    if _func_or_class and inspect.isclass(_func_or_class):
+        return decorate_class(_func_or_class)
+    elif _func_or_class:
         return span_decorator(_func_or_class)
+    else:
+        return span_decorator  # type: ignore
