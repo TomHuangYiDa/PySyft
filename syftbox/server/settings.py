@@ -26,7 +26,7 @@ class ServerSettings(BaseSettings):
     """API key for the email service"""
 
     @field_validator("data_folder", mode="after")
-    def data_folder_abs(cls, v):
+    def data_folder_abs(cls, v) -> Path:
         return Path(v).expanduser().resolve()
 
     @property
