@@ -39,7 +39,7 @@ class SyncDecisionType(Enum):
     DELETE = 3
 
 
-def update_local(client: SyftClientInterface, local_syncstate: FileMetadata, remote_syncstate: FileMetadata):
+def update_local(client: SyftClientInterface, local_syncstate: FileMetadata, remote_syncstate: FileMetadata) -> None:
     diff = get_diff(client.server_client, local_syncstate.path, local_syncstate.signature_bytes)
     abs_path = client.workspace.datasites / local_syncstate.path
     local_data = abs_path.read_bytes()
@@ -56,7 +56,7 @@ def update_local(client: SyftClientInterface, local_syncstate: FileMetadata, rem
     abs_path.write_bytes(new_data)
 
 
-def update_remote(client: SyftClientInterface, local_syncstate: FileMetadata, remote_syncstate: FileMetadata):
+def update_remote(client: SyftClientInterface, local_syncstate: FileMetadata, remote_syncstate: FileMetadata) -> None:
     abs_path = client.workspace.datasites / local_syncstate.path
     local_data = abs_path.read_bytes()
 
@@ -64,16 +64,16 @@ def update_remote(client: SyftClientInterface, local_syncstate: FileMetadata, re
     apply_diff(client.server_client, local_syncstate.path, diff, local_syncstate.hash)
 
 
-def delete_local(client: SyftClientInterface, remote_syncstate: FileMetadata):
+def delete_local(client: SyftClientInterface, remote_syncstate: FileMetadata) -> None:
     abs_path = client.workspace.datasites / remote_syncstate.path
     abs_path.unlink()
 
 
-def delete_remote(client: SyftClientInterface, local_syncstate: FileMetadata):
+def delete_remote(client: SyftClientInterface, local_syncstate: FileMetadata) -> None:
     delete(client.server_client, local_syncstate.path)
 
 
-def create_local(client: SyftClientInterface, remote_syncstate: FileMetadata):
+def create_local(client: SyftClientInterface, remote_syncstate: FileMetadata) -> None:
     abs_path = client.workspace.datasites / remote_syncstate.path
     content_bytes = download(client.server_client, remote_syncstate.path)
     abs_path.parent.mkdir(parents=True, exist_ok=True)
@@ -92,7 +92,7 @@ def create_local_batch(client: SyftClientInterface, remote_syncstates: list[Path
     return zip_file.namelist()
 
 
-def create_remote(client: SyftClientInterface, local_syncstate: FileMetadata):
+def create_remote(client: SyftClientInterface, local_syncstate: FileMetadata) -> None:
     abs_path = client.workspace.datasites / local_syncstate.path
     data = abs_path.read_bytes()
     create(client.server_client, local_syncstate.path, data)
@@ -115,7 +115,7 @@ class SyncDecision(BaseModel):
     remote_syncstate: Optional[FileMetadata]
     is_executed: bool = False
 
-    def execute(self, client: SyftClientInterface):
+    def execute(self, client: SyftClientInterface) -> None:
         if self.operation == SyncDecisionType.NOOP:
             pass
         elif self.action_type == SyncActionType.CREATE_REMOTE:
@@ -143,7 +143,7 @@ class SyncDecision(BaseModel):
         raise ValueError("No path found in SyncDecision")
 
     @property
-    def action_type(self) -> SyncActionType:
+    def action_type(self) -> SyncActionType:  # type: ignore
         if self.operation == SyncDecisionType.NOOP:
             return SyncActionType.NOOP
         if self.operation == SyncDecisionType.CREATE and self.side_to_update == SyncSide.LOCAL:
@@ -278,7 +278,7 @@ class SyncDecision(BaseModel):
         elif self.side_to_update == SyncSide.LOCAL:
             is_valid, reason = self._is_valid_local_decision(abs_path)
         else:
-            is_valid, reason = True, ""
+            is_valid, reason = True, ""  # type: ignore[unreachable]
 
         if not is_valid and show_warnings:
             logger.warning(reason)
