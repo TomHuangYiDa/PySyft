@@ -353,6 +353,12 @@ async def install() -> FileResponse:
     return FileResponse(install_script, media_type="text/plain")
 
 
+@app.get("/icon.png")
+async def icon():
+    icon_path = current_dir / "assets" / "icon.png"
+    return FileResponse(icon_path, media_type="image/png")
+
+
 @app.get("/info")
 async def info() -> dict:
     return {
