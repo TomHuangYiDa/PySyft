@@ -1,11 +1,11 @@
 from syft_event import Response, Server
+import time
 from utils import LoginResponse, body_to_obj
-
 from syftbox.lib import Client
 
 client = Client.load()
 print("> Client", client.email)
-app = Server(app_name="test", client=client, message_timeout=5)
+app = Server(app_name="test", client=client, message_timeout=120)
 
 
 @app.get("/public/rpc/test/listen")
@@ -19,7 +19,9 @@ def login(request):
     headers = {}
 
     headers["content-type"] = "application/json"
-    headers["object-type"] = type(result).__name__
+    headers["x-syft-rpc-object-type"] = type(result).__name__
+
+    time.sleep(10)
 
     return Response(content=result, status_code=200, headers=headers)
 

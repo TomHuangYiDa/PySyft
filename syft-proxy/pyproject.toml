@@ -1,0 +1,20 @@
+[project]
+name = "syft-proxy"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.115.5",
+    "syftbox>=0.2.10",
+]
+
+[dependency-groups]
+dev = [
+    "syft-event",
+    "syft-rpc",
+]
+
+[tool.uv.sources]
+syft-rpc = { path = "../syft-rpc", editable = true }
+syft-event = { path = "../syft-event", editable = true }

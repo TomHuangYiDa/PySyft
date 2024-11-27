@@ -7,11 +7,11 @@ request = Request()
 
 headers = {}
 headers["content-type"] = "application/json"
-headers["object-type"] = type(user).__name__
+headers["x-syft-rpc-object-type"] = type(user).__name__
 response = request.get(
     "syft://madhava@openmined.org/public/rpc/test/listen",
     body=user.dump(),
-    headers=headers
+    headers=headers,
 )
 
 result = response.wait()

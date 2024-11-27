@@ -36,7 +36,12 @@ def process_request(file_path, client):
                 headers = {}
                 status_code = NOT_FOUND
 
-            response_msg = msg.reply(from_sender=client.email, body=body, headers=headers, status_code=status_code)
+            response_msg = msg.reply(
+                from_sender=client.email,
+                body=body,
+                headers=headers,
+                status_code=status_code,
+            )
             response_msg.send(client=client)
     except Exception as e:
         import traceback
@@ -128,7 +133,9 @@ class Server:
         self.datasite = client.email
         self.own_datasite_path = client.datasites / client.email
         self.app_name = app_name
-        self.public_listen_path = self.own_datasite_path / "public" / "rpc" / self.app_name / "listen"
+        self.public_listen_path = (
+            self.own_datasite_path / "public" / "rpc" / self.app_name / "listen"
+        )
         # create listen dir
         os.makedirs(self.public_listen_path, exist_ok=True)
         permission = SyftPermission.mine_with_public_write(email=self.datasite)

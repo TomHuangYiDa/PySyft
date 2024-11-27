@@ -1,5 +1,6 @@
 import json
 import os
+from urllib.parse import urlencode
 import re
 import time
 from collections import defaultdict
@@ -24,6 +25,8 @@ class RPCRegistry:
 
 class SyftBoxURL:
     def __init__(self, url: str):
+        if isinstance(url, SyftBoxURL):
+            url = str(url)
         self.url = url
         self._validate_url()
         self._parsed_url = self._parse_url()
@@ -38,7 +41,11 @@ class SyftBoxURL:
         """Parses the URL using `urlparse` and custom logic for extracting the email."""
         url_without_protocol = self.url[len("syft://") :]
         email, _, path = url_without_protocol.partition("/")
-        return {"protocol": "syft://", "host": email, "path": f"/{path}" if path else "/"}
+        return {
+            "protocol": "syft://",
+            "host": email,
+            "path": f"/{path}" if path else "/",
+        }
 
     @property
     def protocol(self):
@@ -72,6 +79,20 @@ class SyftBoxURL:
     def __repr__(self):
         return f"{self.protocol}{self.host}{self.path}"
 
+    def as_http_params(self) -> dict[str, str]:
+        return {
+            "method": "get",
+            "datasite": self.host,
+            "path": self.path,
+        }
+
+    def to_http_get(self, rpc_url: str) -> str:
+        rpc_url = rpc_url.split("//")[-1]
+        params = self.as_http_params()
+        url_params = urlencode(params)
+        http_url = f"http://{rpc_url}?{url_params}"
+        return http_url
+
 
 serializers[SyftBoxURL] = str
 
@@ -102,7 +123,9 @@ class Message(JSONModel):
             return SyftBoxURL(value)
         if isinstance(value, SyftBoxURL):
             return value
-        raise ValueError(f"Invalid type for url: {type(value)}. Expected str or SyftBoxURL.")
+        raise ValueError(
+            f"Invalid type for url: {type(value)}. Expected str or SyftBoxURL."
+        )
 
     def local_path(self, client):
         return self.url.to_local_path(client.workspace.datasites)
@@ -144,7 +167,11 @@ class RequestMessage(Message):
     message_type: str = "request"
 
     def reply(
-        self, from_sender: str, body: object | str | bytes, headers: dict[str, str] | None, status_code: int = 200
+        self,
+        from_sender: str,
+        body: object | str | bytes,
+        headers: dict[str, str] | None,
+        status_code: int = 200,
     ) -> Self:
         if headers is None:
             headers = {}
@@ -190,7 +217,7 @@ class Future(BaseModel):
             if self.value is not None:
                 return self.value
             time.sleep(0.1)
-        raise Exception("Timeout waiting for response")
+        raise TimeoutError(f"Timeout reached waiting {timeout} for response")
 
     @property
     def resolve(self):
@@ -220,7 +247,9 @@ class Request:
         syftbox_url = SyftBoxURL(url)
         return self.send_request(syftbox_url, body=body, headers=headers)
 
-    def send_request(self, url, body: Any, headers: dict[str, str] | None = None) -> Future:
+    def send_request(
+        self, url, body: Any, headers: dict[str, str] | None = None
+    ) -> Future:
         if headers is None:
             headers = {}
         m = RequestMessage(

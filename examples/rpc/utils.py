@@ -1,6 +1,8 @@
 from syft_rpc import JSONModel
 from syft_rpc import Future
 
+OBJECT_TYPE_HEADER = "x-syft-rpc-object-type"
+
 
 class User(JSONModel):
     id: int
@@ -16,8 +18,8 @@ TypeRegistry = {"User": User, "LoginResponse": LoginResponse}
 
 
 def to_obj(obj, headers):
-    if "object-type" in headers and headers["object-type"] in TypeRegistry:
-        constructor = TypeRegistry[headers["object-type"]]
+    if OBJECT_TYPE_HEADER in headers and headers[OBJECT_TYPE_HEADER] in TypeRegistry:
+        constructor = TypeRegistry[headers[OBJECT_TYPE_HEADER]]
         return constructor(**obj)
 
 
