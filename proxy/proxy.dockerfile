@@ -1,6 +1,8 @@
 # docker build -f proxy/proxy.dockerfile -t syftbox-proxy proxy
 # docker run -d -p 80:80 -p 443:443 -v $(pwd)/proxy/server_nginx.conf:/etc/nginx/nginx.conf --name server-syftbox-proxy syftbox-proxy
-# docker run -d -p 9080:80 -p 9443:443 -v $(pwd)/proxy/client_nginx.conf:/etc/nginx/nginx.conf --name client-syftbox-proxy syftbox-proxy
+
+# client
+# docker run -d -p 9980:80 -p 9943:443 -v $(pwd)/proxy/client_nginx.conf:/etc/nginx/nginx.conf --name client-syftbox-proxy syftbox-proxy
 
 
 # bore + tls
