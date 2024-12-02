@@ -8,8 +8,11 @@ from threading import Thread
 from syft_rpc.rpc import RequestMessage
 from watchdog.events import FileSystemEventHandler
 from watchdog.observers import Observer
+import threading
+from pathspec import PathSpec
 
 from syftbox.lib import SyftPermission
+from syft_rpc import SyftBoxURL
 
 dispatch = {}
 
@@ -17,32 +20,87 @@ dispatch = {}
 NOT_FOUND = 404
 
 
-def process_request(file_path, client):
+def get_request_handler(func):
     """Process the file that is detected."""
-    print(f"Processing file: {file_path}")
-    try:
-        with open(file_path, "rb") as file:
-            msg = RequestMessage.load(file.read())
-            print("msg.path", msg.url_path, msg.url_path in dispatch)
-            if msg.url_path in dispatch:
-                route = dispatch[msg.url_path]
-                response = route(msg)
+    print("making get request handler")
+
+    def handler(file_path, client):
+        print(f"Processing file: {file_path}")
+        try:
+            with open(file_path, "rb") as file:
+                msg = RequestMessage.load(file.read())
+                print("msg.path", msg.url_path, msg.url_path in dispatch)
+
+                response = func(msg)
                 print("got response from function", response, type(response))
                 body = response.content
                 headers = response.headers
                 status_code = response.status_code
-            else:
-                body = b""
-                headers = {}
-                status_code = NOT_FOUND
 
-            response_msg = msg.reply(
-                from_sender=client.email,
-                body=body,
-                headers=headers,
-                status_code=status_code,
-            )
-            response_msg.send(client=client)
+                response_msg = msg.reply(
+                    from_sender=client.email,
+                    body=body,
+                    headers=headers,
+                    status_code=status_code,
+                )
+                response_msg.send(client=client)
+        except Exception as e:
+            import traceback
+
+            print(traceback.format_exc())
+            print(f"Failed to process request: {file_path}. {e}")
+
+    return handler
+
+
+def file_change_handler(func):
+    """Process the file that is detected."""
+    print("making file_change_handler")
+
+    def handler(file_path, client):
+        print(f"Processing file: {file_path}")
+        try:
+            with open(file_path, "rb") as file:
+                msg = RequestMessage.load(file.read())
+                print("msg.path", msg.url_path, msg.url_path in dispatch)
+
+                response = func(msg)
+                print("got response from function", response, type(response))
+                body = response.content
+                headers = response.headers
+                status_code = response.status_code
+
+                response_msg = msg.reply(
+                    from_sender=client.email,
+                    body=body,
+                    headers=headers,
+                    status_code=status_code,
+                )
+                response_msg.send(client=client)
+        except Exception as e:
+            import traceback
+
+            print(traceback.format_exc())
+            print(f"Failed to process request: {file_path}. {e}")
+
+    return handler
+
+
+def process_request(file_path, client):
+    """Process the file that is detected."""
+    try:
+        print(f"Processing file: {file_path}")
+        url = SyftBoxURL(file_path)
+        route = url.path
+        print("got a file", route)
+
+        for spec, handler in dispatch.items():
+            print("Checking spec", spec, route)
+            if spec.match_file(route):
+                print("found match, running handler")
+                handler(file_path, client)
+                return
+
     except Exception as e:
         import traceback
 
@@ -144,13 +202,23 @@ class Server:
         start_cleanup_in_thread(self.public_listen_path, message_timeout)
         print(f"Listening on: {self.public_listen_path}")
 
-    def register(self, path: str, func):
-        print(f"Registering path: {path}")
-        dispatch[path] = func
+    def register(self, glob_path: str, func):
+        print(f"Registering path: {glob_path}")
+        spec = PathSpec.from_lines("gitwildmatch", [glob_path])
+        dispatch[spec] = func
 
     def get(self, path: str):
         def decorator(function: Callable):
-            self.register(path, function)
+            func = get_request_handler(function)
+            self.register(path, func)
+            return function
+
+        return decorator
+
+    def file_change(self, path: str):
+        def decorator(function: Callable):
+            func = file_change_handler(function)
+            self.register(path, func)
             return function
 
         return decorator
@@ -175,6 +243,19 @@ class Server:
         finally:
             loop.run_until_complete(self.shutdown())
             loop.close()
+
+    def start(self):
+        """Starts the server without blocking the current thread."""
+        loop = asyncio.get_event_loop()
+
+        def start_loop():
+            asyncio.set_event_loop(loop)
+            print("Server started in non-blocking mode.")
+            loop.run_until_complete(self.run_forever())
+
+        # Run the event loop in a background thread
+        thread = threading.Thread(target=start_loop, daemon=True)
+        thread.start()
 
     async def shutdown(self):
         """Custom shutdown logic."""
