@@ -6,8 +6,8 @@ from pathlib import Path
 from typing import List, Optional
 
 from syftbox.lib.permissions import PermissionFile, PermissionRule
-from syftbox.server.settings import ServerSettings
 from syftbox.server.models.sync_models import FileMetadata
+from syftbox.server.settings import ServerSettings
 
 
 def save_file_metadata(conn: sqlite3.Connection, metadata: FileMetadata):
@@ -39,9 +39,7 @@ def delete_file_metadata(conn: sqlite3.Connection, path: str):
         raise ValueError(f"Failed to delete metadata for {path}.")
 
 
-def get_all_metadata(
-    conn: sqlite3.Connection, path_like: Optional[str] = None
-) -> list[FileMetadata]:
+def get_all_metadata(conn: sqlite3.Connection, path_like: Optional[str] = None) -> list[FileMetadata]:
     query = "SELECT * FROM file_metadata"
     params = ()
 
@@ -141,11 +139,9 @@ def query_rules_for_permfile(cursor, file: PermissionFile):
     return cursor.fetchall()
 
 
-def get_rules_for_permfile(cursor, file: PermissionFile):
-    return [
-        PermissionRule.from_db_row(row)
-        for row in query_rules_for_permfile(cursor, file)
-    ]
+def get_rules_for_permfile(connection: sqlite3.Connection, file: PermissionFile):
+    cursor = connection.cursor()
+    return [PermissionRule.from_db_row(row) for row in query_rules_for_permfile(cursor, file)]
 
 
 def get_all_files_under_dir(cursor, dir_path):
@@ -189,15 +185,14 @@ def get_all_files_under_syftperm(cursor, permfile: PermissionFile) -> List[Path]
     ]
 
 
-def get_rules_for_path(cursor, path: Path):
+def get_rules_for_path(connection: sqlite3.Connection, path: Path):
     parents = path.parents
     placeholders = ",".join("?" * len(parents))
+    cursor = connection.cursor()
     cursor.execute(
         """
         SELECT * FROM rules WHERE permfile_dir in ({})
-    """.format(
-            placeholders
-        ),
+    """.format(placeholders),
         [str(x) for x in parents],
     )
     return [PermissionRule.from_db_row(row) for row in cursor.fetchall()]
@@ -213,8 +208,8 @@ def set_rules_for_permfile(connection, file: PermissionFile):
 
         cursor.execute(
             """
-        DELETE FROM rules 
-        WHERE permfile_path = ? 
+        DELETE FROM rules
+        WHERE permfile_path = ?
         """,
             (str(file.filepath),),
         )
@@ -226,21 +221,17 @@ def set_rules_for_permfile(connection, file: PermissionFile):
 
         for rule in file.rules:
             for _id, file_in_dir in files_under_dir:
-                match, match_for_email = rule.filepath_matches_rule_path(
-                    file_in_dir.path
-                )
+                match, match_for_email = rule.filepath_matches_rule_path(file_in_dir.path)
                 if match:
-                    rule2files.append(
-                        [str(rule.permfile_path), rule.priority, _id, match_for_email]
-                    )
+                    rule2files.append([str(rule.permfile_path), rule.priority, _id, match_for_email])
 
         rule_rows = [tuple(rule.to_db_row().values()) for rule in file.rules]
 
         cursor.executemany(
             """
         INSERT INTO rules (
-            permfile_path, permfile_dir, priority, path, user, 
-            can_read, can_create, can_write, admin, 
+            permfile_path, permfile_dir, priority, path, user,
+            can_read, can_create, can_write, admin,
             disallow, terminal
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(permfile_path, priority) DO UPDATE SET
@@ -269,13 +260,14 @@ def set_rules_for_permfile(connection, file: PermissionFile):
         raise e
 
 
-def get_read_permissions_for_user(user: str):
+def get_read_permissions_for_user(connection: sqlite3.Connection, user: str):
+    cursor = connection.cursor()
     res = cursor.execute(
         """
     SELECT path,
     (
         SELECT COALESCE(max(
-            CASE 
+            CASE
                 WHEN can_read AND NOT disallow AND NOT terminal THEN rule_prio
                 WHEN can_read AND NOT disallow AND terminal THEN terminal_prio
                 ELSE 0
@@ -287,7 +279,7 @@ def get_read_permissions_for_user(user: str):
                 WHEN can_read AND disallow AND terminal THEN terminal_prio
                 ELSE 0
             END
-        ), 0)  
+        ), 0)
         FROM (
             SELECT can_read, disallow, terminal,
                 row_number() OVER (ORDER BY rules.priority DESC) AS rule_prio,

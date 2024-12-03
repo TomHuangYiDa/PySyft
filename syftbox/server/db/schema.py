@@ -11,6 +11,8 @@ def get_db(path: str):
         conn.execute("PRAGMA journal_mode=WAL;")
         conn.execute("PRAGMA busy_timeout=5000;")
         conn.execute("PRAGMA foreign_keys = ON;")
+        conn.row_factory = sqlite3.Row
+
         # Create the table if it doesn't exist
         conn.execute(
             """
