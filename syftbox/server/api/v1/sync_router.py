@@ -17,7 +17,6 @@ from syftbox.server.db.schema import get_db
 from syftbox.server.settings import ServerSettings, get_server_settings
 from syftbox.server.users.auth import get_current_user
 
-
 from ...models.sync_models import (
     ApplyDiffRequest,
     ApplyDiffResponse,
