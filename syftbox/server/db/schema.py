@@ -33,6 +33,7 @@ def get_db(path: str):
             CREATE TABLE IF NOT EXISTS rules (
                 permfile_path varchar(1000) NOT NULL,
                 permfile_dir varchar(1000) NOT NULL,
+                permfile_depth INTEGER NOT NULL,
                 priority INTEGER NOT NULL,
                 path varchar(1000) NOT NULL,
                 user varchar(1000) NOT NULL,

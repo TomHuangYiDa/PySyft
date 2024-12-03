@@ -1,11 +1,11 @@
-from pydantic import model_validator
+import re
+import sqlite3
 from enum import Enum
 from pathlib import Path
 from typing import List, Optional, Tuple
-import re
+
 import yaml
-import sqlite3
-from pydantic import BaseModel
+from pydantic import BaseModel, model_validator
 from wcmatch.glob import globmatch
 
 
@@ -41,15 +41,17 @@ class PermissionRule(BaseModel):
     def permfile_path(self):
         return self.dir_path / ".syftperm"
 
+    @property
+    def depth(self):
+        return len(self.permfile_path.parts)
+
         # write model validator that accepts either a single string or a list of strings as permissions when initializing
 
     @model_validator(mode="before")
     @classmethod
     def validate_permissions(cls, values):
         # check if values only contains keys that are in the model
-        invalid_keys = set(values.keys()) - (
-            set(cls.model_fields.keys()) | set(["type"])
-        )
+        invalid_keys = set(values.keys()) - (set(cls.model_fields.keys()) | set(["type"]))
         if len(invalid_keys) > 0:
             raise PermissionParsingError(
                 f"rule yaml contains invalid keys {invalid_keys}, only {cls.model_fields.keys()} are allowed"
@@ -67,32 +69,20 @@ class PermissionRule(BaseModel):
 
         # if user is not a valid email, or *, raise an error
         email = values.get("user")
-        if email != "*" and not bool(
-            re.search(r"^[\w\.\+\-]+\@[\w]+\.[a-z]{2,3}$", email)
-        ):
-            raise PermissionParsingError(
-                f"user {values.get('user')} is not a valid email or *"
-            )
+        if email != "*" and not bool(re.search(r"^[\w\.\+\-]+\@[\w]+\.[a-z]{2,3}$", email)):
+            raise PermissionParsingError(f"user {values.get('user')} is not a valid email or *")
 
         # listify permissions
         perms = values.get("permissions")
         if isinstance(perms, str):
             perms = [perms]
         if isinstance(perms, list):
-            values["permissions"] = [
-                PermissionType[p.upper()] if isinstance(p, str) else p for p in perms
-            ]
+            values["permissions"] = [PermissionType[p.upper()] if isinstance(p, str) else p for p in perms]
         else:
-            raise ValueError(
-                f"permissions should be a list of strings or a single string, received {type(perms)}"
-            )
+            raise ValueError(f"permissions should be a list of strings or a single string, received {type(perms)}")
 
         path = values.get("path")
-        if (
-            "**" in path
-            and "{useremail}" in path
-            and path.index("**") < path.rindex("{useremail}")
-        ):
+        if "**" in path and "{useremail}" in path and path.index("**") < path.rindex("{useremail}"):
             # this would make creating the path2rule mapping more challenging to compute beforehand
             raise PermissionParsingError("** can never be after {useremail}")
 
@@ -119,9 +109,7 @@ class PermissionRule(BaseModel):
         return cls(
             dir_path=Path(row["permfile_path"]).parent,
             path=row["path"],
-            user=row[
-                "user"
-            ],  # Default to all users since DB schema doesn't show user field
+            user=row["user"],  # Default to all users since DB schema doesn't show user field
             allow=not row["disallow"],
             terminal=bool(row["terminal"]),
             priority=row["priority"],
@@ -133,6 +121,7 @@ class PermissionRule(BaseModel):
         return {
             "permfile_path": str(self.permfile_path),  # Reconstruct full path
             "permfile_dir": str(self.dir_path),
+            "permfile_depth": self.depth,
             "priority": self.priority,
             "path": self.path,
             "user": self.user,
@@ -162,13 +151,9 @@ class PermissionRule(BaseModel):
         match_for_email = None
         if self.has_email_template:
             match = False
-            emails_in_file_path = [
-                part for part in relative_file_path.split("/") if "@" in part
-            ]  # todo: improve this
+            emails_in_file_path = [part for part in relative_file_path.split("/") if "@" in part]  # todo: improve this
             for email in emails_in_file_path:
-                if globmatch(
-                    self.path.replace("{useremail}", email), str(relative_file_path)
-                ):
+                if globmatch(self.path.replace("{useremail}", email), str(relative_file_path)):
                     match = True
                     match_for_email = email
                     break
@@ -190,6 +175,10 @@ class PermissionFile(BaseModel):
     rules: List[PermissionRule]
 
     @property
+    def depth(self):
+        return len(self.filepath.parts)
+
+    @property
     def dir_path(self):
         return self.filepath.parent
 
@@ -203,9 +192,7 @@ class PermissionFile(BaseModel):
     @classmethod
     def from_rule_dicts(cls, permfile_file_path, content, rule_dicts):
         if not isinstance(rule_dicts, list):
-            raise ValueError(
-                f"rules should be passed as a list of dicts, received {type(rule_dicts)}"
-            )
+            raise ValueError(f"rules should be passed as a list of dicts, received {type(rule_dicts)}")
         rules = []
         dir_path = Path(permfile_file_path).parent
         for i, rule_dict in enumerate(rule_dicts):
@@ -239,6 +226,7 @@ class ComputedPermission(BaseModel):
     @classmethod
     def from_user_and_path(cls, cursor: sqlite3.Cursor, user: str, path: Path):
         from syftbox.server.db.db import get_rules_for_path
+
         rules: List[PermissionRule] = get_rules_for_path(cursor, path)
 
         permission = cls(user=user, file_path=path)

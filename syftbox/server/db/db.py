@@ -230,10 +230,10 @@ def set_rules_for_permfile(connection, file: PermissionFile):
         cursor.executemany(
             """
         INSERT INTO rules (
-            permfile_path, permfile_dir, priority, path, user,
+            permfile_path, permfile_dir, permfile_depth, priority, path, user,
             can_read, can_create, can_write, admin,
             disallow, terminal
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(permfile_path, priority) DO UPDATE SET
             path = excluded.path,
             user = excluded.user,
@@ -262,6 +262,7 @@ def set_rules_for_permfile(connection, file: PermissionFile):
 
 def get_read_permissions_for_user(connection: sqlite3.Connection, user: str):
     cursor = connection.cursor()
+
     res = cursor.execute(
         """
     SELECT path,
@@ -280,10 +281,25 @@ def get_read_permissions_for_user(connection: sqlite3.Connection, user: str):
                 ELSE 0
             END
         ), 0)
+        or
+        COALESCE(max(
+            CASE
+                WHEN admin AND NOT disallow AND NOT terminal THEN rule_prio
+                WHEN admin AND NOT disallow AND terminal THEN terminal_prio
+                ELSE 0
+            END
+        ) >
+        max(
+            CASE
+                WHEN admin AND disallow AND NOT terminal THEN rule_prio
+                WHEN admin AND disallow AND terminal THEN terminal_prio
+                ELSE 0
+            END
+        ), 0)
         FROM (
-            SELECT can_read, disallow, terminal,
-                row_number() OVER (ORDER BY rules.priority DESC) AS rule_prio,
-                row_number() OVER (ORDER BY rules.priority ASC) * 1000000 AS terminal_prio
+            SELECT can_read, admin, disallow, terminal,
+                row_number() OVER (ORDER BY rules.permfile_depth, rules.priority ASC) AS rule_prio,
+                row_number() OVER (ORDER BY rules.permfile_depth, rules.priority DESC) * 1000000 AS terminal_prio
             FROM rule_files
             JOIN rules ON rule_files.permfile_path = rules.permfile_path and rule_files.priority = rules.priority
             WHERE rule_files.file_id = f.id and (rules.user = ? or rules.user = "*" or rule_files.match_for_email = ?)
