@@ -233,8 +233,8 @@ def test_get_all_read_permissions_for_user(connection_with_tables: sqlite3.Conne
 
     assert len(res) == 3
     assert res[0]["path"] == "user@example.org/test2/a.txt"
-    assert res[0]["read_permission"] is True
+    assert res[0]["read_permission"]
     assert res[1]["path"] == "user@example.org/test2/b.txt"
-    assert res[1]["read_permission"] is False
+    assert not res[1]["read_permission"]
     assert res[2]["path"] == "user@example.org/test2/c.txt"
-    assert res[2]["read_permission"] is True
+    assert res[2]["read_permission"]

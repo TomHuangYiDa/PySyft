@@ -30,7 +30,7 @@ def get_db(path: str):
         # Create a table for storing file information
         conn.execute(
             """
-            CREATE TABLE rules (
+            CREATE TABLE IF NOT EXISTS rules (
                 permfile_path varchar(1000) NOT NULL,
                 permfile_dir varchar(1000) NOT NULL,
                 priority INTEGER NOT NULL,
@@ -49,7 +49,7 @@ def get_db(path: str):
 
         conn.execute(
             """
-        CREATE TABLE rule_files (
+        CREATE TABLE IF NOT EXISTS rule_files (
             permfile_path varchar(1000) NOT NULL,
             priority INTEGER NOT NULL,
             file_id INTEGER NOT NULL,
