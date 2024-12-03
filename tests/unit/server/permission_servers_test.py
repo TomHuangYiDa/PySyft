@@ -301,6 +301,38 @@ def test_single_read_permission(connection_with_tables: sqlite3.Connection):
     assert res[0]["read_permission"]
 
 
+def test_single_admin_permission(connection_with_tables: sqlite3.Connection):
+    cursor = connection_with_tables.cursor()
+    path = "user@example.org/test2/a.txt"
+    insert_file_metadata(cursor=cursor, fileid=1, path=path)
+
+    insert_rule(
+        cursor=cursor,
+        permfile_path="user@example.org/test2/.syftperm",
+        priority=1,
+        path="*",
+        user="*",
+        can_read=False,
+        admin=True,
+        disallow=False,
+        terminal=False,
+    )
+
+    insert_rule_files(
+        cursor=cursor,
+        permfile_path="user@example.org/test2/.syftperm",
+        priority=1,
+        fileid=1,
+    )
+
+    connection_with_tables.commit()
+    res = [dict(x) for x in get_read_permissions_for_user(connection_with_tables, "user@example.org")]
+
+    assert len(res) == 1
+    assert res[0]["path"] == path
+    assert res[0]["read_permission"]
+
+
 def test_disallow_permission(connection_with_tables: sqlite3.Connection):
     cursor = connection_with_tables.cursor()
 
