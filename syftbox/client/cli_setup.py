@@ -6,17 +6,26 @@ import json
 import shutil
 from pathlib import Path
 
+import httpx
+import typer
 from rich import print as rprint
 from rich.prompt import Confirm, Prompt
 
 from syftbox.__version__ import __version__
+from syftbox.client.auth import authenticate_user
 from syftbox.client.client2 import METADATA_FILENAME
 from syftbox.lib.client_config import SyftClientConfig
 from syftbox.lib.constants import DEFAULT_DATA_DIR
 from syftbox.lib.exceptions import ClientConfigException
 from syftbox.lib.validators import DIR_NOT_EMPTY, is_valid_dir, is_valid_email
+from syftbox.lib.workspace import SyftWorkspace
 
 __all__ = ["setup_config_interactive"]
+
+
+def is_empty(data_dir: Path) -> bool:
+    """True if the data_dir is empty"""
+    return not any(data_dir.iterdir())
 
 
 def has_old_syftbox_version(data_dir: Path) -> bool:
@@ -39,20 +48,38 @@ def prompt_delete_old_data_dir(data_dir: Path) -> bool:
 def get_migration_decision(data_dir: Path):
     migrate_datasite = False
     if data_dir.exists():
-        if has_old_syftbox_version(data_dir):
+        if is_empty(data_dir):
+            migrate_datasite = False
+        elif has_old_syftbox_version(data_dir):
             # we need this extra if because we do 2 things:
             # 1. determine if we want to remove
             # 2. determine if we want to migrate
             if prompt_delete_old_data_dir(data_dir):
                 rprint("Removing old syftbox folder")
-                shutil.rmtree(str(data_dir))
+                apps_dir = SyftWorkspace(data_dir).apps
+                paths_to_exclude = [apps_dir]
+                # Remove everything except the paths in paths_to_exclude
+                for item in data_dir.iterdir():
+                    if item not in paths_to_exclude:
+                        if item.is_dir():
+                            shutil.rmtree(item)
+                        else:
+                            item.unlink()
                 migrate_datasite = False
             else:
                 migrate_datasite = True
     return migrate_datasite
 
 
-def setup_config_interactive(config_path: Path, email: str, data_dir: Path, server: str, port: int) -> SyftClientConfig:
+def setup_config_interactive(
+    config_path: Path,
+    email: str,
+    data_dir: Path,
+    server: str,
+    port: int,
+    skip_auth: bool = False,
+    skip_verify_install: bool = False,
+) -> SyftClientConfig:
     """Setup the client configuration interactively. Called from CLI"""
 
     config_path = config_path.expanduser().resolve()
@@ -88,6 +115,14 @@ def setup_config_interactive(config_path: Path, email: str, data_dir: Path, serv
         if port != conf.client_url.port:
             conf.set_port(port)
 
+    # Short-lived client for all pre-authentication requests
+    login_client = httpx.Client(base_url=str(conf.server_url))
+    if not skip_verify_install:
+        verify_installation(conf, login_client)
+
+    if not skip_auth:
+        conf.access_token = authenticate_user(conf, login_client)
+
     # DO NOT SAVE THE CONFIG HERE.
     # We don't know if the client will accept the config yet
     return conf
@@ -122,3 +157,31 @@ def prompt_email() -> str:
             rprint(f"[bold red]Invalid email[/bold red]: '{email}'")
             continue
         return email
+
+
+def verify_installation(conf: SyftClientConfig, client: httpx.Client) -> None:
+    try:
+        response = client.get("/info")
+        response.raise_for_status()
+        server_info = response.json()
+        server_version = server_info["version"]
+        local_version = __version__
+
+        if server_version == local_version:
+            return
+
+        should_continue = Confirm.ask(
+            f"\n[yellow]Server version ({server_version}) does not match your client version ({local_version}).\n"
+            f"[bold](recommended)[/bold] To update, run:\n\n"
+            f"[bold]curl -LsSf https://syftbox.openmined.org/install.sh | sh[/bold][/yellow]\n\n"
+            f"Continue without updating?"
+        )
+        if not should_continue:
+            raise typer.Exit()
+
+    except (httpx.HTTPError, KeyError):
+        should_continue = Confirm.ask(
+            "\n[bold red]Could not connect to the SyftBox server, continue anyway?[/bold red]"
+        )
+        if not should_continue:
+            raise typer.Exit()
