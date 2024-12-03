@@ -3,12 +3,11 @@ import shutil
 import sqlite3
 import tempfile
 from pathlib import Path
-from typing import Optional
+from typing import List, Optional
 
+from syftbox.lib.permissions import PermissionFile, PermissionRule
 from syftbox.server.settings import ServerSettings
 from syftbox.server.models.sync_models import FileMetadata
-
-
 
 
 def save_file_metadata(conn: sqlite3.Connection, metadata: FileMetadata):
@@ -40,7 +39,9 @@ def delete_file_metadata(conn: sqlite3.Connection, path: str):
         raise ValueError(f"Failed to delete metadata for {path}.")
 
 
-def get_all_metadata(conn: sqlite3.Connection, path_like: Optional[str] = None) -> list[FileMetadata]:
+def get_all_metadata(
+    conn: sqlite3.Connection, path_like: Optional[str] = None
+) -> list[FileMetadata]:
     query = "SELECT * FROM file_metadata"
     params = ()
 
@@ -92,7 +93,11 @@ def get_all_datasites(conn: sqlite3.Connection) -> list[str]:
 
 
 def move_with_transaction(
-    conn: sqlite3.Connection, *, origin_path: Path, metadata: FileMetadata, server_settings: ServerSettings
+    conn: sqlite3.Connection,
+    *,
+    origin_path: Path,
+    metadata: FileMetadata,
+    server_settings: ServerSettings,
 ):
     """The file system and database do not share transactions,
     so this operation is not atomic.
@@ -124,52 +129,80 @@ def move_with_transaction(
     # Delete the temp file if it exists
     if os.path.exists(temp_path):
         os.remove(temp_path)
-        
-        
-        
+
+
 def query_rules_for_permfile(cursor, file: PermissionFile):
-    cursor.execute("""
+    cursor.execute(
+        """
         SELECT * FROM rules WHERE permfile_path = ? ORDER BY priority
-    """, (str(file.filepath),))
-    return cursor.fetchall()    
-
-def get_rules_for_permfile(cursor, file: PermissionFile):
-    return [PermissionRule.from_db_row(row) for row in query_rules_for_permfile(cursor, file)]
-        
-        
-
-def get_all_files_under_dir(cursor, dir_path):
-    cursor.execute("""
-        SELECT * FROM file_metadata WHERE path LIKE ?
-    """, (str(dir_path) + "/%",))
+    """,
+        (str(file.filepath),),
+    )
     return cursor.fetchall()
 
-from syftbox.server.sync.models import FileMetadata
+
+def get_rules_for_permfile(cursor, file: PermissionFile):
+    return [
+        PermissionRule.from_db_row(row)
+        for row in query_rules_for_permfile(cursor, file)
+    ]
+
+
+def get_all_files_under_dir(cursor, dir_path):
+    cursor.execute(
+        """
+        SELECT * FROM file_metadata WHERE path LIKE ?
+    """,
+        (str(dir_path) + "/%",),
+    )
+    return cursor.fetchall()
 
 
 def get_all_files(cursor):
-    cursor.execute("""
+    cursor.execute(
+        """
         SELECT * FROM file_metadata
-    """)
+    """
+    )
     return cursor.fetchall()
 
+
 def get_all_files_under_syftperm(cursor, permfile: PermissionFile) -> List[Path]:
-    cursor.execute("""
+    cursor.execute(
+        """
         SELECT * FROM file_metadata WHERE path LIKE ?
-    """, (str(permfile.dir_path) + "/%",))
-    return [(row["id"], FileMetadata(path=Path(row["path"]), hash=row["hash"], signature=row["signature"], file_size=row["file_size"], last_modified=row["last_modified"]))
-            for row in cursor.fetchall()]
-    
+    """,
+        (str(permfile.dir_path) + "/%",),
+    )
+    return [
+        (
+            row["id"],
+            FileMetadata(
+                path=Path(row["path"]),
+                hash=row["hash"],
+                signature=row["signature"],
+                file_size=row["file_size"],
+                last_modified=row["last_modified"],
+            ),
+        )
+        for row in cursor.fetchall()
+    ]
+
+
 def get_rules_for_path(cursor, path: Path):
     parents = path.parents
     placeholders = ",".join("?" * len(parents))
-    cursor.execute("""
+    cursor.execute(
+        """
         SELECT * FROM rules WHERE permfile_dir in ({})
-    """.format(placeholders), [str(x) for x in parents])
+    """.format(
+            placeholders
+        ),
+        [str(x) for x in parents],
+    )
     return [PermissionRule.from_db_row(row) for row in cursor.fetchall()]
 
-    
-    
+
 def set_rules_for_permfile(connection, file: PermissionFile):
     """
     Atomically set the rules for a permission file. Basically its just a write operation, but
@@ -177,30 +210,34 @@ def set_rules_for_permfile(connection, file: PermissionFile):
     """
     try:
         cursor = connection.cursor()
-        
+
         cursor.execute(
-        """
+            """
         DELETE FROM rules 
         WHERE permfile_path = ? 
-        """,  
-            (str(file.filepath),)
+        """,
+            (str(file.filepath),),
         )
 
-            
         # TODO
         files_under_dir = get_all_files_under_syftperm(cursor, file)
-        
+
         rule2files = []
-        
+
         for rule in file.rules:
             for _id, file_in_dir in files_under_dir:
-                match, match_for_email = rule.filepath_matches_rule_path(file_in_dir.path)
+                match, match_for_email = rule.filepath_matches_rule_path(
+                    file_in_dir.path
+                )
                 if match:
-                    rule2files.append([str(rule.permfile_path), rule.priority, _id, match_for_email])                
-        
+                    rule2files.append(
+                        [str(rule.permfile_path), rule.priority, _id, match_for_email]
+                    )
+
         rule_rows = [tuple(rule.to_db_row().values()) for rule in file.rules]
-            
-        cursor.executemany("""
+
+        cursor.executemany(
+            """
         INSERT INTO rules (
             permfile_path, permfile_dir, priority, path, user, 
             can_read, can_create, can_write, admin, 
@@ -215,22 +252,26 @@ def set_rules_for_permfile(connection, file: PermissionFile):
             admin = excluded.admin,
             disallow = excluded.disallow,
             terminal = excluded.terminal;
-        """, rule_rows)
-        
-        
-        cursor.executemany("""
+        """,
+            rule_rows,
+        )
+
+        cursor.executemany(
+            """
             INSERT INTO rule_files (permfile_path, priority, file_id, match_for_email) VALUES (?, ?, ?, ?)
-        """, rule2files)
-        
-        
+        """,
+            rule2files,
+        )
+
         connection.commit()
     except Exception as e:
         connection.rollback()
         raise e
-    
-    
+
+
 def get_read_permissions_for_user(user: str):
-    res = cursor.execute("""
+    res = cursor.execute(
+        """
     SELECT path,
     (
         SELECT COALESCE(max(
@@ -257,10 +298,7 @@ def get_read_permissions_for_user(user: str):
         )
     ) AS read_permission
     FROM file_metadata f
-    """, (user, user))
+    """,
+        (user, user),
+    )
     return res.fetchall()
-
-
-
-
-

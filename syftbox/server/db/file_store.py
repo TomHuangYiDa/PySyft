@@ -3,10 +3,10 @@ from pathlib import Path
 from pydantic import BaseModel
 
 from syftbox.server.settings import ServerSettings
-from syftbox.server.sync import db
-from syftbox.server.sync.db import get_db
-from syftbox.server.sync.hash import hash_file
-from syftbox.server.sync.models import AbsolutePath, FileMetadata, RelativePath
+from syftbox.server.db import db
+from syftbox.server.db.schema import get_db
+from syftbox.lib.hash import hash_file
+from syftbox.server.models.sync_models import AbsolutePath, FileMetadata, RelativePath
 
 
 class SyftFile(BaseModel):
