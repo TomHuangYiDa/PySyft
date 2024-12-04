@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
+import yaml
 from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import (
@@ -27,6 +28,7 @@ from syftbox.lib.lib import (
     Jsonable,
     get_datasites,
 )
+from syftbox.lib.permissions import PermissionFile
 from syftbox.server.analytics import log_analytics_event
 from syftbox.server.db import db
 from syftbox.server.db.schema import get_db
@@ -140,6 +142,15 @@ def init_db(settings: ServerSettings) -> None:
         if not abs_path.exists():
             logger.info(f"{m.path} not found in {settings.snapshot_folder}, deleting from db")
             db.delete_file_metadata(cur, m.path.as_posix())
+
+    # fill the permission tables
+    for file in settings.snapshot_folder.rglob("syftperm.yaml"):
+        content = file.read_text()
+        rule_dicts = yaml.safe_load(content)
+        perm_file = PermissionFile.from_rule_dicts(
+            permfile_file_path=file.relative_to(settings.snapshot_folder), rule_dicts=rule_dicts, content=content
+        )
+        db.set_rules_for_permfile(con, perm_file)
 
     cur.close()
     con.commit()
