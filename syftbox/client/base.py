@@ -75,3 +75,15 @@ class SyftClientInterface(Protocol):
     def log_analytics_event(self, event_name: str, **kwargs) -> None:
         """Log an analytics event to the server."""
         ...  # pragma: no cover
+
+
+class MetricCollector(Protocol):
+    """
+    Protocol for classes that collect performance metrics.
+    """
+
+    client_config: SyftClientConfig
+
+    def collect_metrics(self, num_runs: int) -> dict:
+        """Calculate performance metrics."""
+        ...
