@@ -1,5 +1,7 @@
+import json
 import re
 import sqlite3
+from collections import defaultdict
 from enum import Enum
 from pathlib import Path
 from typing import List, Optional, Tuple
@@ -271,3 +273,61 @@ class ComputedPermission(BaseModel):
                     self.perms[permtype] = rule.allow
                 if rule.terminal:
                     self.terminal[permtype] = True
+
+
+# migration code, can be deleted after prod migration is done
+
+
+def map_email_to_permissions(json_data: dict) -> dict:
+    email_permissions = defaultdict(list)
+    for permission, emails in json_data.items():
+        for email in emails:
+            email_permissions[email].append(permission)
+    return email_permissions
+
+
+def convert_permission(old_perm_dict: dict) -> dict:
+    terminal = old_perm_dict.pop("terminal", False)
+    old_perm_dict.pop("filepath", None)  # not needed, we use the actual path of the perm file
+
+    user_permissions = map_email_to_permissions(old_perm_dict)
+    output = []
+
+    for email in user_permissions:
+        new_perm_dict = {
+            "permissions": user_permissions[email],
+            "path": "**",
+            "user": email if email != "GLOBAL" else "*",  # "*" is a wildcard for all users
+        }
+        if terminal:
+            new_perm_dict["terminal"] = terminal
+        output.append(new_perm_dict)
+
+    return output
+
+
+def migrate_permissions(snapshot_folder: Path):
+    """
+    Migrate all `_.syftperm` files from old format to new format within a given snapshot folder.
+    This function:
+    - searches for files with the extension '_.syftperm' in the specified snapshot folder.
+    -  converts their content from JSON to YAML format
+    - writes the converted content to new files with the name 'syftperm.yaml' in the same path
+    - deletes the original `_.syftperm` files
+
+    Args:
+        snapshot_folder (str): The path to the snapshot folder containing the permission files.
+    Returns:
+        None
+    """
+
+    files = snapshot_folder.rglob("_.syftperm")
+    for file in files:
+        old_data = json.loads(file.read_text())
+        new_data = convert_permission(old_data)
+        new_file_path = file.with_name(file.name.replace("_.syftperm", "syftperm.yaml"))
+        print(new_file_path)
+        print(new_data)
+        new_file_path.write_text(yaml.dump(new_data))
+        # do we need to backup the old file?
+        file.unlink()
