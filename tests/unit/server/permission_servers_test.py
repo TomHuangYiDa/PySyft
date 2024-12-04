@@ -1,5 +1,6 @@
 import sqlite3
 from pathlib import Path
+from typing import Optional
 
 import pytest
 
@@ -67,7 +68,7 @@ def insert_rule_files(
     permfile_path: str,
     priority: int,
     fileid: int,
-    match_for_email: str | None = None,
+    match_for_email: Optional[str] = None,
 ):
     cursor.execute(
         """

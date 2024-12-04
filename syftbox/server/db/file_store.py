@@ -7,6 +7,7 @@ from pydantic import BaseModel
 from syftbox.lib.hash import hash_file
 from syftbox.lib.permissions import ComputedPermission, PermissionRule, PermissionType
 from syftbox.server.db import db
+from syftbox.server.db.db import get_rules_for_path
 from syftbox.server.db.schema import get_db
 from syftbox.server.models.sync_models import AbsolutePath, FileMetadata, RelativePath
 from syftbox.server.settings import ServerSettings
@@ -19,8 +20,6 @@ class SyftFile(BaseModel):
 
 
 def computed_permission_for_user_and_path(cursor: sqlite3.Cursor, user: str, path: Path):
-    from syftbox.server.db.db import get_rules_for_path
-
     rules: List[PermissionRule] = get_rules_for_path(cursor, path)
     return ComputedPermission.from_user_rules_and_path(rules=rules, user=user, file_path=path)
 
@@ -33,18 +32,22 @@ class FileStore:
     def db_path(self) -> AbsolutePath:
         return self.server_settings.file_db_path
 
-    def delete(self, path: RelativePath) -> None:
-        conn = get_db(self.db_path)
-        cursor = conn.cursor()
-        cursor.execute("BEGIN IMMEDIATE;")
-        try:
-            db.delete_file_metadata(cursor, str(path))
-        except ValueError:
-            pass
-        abs_path = self.server_settings.snapshot_folder / path
-        abs_path.unlink(missing_ok=True)
-        conn.commit()
-        cursor.close()
+    def delete(self, path: RelativePath, user: str) -> None:
+        with get_db(self.db_path) as conn:
+            computed_perm = computed_permission_for_user_and_path(conn, user, path)
+            if not computed_perm.has_permission(PermissionType.WRITE):
+                raise PermissionError(f"User {user} does not have write permission for {path}")
+
+            cursor = conn.cursor()
+            cursor.execute("BEGIN IMMEDIATE;")
+            try:
+                db.delete_file_metadata(cursor, str(path))
+            except ValueError:
+                pass
+            abs_path = self.server_settings.snapshot_folder / path
+            abs_path.unlink(missing_ok=True)
+            conn.commit()
+            cursor.close()
 
     def get(self, path: RelativePath, user: str) -> SyftFile:
         with get_db(self.db_path) as conn:
