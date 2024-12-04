@@ -1,5 +1,4 @@
 import re
-import sqlite3
 from enum import Enum
 from pathlib import Path
 from typing import List, Optional, Tuple
@@ -224,15 +223,10 @@ class ComputedPermission(BaseModel):
     }
 
     @classmethod
-    def from_user_and_path(cls, cursor: sqlite3.Cursor, user: str, path: Path):
-        from syftbox.server.db.db import get_rules_for_path
-
-        rules: List[PermissionRule] = get_rules_for_path(cursor, path)
-
+    def from_user_rules_and_path(cls, rules: List[PermissionRule], user: str, path: Path):
         permission = cls(user=user, file_path=path)
         for rule in rules:
             permission.apply(rule)
-
         return permission
 
     def has_permission(self, permtype: PermissionType):

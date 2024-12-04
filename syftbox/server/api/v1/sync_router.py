@@ -9,7 +9,8 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response, Upload
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from loguru import logger
 
-from syftbox.lib.lib import PermissionTree, SyftPermission, filter_metadata
+from syftbox.lib.lib import SyftPermission
+from syftbox.lib.permissions import PermissionType
 from syftbox.server.analytics import log_file_change_event
 from syftbox.server.db.db import get_all_datasites
 from syftbox.server.db.file_store import FileStore, SyftFile
@@ -53,7 +54,7 @@ def get_diff(
     email: str = Depends(get_current_user),
 ) -> DiffResponse:
     try:
-        file = file_store.get(req.path)
+        file = file_store.get(req.path, email)
     except ValueError:
         raise HTTPException(status_code=404, detail="file not found")
     diff = py_fast_rsync.diff(req.signature_bytes, file.data)
@@ -92,17 +93,7 @@ def dir_state(
     server_settings: ServerSettings = Depends(get_server_settings),
     email: str = Depends(get_current_user),
 ) -> list[FileMetadata]:
-    full_path = server_settings.snapshot_folder / dir
-    # get the top level perm file
-    try:
-        perm_tree = PermissionTree.from_path(full_path, raise_on_corrupted_files=True)
-    except ValueError:
-        raise HTTPException(status_code=500, detail=f"Failed to parse permission tree: {dir}")
-
-    # filter the read state for this user by the perm tree
-    metadata_list = file_store.list(dir)
-    filtered_metadata = filter_metadata(email, metadata_list, perm_tree, server_settings.snapshot_folder)
-    return filtered_metadata
+    return file_store.list_for_user(dir, email)
 
 
 @router.post("/get_metadata", response_model=FileMetadata)
@@ -112,7 +103,7 @@ def get_metadata(
     email: str = Depends(get_current_user),
 ) -> FileMetadata:
     try:
-        metadata = file_store.get_metadata(req.path_like)
+        metadata = file_store.get_metadata(req.path)
         return metadata
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -125,7 +116,7 @@ def apply_diffs(
     email: str = Depends(get_current_user),
 ) -> ApplyDiffResponse:
     try:
-        file = file_store.get(req.path)
+        file = file_store.get(req.path, email)
     except ValueError:
         raise HTTPException(status_code=404, detail="file not found")
 
@@ -138,7 +129,7 @@ def apply_diffs(
     if SyftPermission.is_permission_file(file.metadata.path) and not SyftPermission.is_valid(result):
         raise HTTPException(status_code=400, detail="invalid syftpermission contents, skipped writing")
 
-    file_store.put(req.path, result)
+    file_store.put(req.path, result, user=email, check_permission=PermissionType.WRITE)
 
     log_file_change_event(
         "/sync/apply_diff",
@@ -188,6 +179,8 @@ def create_file(
     file_store.put(
         relative_path,
         contents,
+        user=email,
+        check_permission=PermissionType.CREATE,
     )
 
     log_file_change_event(
@@ -206,7 +199,7 @@ def download_file(
     email: str = Depends(get_current_user),
 ) -> FileResponse:
     try:
-        abs_path = file_store.get(req.path).absolute_path
+        abs_path = file_store.get(req.path, email).absolute_path
         return FileResponse(abs_path)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -238,7 +231,7 @@ async def get_files(
     all_files = []
     for path in req.paths:
         try:
-            file = file_store.get(path)
+            file = file_store.get(path, email)
         except ValueError:
             logger.warning(f"File not found: {path}")
             continue

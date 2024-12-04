@@ -548,3 +548,6 @@ def test_for_email(connection_with_tables: sqlite3.Connection):
     assert len(res) == 1
     assert res[0]["path"] == "alice@example.org/test/bob@example.org/data.txt"
     assert res[0]["read_permission"]
+
+    # TODO: test like clause
+    # TODO: add dir state test

@@ -13,6 +13,7 @@ def test_put_atomic(tmpdir):
     system_path = settings.snapshot_folder / syft_path
 
     with ThreadPoolExecutor(max_workers=5) as executor:
+        # TODO: add permissions
         executor.map(lambda _: FileStore(settings).put(syft_path, uuid.uuid4().bytes), range(25))
 
     assert system_path.exists()
