@@ -159,7 +159,7 @@ class PermissionRule(BaseModel):
                     match_for_email = email
                     break
         else:
-            match = globmatch(self.path, str(relative_file_path))
+            match = globmatch(str(relative_file_path), self.path)
         return match, match_for_email
 
     @property
