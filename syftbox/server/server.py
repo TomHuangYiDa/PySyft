@@ -22,21 +22,21 @@ from loguru import logger
 from typing_extensions import Any, Optional, Union
 
 from syftbox.__version__ import __version__
+from syftbox.lib.hash import collect_files, hash_files
 from syftbox.lib.lib import (
     Jsonable,
     get_datasites,
 )
 from syftbox.server.analytics import log_analytics_event
 from syftbox.server.db import db
-from syftbox.lib.hash import hash_files, collect_files
 from syftbox.server.db.schema import get_db
 from syftbox.server.logger import setup_logger
 from syftbox.server.middleware import LoguruMiddleware
 from syftbox.server.settings import ServerSettings, get_server_settings
 from syftbox.server.users.auth import get_current_user
 
-from .emails.router import router as emails_router
 from .api.v1.sync_router import router as sync_router
+from .emails.router import router as emails_router
 from .users.router import router as users_router
 
 current_dir = Path(__file__).parent
@@ -132,6 +132,14 @@ def init_db(settings: ServerSettings) -> None:
     cur = con.cursor()
     for m in metadata:
         db.save_file_metadata(cur, m)
+
+    # remove files that are not in the snapshot folder
+    all_metadata = db.get_all_metadata(cur)
+    for m in all_metadata:
+        abs_path = settings.snapshot_folder / m.path
+        if not abs_path.exists():
+            logger.info(f"{m.path} not found in {settings.snapshot_folder}, deleting from db")
+            db.delete_file_metadata(cur, m.path.as_posix())
 
     cur.close()
     con.commit()
