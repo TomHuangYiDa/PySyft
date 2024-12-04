@@ -19,9 +19,9 @@ class SyftFile(BaseModel):
     absolute_path: AbsolutePath
 
 
-def computed_permission_for_user_and_path(cursor: sqlite3.Cursor, user: str, path: Path):
-    rules: List[PermissionRule] = get_rules_for_path(cursor, path)
-    return ComputedPermission.from_user_rules_and_path(rules=rules, user=user, file_path=path)
+def computed_permission_for_user_and_path(connection: sqlite3.Connection, user: str, path: Path):
+    rules: List[PermissionRule] = get_rules_for_path(connection, path)
+    return ComputedPermission.from_user_rules_and_path(rules=rules, user=user, path=path)
 
 
 class FileStore:
@@ -59,7 +59,7 @@ class FileStore:
             abs_path = self.server_settings.snapshot_folder / metadata.path
 
             if not Path(abs_path).exists():
-                self.delete(metadata.path.as_posix())
+                self.delete(metadata.path.as_posix(), user)
                 raise ValueError("File not found")
             return SyftFile(
                 metadata=metadata,

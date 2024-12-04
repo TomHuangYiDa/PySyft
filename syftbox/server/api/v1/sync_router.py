@@ -154,7 +154,7 @@ def delete_file(
         file_store=file_store,
     )
 
-    file_store.delete(req.path)
+    file_store.delete(req.path, email)
     return JSONResponse(content={"status": "success"})
 
 

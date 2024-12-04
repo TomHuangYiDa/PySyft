@@ -261,7 +261,7 @@ def set_rules_for_permfile(connection, file: PermissionFile):
 
 
 def get_read_permissions_for_user(
-    connection: sqlite3.Connection, user: str, path_like: RelativePath | None = None
+    connection: sqlite3.Connection, user: str, path_like: str | None = None
 ) -> list[sqlite3.Row]:
     cursor = connection.cursor()
 
@@ -328,7 +328,7 @@ def get_read_permissions_for_user(
 def get_filemetadata_with_read_access(
     connection: sqlite3.Connection, user: str, path: RelativePath | None = None
 ) -> list[FileMetadata]:
-    res = get_read_permissions_for_user(connection, user, path)
+    res = get_read_permissions_for_user(connection, user, str(path))
     return [
         FileMetadata(
             path=row["path"],

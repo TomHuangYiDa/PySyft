@@ -231,7 +231,14 @@ class ComputedPermission(BaseModel):
             permission.apply(rule)
         return permission
 
+    @property
+    def path_owner(self):
+        """owner of the datasite for this path"""
+        return str(self.file_path).split("/", 1)[0]
+
     def has_permission(self, permtype: PermissionType):
+        if self.path_owner == self.user:
+            return True
         return self.perms[permtype]
 
     def user_matches(self, rule: PermissionRule):

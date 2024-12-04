@@ -4,12 +4,13 @@ from typing import Optional
 
 import pytest
 
-from syftbox.lib.permissions import ComputedPermission, PermissionFile, PermissionType
+from syftbox.lib.permissions import PermissionFile, PermissionType
 from syftbox.server.db.db import (
     get_read_permissions_for_user,
     get_rules_for_permfile,
     set_rules_for_permfile,
 )
+from syftbox.server.db.file_store import computed_permission_for_user_and_path
 from syftbox.server.db.schema import get_db
 
 
@@ -247,7 +248,8 @@ def test_computed_permissions(connection_with_tables: sqlite3.Connection):
     set_rules_for_permfile(connection_with_tables, file)
 
     # TODO: split this and decouple db and permission overlaying
-    computed_permission = ComputedPermission.from_user_and_path(
+
+    computed_permission = computed_permission_for_user_and_path(
         connection_with_tables, "user@example.org", Path("user@example.org/test2/a.txt")
     )
     assert computed_permission.has_permission(PermissionType.READ)
