@@ -3,6 +3,7 @@ from pathlib import Path
 import pytest
 
 from syftbox.lib.permissions import (
+    ComputedPermission,
     PermissionFile,
     PermissionParsingError,
     PermissionRule,
@@ -70,3 +71,16 @@ def test_parsing_useremail():
     rule = file.rules[0]
     assert rule.has_email_template
     assert rule.resolve_path_pattern("user@example.org") == "user@example.org/*"
+
+
+def test_globstar():
+    rule = PermissionRule.from_rule_dict(
+        Path("."), {"path": "**", "permissions": ["admin", "read", "write"], "user": "user@example.org"}, 0
+    )
+    computed_permission = ComputedPermission(user="user@example.org", file_path=Path("a.txt"))
+    computed_permission.apply(rule)
+    assert computed_permission.has_permission(PermissionType.READ)
+
+    computed_permission = ComputedPermission(user="user@example.org", file_path=Path("b/a.txt"))
+    computed_permission.apply(rule)
+    assert computed_permission.has_permission(PermissionType.READ)

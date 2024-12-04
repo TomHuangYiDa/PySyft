@@ -4,6 +4,7 @@ from enum import Enum
 from pathlib import Path
 from typing import List, Optional, Tuple
 
+import wcmatch
 import yaml
 from pydantic import BaseModel, model_validator
 from wcmatch.glob import globmatch
@@ -153,12 +154,14 @@ class PermissionRule(BaseModel):
             match = False
             emails_in_file_path = [part for part in relative_file_path.split("/") if "@" in part]  # todo: improve this
             for email in emails_in_file_path:
-                if globmatch(self.path.replace("{useremail}", email), str(relative_file_path)):
+                if globmatch(
+                    self.path.replace("{useremail}", email), str(relative_file_path), flags=wcmatch.glob.GLOBSTAR
+                ):
                     match = True
                     match_for_email = email
                     break
         else:
-            match = globmatch(self.path, str(relative_file_path))
+            match = globmatch(self.path, str(relative_file_path), flags=wcmatch.glob.GLOBSTAR)
         return match, match_for_email
 
     @property
@@ -259,7 +262,7 @@ class ComputedPermission(BaseModel):
 
         if issubpath(rule.dir_path, self.file_path):
             relative_file_path = self.file_path.relative_to(rule.dir_path)
-            return globmatch(relative_file_path, resolved_path_pattern)
+            return globmatch(relative_file_path, resolved_path_pattern, flags=wcmatch.glob.GLOBSTAR)
         else:
             return False
 
