@@ -193,7 +193,7 @@ def get_rules_for_path(connection: sqlite3.Connection, path: Path):
         """
         SELECT * FROM rules WHERE permfile_dir in ({})
     """.format(placeholders),
-        [str(x) for x in parents],
+        [x.as_posix() for x in parents],
     )
     return [PermissionRule.from_db_row(row) for row in cursor.fetchall()]
 

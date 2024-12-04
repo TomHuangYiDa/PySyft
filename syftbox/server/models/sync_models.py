@@ -57,7 +57,7 @@ class SignatureResponse(BaseModel):
 
 
 class FileMetadataRequest(BaseModel):
-    path: str = Field(description="Path to search for files")
+    path: RelativePath = Field(description="Path to search for files")
 
 
 class FileRequest(BaseModel):

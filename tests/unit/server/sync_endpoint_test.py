@@ -53,7 +53,7 @@ def file_digest(file_path, algorithm="sha256"):
 def test_syft_client_push_flow(client: TestClient):
     response = client.post(
         "/sync/get_metadata",
-        json={"path_like": f"{TEST_DATASITE_NAME}/{TEST_FILE}"},
+        json={"path": f"{TEST_DATASITE_NAME}/{TEST_FILE}"},
     )
 
     response.raise_for_status()
