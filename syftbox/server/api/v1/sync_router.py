@@ -1,6 +1,7 @@
 import base64
 import hashlib
 import sqlite3
+import traceback
 import zipfile
 from io import BytesIO
 
@@ -9,7 +10,6 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response, Upload
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from loguru import logger
 
-from syftbox.lib.lib import SyftPermission
 from syftbox.lib.permissions import PermissionType
 from syftbox.server.analytics import log_file_change_event
 from syftbox.server.db.db import get_all_datasites
@@ -79,7 +79,7 @@ def get_datasite_states(
         try:
             datasite_state = dir_state(RelativePath(datasite), file_store, server_settings, email)
         except Exception as e:
-            logger.error(f"Failed to get dir state for {datasite}: {e}")
+            logger.error(f"Failed to get dir state for {datasite}: {e} {traceback.format_exc()}")
             continue
         datasite_states[datasite] = datasite_state
 
@@ -126,9 +126,6 @@ def apply_diffs(
     if new_hash != req.expected_hash:
         raise HTTPException(status_code=400, detail="hash mismatch, skipped writing")
 
-    if SyftPermission.is_permission_file(file.metadata.path) and not SyftPermission.is_valid(result):
-        raise HTTPException(status_code=400, detail="invalid syftpermission contents, skipped writing")
-
     file_store.put(req.path, result, user=email, check_permission=PermissionType.WRITE)
 
     log_file_change_event(
@@ -172,9 +169,6 @@ def create_file(
         raise HTTPException(status_code=400, detail="file already exists")
 
     contents = file.file.read()
-
-    if SyftPermission.is_permission_file(relative_path) and not SyftPermission.is_valid(contents):
-        raise HTTPException(status_code=400, detail="invalid syftpermission contents, skipped writing")
 
     file_store.put(
         relative_path,

@@ -254,7 +254,6 @@ def set_rules_for_permfile(connection, file: PermissionFile):
             rule2files,
         )
 
-        connection.commit()
     except Exception as e:
         connection.rollback()
         raise e
@@ -276,7 +275,7 @@ def get_read_permissions_for_user(
         params = (user, user, escaped_path)
 
     query = """
-    SELECT path,
+    SELECT path, hash, signature, file_size, last_modified,
     (
         SELECT COALESCE(max(
             CASE

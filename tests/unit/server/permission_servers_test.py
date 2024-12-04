@@ -126,6 +126,7 @@ def test_insert_permissions_from_file(connection_with_tables: sqlite3.Connection
     file = PermissionFile.from_string(yaml_string, file_path)
 
     set_rules_for_permfile(connection_with_tables, file)
+    connection_with_tables.commit()
 
     assert len(get_all_file_mappings(connection_with_tables)) == 2
 
@@ -152,6 +153,7 @@ def test_overwrite_permissions_from_file(connection_with_tables: sqlite3.Connect
     file_path = "user@example.org/test2/.syftperm"
     file = PermissionFile.from_string(yaml_string, file_path)
     set_rules_for_permfile(connection_with_tables, file)
+    connection_with_tables.commit()
     written_rules = get_rules_for_permfile(connection_with_tables, file)
 
     permissions = [x.permissions for x in written_rules]
@@ -197,6 +199,7 @@ def test_overwrite_permissions_from_file(connection_with_tables: sqlite3.Connect
     file_path = "user@example.org/test2/.syftperm"
     file = PermissionFile.from_string(yaml_string, file_path)
     set_rules_for_permfile(connection_with_tables, file)
+    connection_with_tables.commit()
     new_existing_rules = get_rules_for_permfile(connection_with_tables, file)
     paths = [x.path for x in new_existing_rules]
     permissions = [x.permissions for x in new_existing_rules]
@@ -246,6 +249,7 @@ def test_computed_permissions(connection_with_tables: sqlite3.Connection):
     file_path = "user@example.org/test2/.syftperm"
     file = PermissionFile.from_string(yaml_string, file_path)
     set_rules_for_permfile(connection_with_tables, file)
+    connection_with_tables.commit()
 
     # TODO: split this and decouple db and permission overlaying
 

@@ -15,7 +15,9 @@ from syftbox.client.plugins.sync.exceptions import FatalSyncError
 from syftbox.client.plugins.sync.manager import SyncManager
 from syftbox.client.plugins.sync.queue import SyncQueueItem
 from syftbox.client.utils.dir_tree import DirTree, create_dir_tree
+from syftbox.lib.constants import PERM_FILE
 from syftbox.lib.lib import SyftPermission
+from syftbox.lib.permissions import PermissionFile
 from syftbox.server.settings import ServerSettings
 
 fake = faker.Faker()
@@ -117,7 +119,7 @@ def test_create_file(server_client: TestClient, datasite_1: SyftClientInterface,
     # Create a file in datasite_1
     tree = {
         "folder1": {
-            "_.syftperm": SyftPermission.mine_with_public_read(datasite_1.email),
+            PERM_FILE: PermissionFile.mine_with_public_read(datasite_1.email, Path("folder1") / PERM_FILE),
             "file.txt": fake.text(max_nb_chars=1000),
         },
     }

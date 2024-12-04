@@ -18,7 +18,7 @@ from syftbox.client.plugins.sync.sync_client import SyncClient
 from syftbox.client.plugins.sync.types import SyncActionType, SyncDecisionType, SyncSide, SyncStatus
 from syftbox.lib.hash import hash_file
 from syftbox.lib.ignore import filter_ignored_paths
-from syftbox.lib.lib import SyftPermission
+from syftbox.lib.permissions import PermissionFile
 from syftbox.server.models.sync_models import FileMetadata
 
 
@@ -220,8 +220,8 @@ class SyncDecision(BaseModel):
         remote_op = self.operation
         is_invalid_permission_change = (
             remote_op in [SyncDecisionType.CREATE, SyncDecisionType.MODIFY]
-            and SyftPermission.is_permission_file(local_abs_path)
-            and not SyftPermission.is_valid(local_abs_path)
+            and PermissionFile.is_permission_file(local_abs_path)
+            and not PermissionFile.is_valid(local_abs_path)
         )
         return is_invalid_permission_change
 

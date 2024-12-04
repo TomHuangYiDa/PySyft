@@ -148,7 +148,7 @@ class SyftPermission(Jsonable):
 
     def save(self, path=None) -> bool:
         self.perm_path(path=path)
-        if str(self.filepath).endswith(".syftperm"):
+        if str(self.filepath).endswith(PERM_FILE):
             super().save(self.filepath)
         else:
             raise Exception(f"Perm file must end in .syftperm. {self.filepath}")
@@ -255,7 +255,7 @@ class PermissionTree(Jsonable):
         perm_dict = {}
         for root, dirs, files in os.walk(parent_path):
             for file in files:
-                if file.endswith(".syftperm"):
+                if file.endswith(PERM_FILE):
                     path = os.path.join(root, file)
                     try:
                         perm_dict[path] = SyftPermission.load(path)
