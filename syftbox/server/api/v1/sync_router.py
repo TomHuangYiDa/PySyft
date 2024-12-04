@@ -103,7 +103,7 @@ def get_metadata(
     email: str = Depends(get_current_user),
 ) -> FileMetadata:
     try:
-        metadata = file_store.get_metadata(req.path)
+        metadata = file_store.get_metadata(req.path, email)
         return metadata
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))

@@ -63,7 +63,7 @@ class SyncClient:
     def get_metadata(self, path: Path) -> FileMetadata:
         response = self.server_client.post(
             "/sync/get_metadata",
-            json={"path_like": path.as_posix()},
+            json={"path": path.as_posix()},
         )
         self.raise_for_status(response)
         return FileMetadata(**response.json())
