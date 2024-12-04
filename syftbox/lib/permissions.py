@@ -154,7 +154,7 @@ class PermissionRule(BaseModel):
             match = False
             emails_in_file_path = [part for part in relative_file_path.split("/") if "@" in part]  # todo: improve this
             for email in emails_in_file_path:
-                if globmatch(self.path.replace("{useremail}", email), str(relative_file_path)):
+                if globmatch(str(relative_file_path), self.path.replace("{useremail}", email)):
                     match = True
                     match_for_email = email
                     break
