@@ -44,14 +44,6 @@ class FileChangeInfo(BaseModel, frozen=True):
         return self.path < other.path
 
 
-class SyncDecisionType(str, Enum):
-    # TODO remove SyncDecisionType
-    NOOP = "NOOP"
-    CREATE = "CREATE"
-    MODIFY = "MODIFY"
-    DELETE = "DELETE"
-
-
 class SyncActionType(str, Enum):
     NOOP = "NOOP"
     CREATE_REMOTE = "CREATE_REMOTE"
@@ -70,14 +62,3 @@ class SyncActionType(str, Enum):
         ]:
             return SyncSide.REMOTE
         return SyncSide.LOCAL
-
-    @property
-    def decision_type(self) -> "SyncDecisionType":
-        if self == SyncActionType.NOOP:
-            return SyncDecisionType.NOOP
-        if self in [SyncActionType.CREATE_REMOTE, SyncActionType.CREATE_LOCAL]:
-            return SyncDecisionType.CREATE
-        if self in [SyncActionType.DELETE_REMOTE, SyncActionType.DELETE_LOCAL]:
-            return SyncDecisionType.DELETE
-        if self in [SyncActionType.MODIFY_REMOTE, SyncActionType.MODIFY_LOCAL]:
-            return SyncDecisionType.MODIFY
