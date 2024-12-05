@@ -146,7 +146,7 @@ class FileStore:
 
             abs_path.write_bytes(contents)
 
-            # TODO: this is currently not transactional (writing the file and adding rows to db)
+            # TODO: this is currently not atomic (writing the file and adding rows to db)
             # but its also somehwat challenging to do so. Especially date modified is tricky.
             # Because: if we insert first and write the file later, the date modified it not known yet.
             # If we write the file first and then insert, we might have to revert the file, but we need to
