@@ -11,6 +11,7 @@ from pydantic import BaseModel, model_validator
 from wcmatch.glob import globmatch
 
 from syftbox.lib.constants import PERM_FILE
+from syftbox.server.models.sync_models import RelativePath
 
 
 # util
@@ -30,7 +31,7 @@ class PermissionParsingError(Exception):
 
 
 class PermissionRule(BaseModel):
-    dir_path: Path  # where does this permfile live
+    dir_path: RelativePath  # where does this permfile live
     path: str  # what paths does it apply to (e.g. **/*.txt)
     user: str  # can be *,
     allow: bool = True
@@ -72,8 +73,9 @@ class PermissionRule(BaseModel):
             )
 
         # if user is not a valid email, or *, raise an error
-        email = values.get("user")
-        if email != "*" and not bool(re.search(r"^[\w\.\+\-]+\@[\w]+\.[a-z]{2,3}$", email)):
+        email = values.get("user", "")
+        is_valid_email = re.match(r"[^@]+@[^@]+", email or "")
+        if email != "*" and not is_valid_email:
             raise PermissionParsingError(f"user {values.get('user')} is not a valid email or *")
 
         # listify permissions
@@ -187,7 +189,7 @@ class PermissionRule(BaseModel):
 
 
 class PermissionFile(BaseModel):
-    filepath: Path
+    filepath: RelativePath
     rules: List[PermissionRule]
 
     def save(self, path: Path):
@@ -274,7 +276,7 @@ class PermissionFile(BaseModel):
 
 class ComputedPermission(BaseModel):
     user: str
-    file_path: Path
+    file_path: RelativePath
     terminal: dict[PermissionType, bool] = {
         PermissionType.READ: False,
         PermissionType.CREATE: False,
@@ -350,6 +352,8 @@ def map_email_to_permissions(json_data: dict) -> dict:
     email_permissions = defaultdict(list)
     for permission, emails in json_data.items():
         for email in emails:
+            if email is None:
+                continue
             email_permissions[email].append(permission)
     return email_permissions
 
@@ -388,14 +392,15 @@ def migrate_permissions(snapshot_folder: Path):
     Returns:
         None
     """
-
-    files = snapshot_folder.rglob("_.syftperm")
+    old_syftperm_filename = "_.syftperm"
+    files = list(snapshot_folder.rglob(old_syftperm_filename))
     for file in files:
         old_data = json.loads(file.read_text())
         new_data = convert_permission(old_data)
-        new_file_path = file.with_name(file.name.replace("_.syftperm", "syftperm.yaml"))
+        new_file_path = file.with_name(file.name.replace(old_syftperm_filename, PERM_FILE))
         print(new_file_path)
         print(new_data)
         new_file_path.write_text(yaml.dump(new_data))
         # do we need to backup the old file?
-        file.unlink()
+        # might be better to temporarily leave it for debugging purposes
+        # file.unlink()
