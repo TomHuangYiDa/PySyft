@@ -264,8 +264,6 @@ def test_computed_permissions(connection_with_tables: sqlite3.Connection):
     set_rules_for_permfile(connection_with_tables, file)
     connection_with_tables.commit()
 
-    # TODO: split this and decouple db and permission overlaying
-
     computed_permission = computed_permission_for_user_and_path(
         connection_with_tables, "user@example.org", Path("user@example.org/test2/a.txt")
     )

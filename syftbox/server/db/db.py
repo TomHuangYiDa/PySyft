@@ -144,16 +144,6 @@ def get_rules_for_permfile(connection: sqlite3.Connection, file: PermissionFile)
     return [PermissionRule.from_db_row(row) for row in query_rules_for_permfile(cursor, file)]
 
 
-def get_all_files_under_dir(cursor, dir_path):
-    cursor.execute(
-        """
-        SELECT * FROM file_metadata WHERE path LIKE ?
-    """,
-        (str(dir_path) + "/%",),
-    )
-    return cursor.fetchall()
-
-
 def get_all_files(cursor):
     cursor.execute(
         """
@@ -259,19 +249,6 @@ def set_rules_for_permfile(connection, file: PermissionFile):
         raise e
 
 
-def get_permrules_for_in_branch(connection: sqlite3.Connection, path: Path):
-    cursor = connection.cursor()
-    parents = [x.as_posix() for x in path.parents]
-    placeholders = ",".join("?" * len(parents))
-    cursor.execute(
-        """
-        SELECT * FROM rules WHERE permfile_dir in ({})
-    """.format(placeholders),
-        parents,
-    )
-    return [PermissionRule.from_db_row(row) for row in cursor.fetchall()]
-
-
 def get_metadata_for_file(connection: sqlite3.Connection, path: Path):
     cursor = connection.cursor()
     cursor.execute("SELECT * FROM file_metadata WHERE path = ?", (str(path),))
@@ -293,7 +270,7 @@ def link_existing_rules_to_file(connection: sqlite3.Connection, path: Path):
     # 2 check which rules apply to the file
     # 3 link them
 
-    perm_rules = get_permrules_for_in_branch(connection, path)
+    perm_rules = get_rules_for_path(connection, path)
 
     rule2files = []
     _id, _ = get_metadata_for_file(connection, path)

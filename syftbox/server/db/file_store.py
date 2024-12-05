@@ -8,9 +8,18 @@ from pydantic import BaseModel
 
 from syftbox.lib.constants import PERM_FILE
 from syftbox.lib.hash import hash_file
-from syftbox.lib.permissions import ComputedPermission, PermissionFile, PermissionRule, PermissionType
+from syftbox.lib.permissions import (
+    ComputedPermission,
+    PermissionFile,
+    PermissionRule,
+    PermissionType,
+)
 from syftbox.server.db import db
-from syftbox.server.db.db import get_rules_for_path, link_existing_rules_to_file, set_rules_for_permfile
+from syftbox.server.db.db import (
+    get_rules_for_path,
+    link_existing_rules_to_file,
+    set_rules_for_permfile,
+)
 from syftbox.server.db.schema import get_db
 from syftbox.server.models.sync_models import AbsolutePath, FileMetadata, RelativePath
 from syftbox.server.settings import ServerSettings
@@ -121,7 +130,10 @@ class FileStore:
 
             if not skip_permission_check:
                 computed_perm = computed_permission_for_user_and_path(conn, user, path)
-                if check_permission not in [PermissionType.WRITE, PermissionType.CREATE]:
+                if check_permission not in [
+                    PermissionType.WRITE,
+                    PermissionType.CREATE,
+                ]:
                     raise ValueError(f"check_permission must be either WRITE or CREATE, got {check_permission}")
 
                 if not computed_perm.has_permission(check_permission):
@@ -133,6 +145,12 @@ class FileStore:
             abs_path.parent.mkdir(exist_ok=True, parents=True)
 
             abs_path.write_bytes(contents)
+
+            # TODO: this is currently not transactional (writing the file and adding rows to db)
+            # but its also somehwat challenging to do so. Especially date modified is tricky.
+            # Because: if we insert first and write the file later, the date modified it not known yet.
+            # If we write the file first and then insert, we might have to revert the file, but we need to
+            # set it to the old date modified.
             metadata = hash_file(abs_path, root_dir=self.server_settings.snapshot_folder)
             db.save_file_metadata(cursor, metadata)
 
@@ -140,7 +158,10 @@ class FileStore:
                 try:
                     permfile = PermissionFile.from_bytes(contents, path)
                 except (yaml.YAMLError, ValueError):
-                    raise HTTPException(status_code=400, detail="invalid syftpermission contents, skipped writing")
+                    raise HTTPException(
+                        status_code=400,
+                        detail="invalid syftpermission contents, skipped writing",
+                    )
                 set_rules_for_permfile(conn, permfile)
 
             link_existing_rules_to_file(conn, path)
