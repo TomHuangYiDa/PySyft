@@ -7,7 +7,7 @@ from loguru import logger
 from pydantic import BaseModel, Field
 from typing_extensions import Self, Type
 
-from syftbox.client.base import SyftClientInterface
+from syftbox.client.base import SyftBoxContextInterface
 from syftbox.client.plugins.sync.exceptions import SyncEnvironmentError
 from syftbox.client.plugins.sync.sync_action import SyncAction
 from syftbox.client.plugins.sync.types import SyncActionType, SyncStatus
@@ -32,7 +32,7 @@ class LocalState(BaseModel):
     status_info: dict[Path, SyncStatusInfo] = {}
 
     @classmethod
-    def for_client(cls: Type[Self], client: SyftClientInterface) -> Self:
+    def for_client(cls: Type[Self], client: SyftBoxContextInterface) -> Self:
         return cls(path=client.workspace.plugins / LOCAL_STATE_FILENAME)
 
     def insert_completed_action(self, action: SyncAction) -> None:

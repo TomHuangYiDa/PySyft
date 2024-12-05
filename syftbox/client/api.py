@@ -4,7 +4,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from syftbox.client.base import SyftClientInterface
+from syftbox.client.base import SyftBoxContextInterface
 from syftbox.client.routers import app_router, datasite_router, index_router, sync_router
 
 
@@ -22,7 +22,7 @@ async def lifespan(app: FastAPI):
     yield
 
 
-def create_api(client: SyftClientInterface) -> FastAPI:
+def create_api(client: SyftBoxContextInterface) -> FastAPI:
     app = FastAPI(lifespan=lifespan)
 
     allow_origins = [

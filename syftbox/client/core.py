@@ -11,11 +11,12 @@ from pid import PidFile, PidFileAlreadyLockedError, PidFileAlreadyRunningError
 
 from syftbox.__version__ import __version__
 from syftbox.client.api import create_api
-from syftbox.client.base import Plugins, SyftClientInterface
+from syftbox.client.base import PluginManagerInterface, SyftBoxContextInterface
 from syftbox.client.env import syftbox_env
 from syftbox.client.exceptions import SyftAuthenticationError, SyftBoxAlreadyRunning, SyftServerError
 from syftbox.client.logger import setup_logger
 from syftbox.client.plugin_manager import PluginManager
+from syftbox.client.server_client import SyftBoxClient
 from syftbox.client.utils import error_reporting, file_manager, macos
 from syftbox.client.utils.file_manager import _is_wsl
 from syftbox.lib.client_config import SyftClientConfig
@@ -30,7 +31,7 @@ ICON_FOLDER = ASSETS_FOLDER / "icon"
 METADATA_FILENAME = ".metadata.json"
 
 
-class SyftClient:
+class LocalSyftBox:
     """The SyftBox Client
 
     This is the main SyftBox client that handles workspace data, server
@@ -52,15 +53,15 @@ class SyftClient:
 
         self.workspace = SyftWorkspace(self.config.data_dir)
         self.pid = PidFile(pidname="syftbox.pid", piddir=self.workspace.data_dir)
-
-        self.server_client = httpx.Client(
-            base_url=str(self.config.server_url),
-            follow_redirects=True,
-            headers=self.__get_server_headers(),
-        )
+        self.client = SyftBoxClient.from_config(self.config)
 
         # create a single client context shared across components
-        self.__ctx = SyftClientContext(self.config, self.workspace, self.server_client, plugins=None)
+        self.__ctx = LocalSyftBoxContext(
+            self.config,
+            self.workspace,
+            client=self.client,
+            plugins=None,
+        )
         self.plugins = PluginManager(self.__ctx, **kwargs)
         # make plugins available to the context
         self.__ctx.plugins = self.plugins
@@ -85,7 +86,7 @@ class SyftClient:
         return self.datasite / "public"
 
     @property
-    def context(self) -> "SyftClientContext":
+    def context(self) -> "LocalSyftBoxContext":
         return self.__ctx
 
     def start(self):
@@ -194,15 +195,12 @@ class SyftClient:
             os_name = platform.system()
             os_name = "macOS" if os_name == "Darwin" else os_name
 
-        self.server_client.post(
-            "/log_event",
-            json={
-                "event_name": "system_info",
-                "os_name": os_name,
-                "os_version": platform.release(),
-                "syftbox_version": __version__,
-                "python_version": platform.python_version(),
-            },
+        self.client.log_analytics_event(
+            event_name="system_info",
+            os_name=os_name,
+            os_version=platform.release(),
+            syftbox_version=__version__,
+            python_version=platform.python_version(),
         )
 
     def __enter__(self):
@@ -212,7 +210,7 @@ class SyftClient:
         self.shutdown()
 
 
-class SyftClientContext(SyftClientInterface):
+class LocalSyftBoxContext(SyftBoxContextInterface):
     """
     Concrete implementation of SyftClientInterface that provides a lightweight
     client context for components.
@@ -227,12 +225,12 @@ class SyftClientContext(SyftClientInterface):
         self,
         config: SyftClientConfig,
         workspace: SyftWorkspace,
-        server_client: httpx.Client,
-        plugins: Plugins,
+        client: SyftBoxClient,
+        plugins: PluginManagerInterface,
     ):
         self.config = config
         self.workspace = workspace
-        self.server_client = server_client
+        self.client = client
         self.plugins = plugins
 
     @property
@@ -250,17 +248,6 @@ class SyftClientContext(SyftClientInterface):
 
     def __repr__(self) -> str:
         return f"SyftClientContext<{self.config.email}, {self.config.data_dir}>"
-
-    def log_analytics_event(self, event_name: str, **kwargs) -> None:
-        """Log an event to the server"""
-        event_data = {
-            "event_name": event_name,
-            **kwargs,
-        }
-
-        response = self.server_client.post("/log_event", json=event_data)
-        if response.status_code != 200:
-            raise SyftServerError(f"Failed to log event: {response.text}")
 
     def whoami(self) -> str:
         try:
@@ -349,7 +336,7 @@ def run_client(
         logger.debug("Directory icons are disabled")
 
     try:
-        client = SyftClient(client_config, log_level=log_level)
+        client = LocalSyftBox(client_config, log_level=log_level)
         # we don't want to run migration if another instance of client is already running
         bool(client.check_pidfile()) and run_migration(client_config, migrate_datasite=migrate_datasite)
         (not syftbox_env.DISABLE_ICONS) and client.copy_icons()

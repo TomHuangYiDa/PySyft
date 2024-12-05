@@ -7,9 +7,9 @@ from typing import ClassVar, Optional
 import py_fast_rsync
 from loguru import logger
 
+from syftbox.client.base import SyftBoxContextInterface
 from syftbox.client.plugins.sync.constants import MAX_FILE_SIZE_MB
 from syftbox.client.plugins.sync.exceptions import SyftPermissionError, SyncValidationError
-from syftbox.client.plugins.sync.sync_client import SyncClient
 from syftbox.client.plugins.sync.types import SyncActionType, SyncSide, SyncStatus
 from syftbox.lib.lib import SyftPermission
 from syftbox.server.sync.models import FileMetadata
@@ -108,23 +108,23 @@ class SyncAction(ABC):
     def side_to_update(self) -> SyncSide:
         return self.action_type.target_side
 
-    def validate(self, client: SyncClient) -> None:
+    def validate(self, context: SyftBoxContextInterface) -> None:
         """Raises a SyncValidationError if the action is invalid."""
-        validate_sync_action(client, self)
+        validate_sync_action(context, self)
 
-    def is_valid(self, client: SyncClient) -> bool:
+    def is_valid(self, context: SyftBoxContextInterface) -> bool:
         try:
-            self.validate(client)
+            self.validate(context)
             return True
         except SyncValidationError:
             return False
 
     @abstractmethod
-    def execute(self, client: SyncClient) -> None:
+    def execute(self, context: SyftBoxContextInterface) -> None:
         pass
 
     @abstractmethod
-    def reject(self, client: SyncClient, reason: Optional[str] = None) -> None:
+    def reject(self, context: SyftBoxContextInterface, reason: Optional[str] = None) -> None:
         pass
 
     def error(self, exception: Exception) -> None:
@@ -154,24 +154,24 @@ class NoopAction(SyncAction):
         # noop actions are already synced
         self.status = SyncStatus.SYNCED
 
-    def execute(self, client: SyncClient) -> None:
+    def execute(self, context: SyftBoxContextInterface) -> None:
         pass
 
-    def reject(self, client: SyncClient, reason: Optional[str] = None) -> None:
+    def reject(self, context: SyftBoxContextInterface, reason: Optional[str] = None) -> None:
         pass
 
 
 class CreateLocalAction(SyncAction):
     action_type = SyncActionType.CREATE_LOCAL
 
-    def execute(self, client: SyncClient) -> None:
-        content_bytes = client.download(self.path)
-        abs_path = client.workspace.datasites / self.path
+    def execute(self, context: SyftBoxContextInterface) -> None:
+        content_bytes = context.client.sync.download(self.path)
+        abs_path = context.workspace.datasites / self.path
         abs_path.parent.mkdir(parents=True, exist_ok=True)
         abs_path.write_bytes(content_bytes)
         self.status = SyncStatus.SYNCED
 
-    def reject(self, client: SyncClient, reason: Optional[str] = None) -> None:
+    def reject(self, context: SyftBoxContextInterface, reason: Optional[str] = None) -> None:
         # Client doesnt have permission, so no new files are downloaded. Action is a noop.
         self.status = SyncStatus.REJECTED
         self.message = reason
@@ -180,11 +180,11 @@ class CreateLocalAction(SyncAction):
 class ModifyLocalAction(SyncAction):
     action_type = SyncActionType.MODIFY_LOCAL
 
-    def execute(self, client: SyncClient):
+    def execute(self, context: SyftBoxContextInterface):
         # Use rsync to update the local file with the remote changes
-        diff = client.get_diff(self.path, self.local_metadata.signature)
+        diff = context.client.sync.get_diff(self.path, self.local_metadata.signature)
 
-        abs_path = client.workspace.datasites / self.path
+        abs_path = context.workspace.datasites / self.path
         local_data = abs_path.read_bytes()
         new_data = py_fast_rsync.apply(local_data, diff.diff_bytes)
         new_hash = hashlib.sha256(new_data).hexdigest()
@@ -198,9 +198,9 @@ class ModifyLocalAction(SyncAction):
         abs_path.write_bytes(new_data)
         self.status = SyncStatus.SYNCED
 
-    def reject(self, client: SyncClient, reason: Optional[str] = None) -> None:
+    def reject(self, context: SyftBoxContextInterface, reason: Optional[str] = None) -> None:
         # Client doesnt have read permission, so the local file is deleted
-        abs_path = client.workspace.datasites / self.path
+        abs_path = context.workspace.datasites / self.path
         abs_path.unlink()
         self.status = SyncStatus.REJECTED
         self.message = reason
@@ -209,12 +209,12 @@ class ModifyLocalAction(SyncAction):
 class DeleteLocalAction(SyncAction):
     action_type = SyncActionType.DELETE_LOCAL
 
-    def execute(self, client: SyncClient):
-        abs_path = client.workspace.datasites / self.path
+    def execute(self, context: SyftBoxContextInterface):
+        abs_path = context.workspace.datasites / self.path
         abs_path.unlink()
         self.status = SyncStatus.SYNCED
 
-    def reject(self, client: SyncClient, reason: Optional[str] = None) -> None:
+    def reject(self, context: SyftBoxContextInterface, reason: Optional[str] = None) -> None:
         # local delete cannot be rejected by server, this is a noop
         pass
 
@@ -222,15 +222,15 @@ class DeleteLocalAction(SyncAction):
 class CreateRemoteAction(SyncAction):
     action_type = SyncActionType.CREATE_REMOTE
 
-    def execute(self, client: SyncClient):
-        abs_path = client.workspace.datasites / self.path
+    def execute(self, context: SyftBoxContextInterface):
+        abs_path = context.workspace.datasites / self.path
         data = abs_path.read_bytes()
-        client.create(self.path, data)
+        context.client.sync.create(self.path, data)
         self.status = SyncStatus.SYNCED
 
-    def reject(self, client: SyncClient, reason: Optional[str] = None) -> None:
+    def reject(self, context: SyftBoxContextInterface, reason: Optional[str] = None) -> None:
         # Attempted upload without permission, the local file is renamed to a rejected file
-        abs_path = client.workspace.datasites / self.path
+        abs_path = context.workspace.datasites / self.path
         rejected_abs_path = format_rejected_path(abs_path)
         shutil.move(abs_path, rejected_abs_path)
         self.status = SyncStatus.REJECTED
@@ -240,30 +240,30 @@ class CreateRemoteAction(SyncAction):
 class ModifyRemoteAction(SyncAction):
     action_type = SyncActionType.MODIFY_REMOTE
 
-    def execute(self, client: SyncClient):
-        abs_path = client.workspace.datasites / self.path
+    def execute(self, context: SyftBoxContextInterface):
+        abs_path = context.workspace.datasites / self.path
         local_data = abs_path.read_bytes()
         diff = py_fast_rsync.diff(self.remote_metadata.signature_bytes, local_data)
-        client.apply_diff(
+        context.client.sync.apply_diff(
             relative_path=self.path,
             diff=diff,
             expected_hash=self.local_metadata.hash,
         )
         self.status = SyncStatus.SYNCED
 
-    def reject(self, client: SyncClient, reason: Optional[str] = None) -> None:
+    def reject(self, context: SyftBoxContextInterface, reason: Optional[str] = None) -> None:
         # Client doesnt have write permission, so the local changes are rejected and reverted to the remote state
-        abs_path = client.workspace.datasites / self.path
+        abs_path = context.workspace.datasites / self.path
         rejected_abs_path = format_rejected_path(abs_path)
         shutil.move(abs_path, rejected_abs_path)
 
         create_local_action = CreateLocalAction(local_metadata=None, remote_metadata=self.remote_metadata)
         try:
-            create_local_action.execute(client)
+            create_local_action.execute(context)
         except SyftPermissionError:
             # Could not download the remote file due to lack of permission,
             # so only the .rejected file is left locally
-            create_local_action.reject(client)
+            create_local_action.reject(context)
         self.status = SyncStatus.REJECTED
         self.message = reason
 
@@ -271,27 +271,27 @@ class ModifyRemoteAction(SyncAction):
 class DeleteRemoteAction(SyncAction):
     action_type = SyncActionType.DELETE_REMOTE
 
-    def execute(self, client: SyncClient):
-        client.delete(self.path)
+    def execute(self, context: SyftBoxContextInterface):
+        context.client.sync.delete(self.path)
         self.status = SyncStatus.SYNCED
 
-    def reject(self, client: SyncClient, reason: Optional[str] = None) -> None:
+    def reject(self, context: SyftBoxContextInterface, reason: Optional[str] = None) -> None:
         # User does not have permission to delete the remote file, the delete is reverted
         create_local_action = CreateLocalAction(local_metadata=self.local_metadata, remote_metadata=None)
         try:
-            create_local_action.execute(client)
+            create_local_action.execute(context)
         except SyftPermissionError:
             # Could not re-download the file due to lack of permissions,
-            create_local_action.reject(client)
+            create_local_action.reject(context)
         self.status = SyncStatus.REJECTED
         self.message = reason
 
 
-def _validate_local_action(client: SyncClient, action: SyncAction) -> None:
+def _validate_local_action(context: SyftBoxContextInterface, action: SyncAction) -> None:
     if action.action_type in {SyncActionType.DELETE_LOCAL, SyncActionType.NOOP}:
         return
 
-    abs_path = client.workspace.datasites / action.path
+    abs_path = context.workspace.datasites / action.path
 
     # Create/modify local without remote metadata is invalid
     if (
@@ -309,12 +309,12 @@ def _validate_local_action(client: SyncClient, action: SyncAction) -> None:
         raise SyncValidationError(f"File {abs_path} is larger than {MAX_FILE_SIZE_MB}MB.")
 
 
-def _validate_remote_action(client: SyncClient, action: SyncAction) -> None:
+def _validate_remote_action(context: SyftBoxContextInterface, action: SyncAction) -> None:
     # No validation needed for delete or noop actions
     if action.action_type in {SyncActionType.DELETE_REMOTE, SyncActionType.NOOP}:
         return
 
-    abs_path = client.workspace.datasites / action.path
+    abs_path = context.workspace.datasites / action.path
 
     # Create/modify remote without local metadata is invalid
     if (
@@ -340,7 +340,7 @@ def _validate_remote_action(client: SyncClient, action: SyncAction) -> None:
         raise SyncValidationError(f"Encountered invalid permission file {abs_path}.")
 
 
-def validate_sync_action(client: SyncClient, action: SyncAction) -> None:
+def validate_sync_action(context: SyftBoxContextInterface, action: SyncAction) -> None:
     """
     Validate if the action can be executed.
 
@@ -351,6 +351,6 @@ def validate_sync_action(client: SyncClient, action: SyncAction) -> None:
         SyncValidationError: If the action is invalid.
     """
     if action.side_to_update == SyncSide.LOCAL:
-        _validate_local_action(client, action)
+        _validate_local_action(context, action)
     else:
-        _validate_remote_action(client, action)
+        _validate_remote_action(context, action)
