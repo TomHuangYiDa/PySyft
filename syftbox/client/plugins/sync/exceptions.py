@@ -1,7 +1,8 @@
-from syftbox.client.exceptions import SyftBoxError, SyftServerError
+from syftbox.client.exceptions import SyftServerError
+from syftbox.lib.exceptions import SyftBoxException
 
 
-class FatalSyncError(SyftBoxError):
+class FatalSyncError(SyftBoxException):
     """Base exception to signal sync should be interrupted."""
 
     pass
@@ -17,5 +18,5 @@ class SyftPermissionError(SyftServerError):
     pass
 
 
-class SyncValidationError(SyftBoxError):
+class SyncValidationError(SyftBoxException):
     pass

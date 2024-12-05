@@ -131,6 +131,13 @@ class SyncAction(ABC):
     def is_noop(self) -> bool:
         return self.action_type == SyncActionType.NOOP
 
+    @property
+    def result_local_state(self) -> FileMetadata:
+        """Metadata of the local file after the action is executed successfully."""
+        if self.side_to_update == SyncSide.LOCAL:
+            return self.remote_metadata
+        return self.local_metadata
+
 
 class NoopAction(SyncAction):
     action_type = SyncActionType.NOOP

@@ -8,12 +8,17 @@ from loguru import logger
 
 from syftbox.client.exceptions import SyftServerError
 from syftbox.client.plugins.sync.datasite_state import DatasiteState
-from syftbox.client.plugins.sync.exceptions import FatalSyncError, SyftPermissionError, SyncEnvironmentError
+from syftbox.client.plugins.sync.exceptions import (
+    FatalSyncError,
+    SyftPermissionError,
+    SyncEnvironmentError,
+    SyncValidationError,
+)
 from syftbox.client.plugins.sync.local_state import LocalState
 from syftbox.client.plugins.sync.queue import SyncQueue, SyncQueueItem
 from syftbox.client.plugins.sync.sync_action import SyncAction, determine_sync_action
 from syftbox.client.plugins.sync.sync_client import SyncClient
-from syftbox.client.plugins.sync.types import SyncActionType, SyncStatus
+from syftbox.client.plugins.sync.types import SyncActionType
 from syftbox.lib.ignore import filter_ignored_paths
 from syftbox.server.sync.hash import hash_file
 from syftbox.server.sync.models import FileMetadata
@@ -83,51 +88,48 @@ class SyncConsumer:
 
     def determine_action(self, item: SyncQueueItem) -> SyncAction:
         path = item.data.path
-        local_syncstate = self.get_current_local_metadata(path)
-        previous_local_syncstate = self.get_previous_local_metadata(path)
-        server_syncstate = self.get_current_remote_metadata(path)
+        current_local_metadata = self.get_current_local_metadata(path)
+        previous_local_metadata = self.get_previous_local_metadata(path)
+        current_remote_metadata = self.get_current_remote_metadata(path)
 
         return determine_sync_action(
-            local_syncstate=local_syncstate,
-            previous_local_metadata=previous_local_syncstate,
-            server_syncstate=server_syncstate,
+            current_local_metadata=current_local_metadata,
+            previous_local_metadata=previous_local_metadata,
+            current_remote_metadata=current_remote_metadata,
         )
 
-    def process_action(self, action: SyncAction) -> None:
-        if action.is_noop():
-            return
-
-        logger.info(action.info_message)
+    def process_action(self, action: SyncAction) -> SyncAction:
+        """
+        Execute an action and handle any exceptions that may occur. Actions are either:
+        - Executed successfully (status = SYNCED)
+        - Rejected by the server (status = REJECTED). Rejection behaviour is defined by the action.
+            For example, a rejected local deletion will be reverted by creating the file again.
+        - Error occurred during execution (status = ERROR), the action will be retried in the next sync.
+            Errors could be either validation errors (file is too large, etc.) or server errors (connection issues, etc.)
+        """
         try:
+            if action.is_noop():
+                return
+
+            logger.info(action.info_message)
+            action.validate(self.client)
             action.execute(self.client)
         except SyftPermissionError as e:
             action.reject(self.client, reason=str(e))
-        except (SyftServerError, httpx.RequestError) as e:
-            # Unknown server error or connection error, retry next sync
+        except SyncValidationError as e:
+            # TODO Should we reject validation errors as well?
             action.error(e)
+            logger.warning(f"Validation error: {e}")
+        except (SyftServerError, httpx.RequestError) as e:
+            action.error(e)
+            logger.error(f"Failed to sync file {action.path}, it will be retried in the next sync. Reason: {e}")
 
-    def write_to_local_state(self, action: SyncAction) -> None:
-        if action.action_type == SyncActionType.NOOP:
-            return
-
-        if action.status == SyncStatus.SYNCED:
-            self.local_state.insert_synced_file(
-                path=action.path,
-                state=action.result_local_state,
-                action=action.action_type,
-            )
-        else:
-            self.local_state.insert_status_info(
-                path=action.path,
-                status=action.status,
-                message=action.message,
-                action=action.action_type,
-            )
+        return action
 
     def process_filechange(self, item: SyncQueueItem) -> None:
         action = self.determine_action(item)
-        self.process_action(action)
-        self.write_to_local_state(action)
+        action = self.process_action(action)
+        self.local_state.insert_completed_action(action)
 
     def get_current_local_metadata(self, path: Path) -> Optional[FileMetadata]:
         abs_path = self.client.workspace.datasites / path
