@@ -1,6 +1,5 @@
 import json
 import re
-import sqlite3
 from collections import defaultdict
 from enum import Enum
 from pathlib import Path
@@ -11,6 +10,7 @@ import yaml
 from pydantic import BaseModel, model_validator
 from wcmatch.glob import globmatch
 
+from syftbox.lib.constants import PERM_FILE
 from syftbox.server.models.sync_models import RelativePath
 
 
@@ -39,14 +39,12 @@ class PermissionRule(BaseModel):
     permissions: List[PermissionType]  # read/write/create/admin
     priority: int
 
-    _PERMFILE_NAME: str = "syftperm.yaml"  # always the same
-
     def __eq__(self, other):
         return self.model_dump() == other.model_dump()
 
     @property
     def permfile_path(self):
-        return self.dir_path / self._PERMFILE_NAME
+        return self.dir_path / PERM_FILE
 
     @property
     def depth(self):
@@ -150,6 +148,17 @@ class PermissionRule(BaseModel):
             "admin": PermissionType.ADMIN in self.permissions,
         }
 
+    def as_file_json(self):
+        res = {
+            "path": self.path,
+            "user": self.user,
+            "permissions": [p.name.lower() for p in self.permissions],
+            "terminal": self.terminal,
+        }
+        if not self.allow:
+            res["type"] = "disallow"
+        return res
+
     def filepath_matches_rule_path(self, filepath: Path) -> Tuple[bool, Optional[str]]:
         if issubpath(self.dir_path, filepath):
             relative_file_path = filepath.relative_to(self.dir_path)
@@ -181,12 +190,58 @@ class PermissionRule(BaseModel):
 
 class PermissionFile(BaseModel):
     filepath: RelativePath
-    content: str
     rules: List[PermissionRule]
+
+    def save(self, path: Path):
+        with open(path, "w") as f:
+            yaml.dump([x.as_file_json() for x in self.rules], f)
+
+    @classmethod
+    def datasite_default(cls, email: str):
+        return PermissionFile.from_rule_dicts(
+            Path(email) / PERM_FILE,
+            [
+                {
+                    "path": "**",
+                    "user": email,
+                    "permissions": ["admin", "create", "write", "read"],
+                }
+            ],
+        )
 
     @property
     def depth(self):
         return len(self.filepath.parts)
+
+    @classmethod
+    def is_permission_file(cls, path: Path):
+        return path.name == PERM_FILE
+
+    @classmethod
+    def is_valid(cls, path: Path):
+        try:
+            cls.from_file(path)
+            return True
+        except Exception:
+            return False
+
+    @classmethod
+    def mine_with_public_read(cls, email: str, filepath: Path):
+        return cls.from_rule_dicts(
+            filepath,
+            [
+                {
+                    "path": "**",
+                    "user": email,
+                    "permissions": ["admin"],
+                },
+                {
+                    "path": "**",
+                    "user": "*",
+                    "permissions": ["read"],
+                },
+            ],
+        )
 
     @property
     def dir_path(self):
@@ -196,11 +251,10 @@ class PermissionFile(BaseModel):
     def from_file(cls, path):
         with open(path, "r") as f:
             rule_dicts = yaml.safe_load(f)
-            content = f.read()
-            return cls.from_rule_dicts(path, content, rule_dicts)
+            return cls.from_rule_dicts(path, rule_dicts)
 
     @classmethod
-    def from_rule_dicts(cls, permfile_file_path, content, rule_dicts):
+    def from_rule_dicts(cls, permfile_file_path, rule_dicts):
         if not isinstance(rule_dicts, list):
             raise ValueError(f"rules should be passed as a list of dicts, received {type(rule_dicts)}")
         rules = []
@@ -208,12 +262,16 @@ class PermissionFile(BaseModel):
         for i, rule_dict in enumerate(rule_dicts):
             rule = PermissionRule.from_rule_dict(dir_path, rule_dict, priority=i)
             rules.append(rule)
-        return cls(filepath=permfile_file_path, content=content, rules=rules)
+        return cls(filepath=permfile_file_path, rules=rules)
 
     @classmethod
     def from_string(cls, s, path):
         dicts = yaml.safe_load(s)
-        return cls.from_rule_dicts(Path(path), s, dicts)
+        return cls.from_rule_dicts(Path(path), dicts)
+
+    @classmethod
+    def from_bytes(cls, b, path):
+        return cls.from_string(b.decode("utf-8"), path)
 
 
 class ComputedPermission(BaseModel):
@@ -234,18 +292,22 @@ class ComputedPermission(BaseModel):
     }
 
     @classmethod
-    def from_user_and_path(cls, cursor: sqlite3.Cursor, user: str, path: Path):
-        from syftbox.server.db.db import get_rules_for_path
-
-        rules: List[PermissionRule] = get_rules_for_path(cursor, path)
-
+    def from_user_rules_and_path(cls, rules: List[PermissionRule], user: str, path: Path):
         permission = cls(user=user, file_path=path)
         for rule in rules:
             permission.apply(rule)
-
         return permission
 
+    @property
+    def path_owner(self):
+        """owner of the datasite for this path"""
+        return str(self.file_path).split("/", 1)[0]
+
     def has_permission(self, permtype: PermissionType):
+        if self.path_owner == self.user:
+            return True
+        if self.perms[PermissionType.ADMIN]:
+            return True
         return self.perms[permtype]
 
     def user_matches(self, rule: PermissionRule):
@@ -307,7 +369,7 @@ def convert_permission(old_perm_dict: dict) -> dict:
         new_perm_dict = {
             "permissions": user_permissions[email],
             "path": "**",
-            "user": email if email != "GLOBAL" else "*",  # "*" is a wildcard for all users
+            "user": (email if email != "GLOBAL" else "*"),  # "*" is a wildcard for all users
         }
         if terminal:
             new_perm_dict["terminal"] = terminal
@@ -335,7 +397,7 @@ def migrate_permissions(snapshot_folder: Path):
     for file in files:
         old_data = json.loads(file.read_text())
         new_data = convert_permission(old_data)
-        new_file_path = file.with_name(file.name.replace(old_syftperm_filename, PermissionRule._PERMFILE_NAME))
+        new_file_path = file.with_name(file.name.replace(old_syftperm_filename, PERM_FILE))
         print(new_file_path)
         print(new_data)
         new_file_path.write_text(yaml.dump(new_data))

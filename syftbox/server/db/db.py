@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import List, Optional
 
 from syftbox.lib.permissions import PermissionFile, PermissionRule
-from syftbox.server.models.sync_models import FileMetadata
+from syftbox.server.models.sync_models import FileMetadata, RelativePath
 from syftbox.server.settings import ServerSettings
 
 
@@ -55,11 +55,11 @@ def get_all_metadata(conn: sqlite3.Connection, path_like: Optional[str] = None) 
     # would be nice to paginate
     return [
         FileMetadata(
-            path=row[1],
-            hash=row[2],
-            signature=row[3],
-            file_size=row[4],
-            last_modified=row[5],
+            path=row["path"],
+            hash=row["hash"],
+            signature=row["signature"],
+            file_size=row["file_size"],
+            last_modified=row["last_modified"],
         )
         for row in cursor
     ]
@@ -193,7 +193,7 @@ def get_rules_for_path(connection: sqlite3.Connection, path: Path):
         """
         SELECT * FROM rules WHERE permfile_dir in ({})
     """.format(placeholders),
-        [str(x) for x in parents],
+        [x.as_posix() for x in parents],
     )
     return [PermissionRule.from_db_row(row) for row in cursor.fetchall()]
 
@@ -254,18 +254,28 @@ def set_rules_for_permfile(connection, file: PermissionFile):
             rule2files,
         )
 
-        connection.commit()
     except Exception as e:
         connection.rollback()
         raise e
 
 
-def get_read_permissions_for_user(connection: sqlite3.Connection, user: str):
+def get_read_permissions_for_user(
+    connection: sqlite3.Connection, user: str, path_like: str | None = None
+) -> list[sqlite3.Row]:
     cursor = connection.cursor()
 
-    res = cursor.execute(
-        """
-    SELECT path,
+    params = (user, user)
+    like_clause = ""
+    if path_like:
+        if "%" in path_like:
+            raise ValueError("we don't support % in paths")
+        path_like = path_like + "%"
+        escaped_path = path_like.replace("_", "\\_")
+        like_clause += " WHERE path LIKE ? ESCAPE '\\' "
+        params = (user, user, escaped_path)
+
+    query = """
+    SELECT path, hash, signature, file_size, last_modified,
     (
         SELECT COALESCE(max(
             CASE
@@ -306,7 +316,26 @@ def get_read_permissions_for_user(connection: sqlite3.Connection, user: str):
         )
     ) AS read_permission
     FROM file_metadata f
-    """,
-        (user, user),
-    )
+    {}
+    """.format(like_clause)
+
+    res = cursor.execute(query, params)
+
     return res.fetchall()
+
+
+def get_filemetadata_with_read_access(
+    connection: sqlite3.Connection, user: str, path: RelativePath | None = None
+) -> list[FileMetadata]:
+    res = get_read_permissions_for_user(connection, user, str(path))
+    return [
+        FileMetadata(
+            path=row["path"],
+            hash=row["hash"],
+            signature=row["signature"],
+            file_size=row["file_size"],
+            last_modified=row["last_modified"],
+        )
+        for row in res
+        if row["read_permission"]
+    ]

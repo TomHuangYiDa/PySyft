@@ -15,7 +15,9 @@ from syftbox.client.plugins.sync.exceptions import FatalSyncError
 from syftbox.client.plugins.sync.manager import SyncManager
 from syftbox.client.plugins.sync.queue import SyncQueueItem
 from syftbox.client.utils.dir_tree import DirTree, create_dir_tree
+from syftbox.lib.constants import PERM_FILE
 from syftbox.lib.lib import SyftPermission
+from syftbox.lib.permissions import PermissionFile
 from syftbox.server.settings import ServerSettings
 
 fake = faker.Faker()
@@ -117,7 +119,7 @@ def test_create_file(server_client: TestClient, datasite_1: SyftClientInterface,
     # Create a file in datasite_1
     tree = {
         "folder1": {
-            "_.syftperm": SyftPermission.mine_with_public_read(datasite_1.email),
+            PERM_FILE: PermissionFile.mine_with_public_read(datasite_1.email, Path("folder1") / PERM_FILE),
             "file.txt": fake.text(max_nb_chars=1000),
         },
     }
@@ -320,7 +322,9 @@ def test_invalid_sync_to_remote(server_client: TestClient, datasite_1: SyftClien
     }
 
     create_dir_tree(Path(datasite_1.datasite), tree)
-    sync_service_1.producer.enqueue_datasite_changes(datasite=DatasiteState(datasite_1, email=datasite_1.email))
+    sync_service_1.producer.enqueue_datasite_changes(
+        datasite=DatasiteState(sync_service_1.sync_client, email=datasite_1.email),
+    )
 
     queue = sync_service_1.queue
     consumer = sync_service_1.consumer
@@ -348,7 +352,9 @@ def test_invalid_sync_to_remote(server_client: TestClient, datasite_1: SyftClien
     permission_path = datasite_1.datasite / "invalid_on_modify" / "_.syftperm"
     permission_path.write_text("invalid permission")
 
-    sync_service_1.producer.enqueue_datasite_changes(datasite=DatasiteState(datasite_1, email=datasite_1.email))
+    sync_service_1.producer.enqueue_datasite_changes(
+        datasite=DatasiteState(sync_service_1.sync_client, email=datasite_1.email),
+    )
     items_to_sync = []
     while not queue.empty():
         items_to_sync.append(queue.get())
@@ -460,6 +466,6 @@ def test_sync_health_check(datasite_1: SyftClientInterface):
     sync_service = SyncManager(datasite_1)
     sync_service.check_server_status()
 
-    sync_service.client.server_client.headers["Authorization"] = "Bearer invalid_token"
+    sync_service.sync_client.server_client.headers["Authorization"] = "Bearer invalid_token"
     with pytest.raises(FatalSyncError):
         sync_service.check_server_status()

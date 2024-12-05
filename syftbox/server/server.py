@@ -23,6 +23,7 @@ from loguru import logger
 from typing_extensions import Any, Optional, Union
 
 from syftbox.__version__ import __version__
+from syftbox.lib.constants import PERM_FILE
 from syftbox.lib.hash import collect_files, hash_files
 from syftbox.lib.lib import (
     Jsonable,
@@ -144,11 +145,11 @@ def init_db(settings: ServerSettings) -> None:
             db.delete_file_metadata(cur, m.path.as_posix())
 
     # fill the permission tables
-    for file in settings.snapshot_folder.rglob("syftperm.yaml"):
+    for file in settings.snapshot_folder.rglob(PERM_FILE):
         content = file.read_text()
         rule_dicts = yaml.safe_load(content)
         perm_file = PermissionFile.from_rule_dicts(
-            permfile_file_path=file.relative_to(settings.snapshot_folder), rule_dicts=rule_dicts, content=content
+            permfile_file_path=file.relative_to(settings.snapshot_folder), rule_dicts=rule_dicts
         )
         db.set_rules_for_permfile(con, perm_file)
 

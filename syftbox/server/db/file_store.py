@@ -1,9 +1,16 @@
+import sqlite3
 from pathlib import Path
+from typing import List
 
+import yaml
+from fastapi import HTTPException
 from pydantic import BaseModel
 
+from syftbox.lib.constants import PERM_FILE
 from syftbox.lib.hash import hash_file
+from syftbox.lib.permissions import ComputedPermission, PermissionFile, PermissionRule, PermissionType
 from syftbox.server.db import db
+from syftbox.server.db.db import get_rules_for_path, set_rules_for_permfile
 from syftbox.server.db.schema import get_db
 from syftbox.server.models.sync_models import AbsolutePath, FileMetadata, RelativePath
 from syftbox.server.settings import ServerSettings
@@ -15,6 +22,11 @@ class SyftFile(BaseModel):
     absolute_path: AbsolutePath
 
 
+def computed_permission_for_user_and_path(connection: sqlite3.Connection, user: str, path: Path):
+    rules: List[PermissionRule] = get_rules_for_path(connection, path)
+    return ComputedPermission.from_user_rules_and_path(rules=rules, user=user, path=path)
+
+
 class FileStore:
     def __init__(self, server_settings: ServerSettings) -> None:
         self.server_settings = server_settings
@@ -23,26 +35,46 @@ class FileStore:
     def db_path(self) -> AbsolutePath:
         return self.server_settings.file_db_path
 
-    def delete(self, path: RelativePath) -> None:
-        conn = get_db(self.db_path)
-        cursor = conn.cursor()
-        cursor.execute("BEGIN IMMEDIATE;")
-        try:
-            db.delete_file_metadata(cursor, str(path))
-        except ValueError:
-            pass
-        abs_path = self.server_settings.snapshot_folder / path
-        abs_path.unlink(missing_ok=True)
-        conn.commit()
-        cursor.close()
-
-    def get(self, path: RelativePath) -> SyftFile:
+    def delete(self, path: RelativePath, user: str, skip_permission_check: bool = False) -> None:
         with get_db(self.db_path) as conn:
+            if path.name.endswith(PERM_FILE) and not skip_permission_check:
+                # check admin permission
+                computed_perm = computed_permission_for_user_and_path(conn, user, path)
+                if not computed_perm.has_permission(PermissionType.ADMIN):
+                    raise PermissionError(f"User {user} does not have permission to edit syftperm file for {path}")
+
+            computed_perm = computed_permission_for_user_and_path(conn, user, path)
+            if not computed_perm.has_permission(PermissionType.WRITE):
+                raise PermissionError(f"User {user} does not have write permission for {path}")
+
+            cursor = conn.cursor()
+            cursor.execute("BEGIN IMMEDIATE;")
+            try:
+                db.delete_file_metadata(cursor, str(path))
+            except ValueError:
+                pass
+
+            if path.name.endswith(PERM_FILE):
+                # todo: implement delete for permfile
+                permfile = PermissionFile(filepath=path, rules=[])
+                set_rules_for_permfile(conn, permfile)
+
+            abs_path = self.server_settings.snapshot_folder / path
+            abs_path.unlink(missing_ok=True)
+            conn.commit()
+            cursor.close()
+
+    def get(self, path: RelativePath, user: str) -> SyftFile:
+        with get_db(self.db_path) as conn:
+            computed_perm = computed_permission_for_user_and_path(conn, user, path)
+            if not computed_perm.has_permission(PermissionType.READ):
+                raise PermissionError(f"User {user} does not have read permission for {path}")
+
             metadata = db.get_one_metadata(conn, path=str(path))
             abs_path = self.server_settings.snapshot_folder / metadata.path
 
             if not Path(abs_path).exists():
-                self.delete(metadata.path.as_posix())
+                self.delete(metadata.path.as_posix(), user)
                 raise ValueError("File not found")
             return SyftFile(
                 metadata=metadata,
@@ -53,13 +85,18 @@ class FileStore:
     def exists(self, path: RelativePath) -> bool:
         with get_db(self.db_path) as conn:
             try:
+                # we are skipping permission check here for now
                 db.get_one_metadata(conn, path=str(path))
                 return True
             except ValueError:
                 return False
 
-    def get_metadata(self, path: RelativePath) -> FileMetadata:
+    def get_metadata(self, path: RelativePath, user: str, skip_permission_check: bool = False) -> FileMetadata:
         with get_db(self.db_path) as conn:
+            if not skip_permission_check:
+                computed_perm = computed_permission_for_user_and_path(conn, user, path)
+                if not computed_perm.has_permission(PermissionType.READ):
+                    raise PermissionError(f"User {user} does not have read permission for {path}")
             metadata = db.get_one_metadata(conn, path=str(path))
             return metadata
 
@@ -67,21 +104,47 @@ class FileStore:
         with open(path, "rb") as f:
             return f.read()
 
-    def put(self, path: Path, contents: bytes) -> None:
-        abs_path = self.server_settings.snapshot_folder / path
-        abs_path.parent.mkdir(exist_ok=True, parents=True)
-
-        conn = get_db(self.db_path)
-        cursor = conn.cursor()
-        cursor.execute("BEGIN IMMEDIATE;")
-        abs_path.write_bytes(contents)
-        metadata = hash_file(abs_path, root_dir=self.server_settings.snapshot_folder)
-        db.save_file_metadata(cursor, metadata)
-        conn.commit()
-        cursor.close()
-        conn.close()
-
-    def list(self, path: RelativePath) -> list[FileMetadata]:
+    def put(
+        self,
+        path: Path,
+        contents: bytes,
+        user: str,
+        check_permission: PermissionType | None = None,
+        skip_permission_check: bool = False,
+    ) -> None:
         with get_db(self.db_path) as conn:
-            metadata = db.get_all_metadata(conn, path_like=path.as_posix())
-            return metadata
+            if path.name.endswith(PERM_FILE) and not skip_permission_check:
+                # check admin permission
+                computed_perm = computed_permission_for_user_and_path(conn, user, path)
+                if not computed_perm.has_permission(PermissionType.ADMIN):
+                    raise PermissionError(f"User {user} does not have permission to edit syftperm file for {path}")
+
+            if not skip_permission_check:
+                computed_perm = computed_permission_for_user_and_path(conn, user, path)
+                if check_permission not in [PermissionType.WRITE, PermissionType.CREATE]:
+                    raise ValueError(f"check_permission must be either WRITE or CREATE, got {check_permission}")
+
+                if not computed_perm.has_permission(check_permission):
+                    raise PermissionError(f"User {user} does not have write permission for {path}")
+
+            cursor = conn.cursor()
+            cursor.execute("BEGIN IMMEDIATE;")
+            if path.name.endswith(PERM_FILE):
+                try:
+                    permfile = PermissionFile.from_bytes(contents, path)
+                except (yaml.YAMLError, ValueError):
+                    raise HTTPException(status_code=400, detail="invalid syftpermission contents, skipped writing")
+                set_rules_for_permfile(conn, permfile)
+
+            abs_path = self.server_settings.snapshot_folder / path
+            abs_path.parent.mkdir(exist_ok=True, parents=True)
+
+            abs_path.write_bytes(contents)
+            metadata = hash_file(abs_path, root_dir=self.server_settings.snapshot_folder)
+            db.save_file_metadata(cursor, metadata)
+            conn.commit()
+            cursor.close()
+
+    def list_for_user(self, path: RelativePath, email: str) -> list[FileMetadata]:
+        with get_db(self.db_path) as conn:
+            return db.get_filemetadata_with_read_access(conn, email, path)

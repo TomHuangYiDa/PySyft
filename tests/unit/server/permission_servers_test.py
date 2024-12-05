@@ -4,12 +4,13 @@ from typing import Optional
 
 import pytest
 
-from syftbox.lib.permissions import ComputedPermission, PermissionFile, PermissionType
+from syftbox.lib.permissions import PermissionFile, PermissionType
 from syftbox.server.db.db import (
     get_read_permissions_for_user,
     get_rules_for_permfile,
     set_rules_for_permfile,
 )
+from syftbox.server.db.file_store import computed_permission_for_user_and_path
 from syftbox.server.db.schema import get_db
 
 
@@ -125,6 +126,7 @@ def test_insert_permissions_from_file(connection_with_tables: sqlite3.Connection
     file = PermissionFile.from_string(yaml_string, file_path)
 
     set_rules_for_permfile(connection_with_tables, file)
+    connection_with_tables.commit()
 
     assert len(get_all_file_mappings(connection_with_tables)) == 2
 
@@ -151,6 +153,7 @@ def test_overwrite_permissions_from_file(connection_with_tables: sqlite3.Connect
     file_path = "user@example.org/test2/.syftperm"
     file = PermissionFile.from_string(yaml_string, file_path)
     set_rules_for_permfile(connection_with_tables, file)
+    connection_with_tables.commit()
     written_rules = get_rules_for_permfile(connection_with_tables, file)
 
     permissions = [x.permissions for x in written_rules]
@@ -196,6 +199,7 @@ def test_overwrite_permissions_from_file(connection_with_tables: sqlite3.Connect
     file_path = "user@example.org/test2/.syftperm"
     file = PermissionFile.from_string(yaml_string, file_path)
     set_rules_for_permfile(connection_with_tables, file)
+    connection_with_tables.commit()
     new_existing_rules = get_rules_for_permfile(connection_with_tables, file)
     paths = [x.path for x in new_existing_rules]
     permissions = [x.permissions for x in new_existing_rules]
@@ -245,9 +249,11 @@ def test_computed_permissions(connection_with_tables: sqlite3.Connection):
     file_path = "user@example.org/test2/.syftperm"
     file = PermissionFile.from_string(yaml_string, file_path)
     set_rules_for_permfile(connection_with_tables, file)
+    connection_with_tables.commit()
 
     # TODO: split this and decouple db and permission overlaying
-    computed_permission = ComputedPermission.from_user_and_path(
+
+    computed_permission = computed_permission_for_user_and_path(
         connection_with_tables, "user@example.org", Path("user@example.org/test2/a.txt")
     )
     assert computed_permission.has_permission(PermissionType.READ)
@@ -549,3 +555,6 @@ def test_for_email(connection_with_tables: sqlite3.Connection):
     assert len(res) == 1
     assert res[0]["path"] == "alice@example.org/test/bob@example.org/data.txt"
     assert res[0]["read_permission"]
+
+    # TODO: test like clause
+    # TODO: add dir state test
