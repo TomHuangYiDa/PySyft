@@ -221,7 +221,7 @@ class SyncDecision(BaseModel):
         is_invalid_permission_change = (
             remote_op in [SyncDecisionType.CREATE, SyncDecisionType.MODIFY]
             and PermissionFile.is_permission_file(local_abs_path)
-            and not PermissionFile.is_valid(local_abs_path)
+            and not PermissionFile.is_valid(local_abs_path, Path("/"))  # does not matter here
         )
         return is_invalid_permission_change
 

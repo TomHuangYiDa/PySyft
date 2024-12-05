@@ -134,7 +134,7 @@ def query_rules_for_permfile(cursor, file: PermissionFile):
         """
         SELECT * FROM rules WHERE permfile_path = ? ORDER BY priority
     """,
-        (str(file.filepath),),
+        (str(file.relative_filepath),),
     )
     return cursor.fetchall()
 
@@ -211,7 +211,7 @@ def set_rules_for_permfile(connection, file: PermissionFile):
         DELETE FROM rules
         WHERE permfile_path = ?
         """,
-            (str(file.filepath),),
+            (str(file.relative_filepath),),
         )
 
         # TODO
@@ -257,6 +257,60 @@ def set_rules_for_permfile(connection, file: PermissionFile):
     except Exception as e:
         connection.rollback()
         raise e
+
+
+def get_permrules_for_in_branch(connection: sqlite3.Connection, path: Path):
+    cursor = connection.cursor()
+    parents = [x.as_posix() for x in path.parents]
+    placeholders = ",".join("?" * len(parents))
+    cursor.execute(
+        """
+        SELECT * FROM rules WHERE permfile_dir in ({})
+    """.format(placeholders),
+        parents,
+    )
+    return [PermissionRule.from_db_row(row) for row in cursor.fetchall()]
+
+
+def get_metadata_for_file(connection: sqlite3.Connection, path: Path):
+    cursor = connection.cursor()
+    cursor.execute("SELECT * FROM file_metadata WHERE path = ?", (str(path),))
+    row = cursor.fetchone()
+    return (
+        row["id"],
+        FileMetadata(
+            path=row["path"],
+            hash=row["hash"],
+            signature=row["signature"],
+            file_size=row["file_size"],
+            last_modified=row["last_modified"],
+        ),
+    )
+
+
+def link_existing_rules_to_file(connection: sqlite3.Connection, path: Path):
+    # 1 find all rules in that branch of the tree
+    # 2 check which rules apply to the file
+    # 3 link them
+
+    perm_rules = get_permrules_for_in_branch(connection, path)
+
+    rule2files = []
+    _id, _ = get_metadata_for_file(connection, path)
+
+    for rule in perm_rules:
+        match, match_for_email = rule.filepath_matches_rule_path(path)
+        if match:
+            rule2files.append([str(rule.permfile_path), rule.priority, _id, match_for_email])
+    cursor = connection.cursor()
+    cursor.executemany(
+        """
+        INSERT INTO rule_files (permfile_path, priority, file_id, match_for_email) VALUES (?, ?, ?, ?)
+        ON CONFLICT(permfile_path, priority, file_id) DO UPDATE SET
+            match_for_email = excluded.match_for_email
+    """,
+        rule2files,
+    )
 
 
 def get_read_permissions_for_user(
@@ -322,6 +376,17 @@ def get_read_permissions_for_user(
     res = cursor.execute(query, params)
 
     return res.fetchall()
+
+
+def print_table(connection: sqlite3.Connection, table: str):
+    """util function for debugging"""
+    cursor = connection.cursor()
+    cursor.execute(f"SELECT * FROM {table}")
+    rows = cursor.fetchall()
+    for i, row in enumerate(rows):
+        if i == 0:
+            print("  |  ".join(dict(row).keys()))
+        print("  |  ".join(str(x) for x in list(dict(row).values())))
 
 
 def get_filemetadata_with_read_access(

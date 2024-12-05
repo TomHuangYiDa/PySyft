@@ -10,7 +10,7 @@ from syftbox.lib.constants import PERM_FILE
 from syftbox.lib.hash import hash_file
 from syftbox.lib.permissions import ComputedPermission, PermissionFile, PermissionRule, PermissionType
 from syftbox.server.db import db
-from syftbox.server.db.db import get_rules_for_path, set_rules_for_permfile
+from syftbox.server.db.db import get_rules_for_path, link_existing_rules_to_file, set_rules_for_permfile
 from syftbox.server.db.schema import get_db
 from syftbox.server.models.sync_models import AbsolutePath, FileMetadata, RelativePath
 from syftbox.server.settings import ServerSettings
@@ -56,7 +56,7 @@ class FileStore:
 
             if path.name.endswith(PERM_FILE):
                 # todo: implement delete for permfile
-                permfile = PermissionFile(filepath=path, rules=[])
+                permfile = PermissionFile(relative_filepath=path, rules=[])
                 set_rules_for_permfile(conn, permfile)
 
             abs_path = self.server_settings.snapshot_folder / path
@@ -129,6 +129,13 @@ class FileStore:
 
             cursor = conn.cursor()
             cursor.execute("BEGIN IMMEDIATE;")
+            abs_path = self.server_settings.snapshot_folder / path
+            abs_path.parent.mkdir(exist_ok=True, parents=True)
+
+            abs_path.write_bytes(contents)
+            metadata = hash_file(abs_path, root_dir=self.server_settings.snapshot_folder)
+            db.save_file_metadata(cursor, metadata)
+
             if path.name.endswith(PERM_FILE):
                 try:
                     permfile = PermissionFile.from_bytes(contents, path)
@@ -136,12 +143,8 @@ class FileStore:
                     raise HTTPException(status_code=400, detail="invalid syftpermission contents, skipped writing")
                 set_rules_for_permfile(conn, permfile)
 
-            abs_path = self.server_settings.snapshot_folder / path
-            abs_path.parent.mkdir(exist_ok=True, parents=True)
+            link_existing_rules_to_file(conn, path)
 
-            abs_path.write_bytes(contents)
-            metadata = hash_file(abs_path, root_dir=self.server_settings.snapshot_folder)
-            db.save_file_metadata(cursor, metadata)
             conn.commit()
             cursor.close()
 

@@ -171,7 +171,14 @@ def test_overwrite_permissions_from_file(connection_with_tables: sqlite3.Connect
     assert allows == [True, True, False]
 
     assert (
-        len([x for x in get_all_file_mappings(connection_with_tables) if x["permfile_path"] == str(file.filepath)]) == 2
+        len(
+            [
+                x
+                for x in get_all_file_mappings(connection_with_tables)
+                if x["permfile_path"] == str(file.relative_filepath)
+            ]
+        )
+        == 2
     )
 
     # overwrite

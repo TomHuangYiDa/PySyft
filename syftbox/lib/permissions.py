@@ -1,5 +1,6 @@
 import json
 import re
+import traceback
 from collections import defaultdict
 from enum import Enum
 from pathlib import Path
@@ -189,7 +190,7 @@ class PermissionRule(BaseModel):
 
 
 class PermissionFile(BaseModel):
-    filepath: RelativePath
+    relative_filepath: RelativePath
     rules: List[PermissionRule]
 
     def save(self, path: Path):
@@ -211,18 +212,20 @@ class PermissionFile(BaseModel):
 
     @property
     def depth(self):
-        return len(self.filepath.parts)
+        return len(self.relative_filepath.parts)
 
     @classmethod
     def is_permission_file(cls, path: Path):
         return path.name == PERM_FILE
 
     @classmethod
-    def is_valid(cls, path: Path):
+    def is_valid(cls, path: Path, datasite_path: Path, _print=True):
         try:
-            cls.from_file(path)
+            cls.from_file(path, datasite_path)
             return True
-        except Exception:
+        except Exception as e:
+            if _print:
+                print(f"Invalid permission file {path}: {e}\n{traceback.format_exc()}")
             return False
 
     @classmethod
@@ -245,13 +248,14 @@ class PermissionFile(BaseModel):
 
     @property
     def dir_path(self):
-        return self.filepath.parent
+        return self.relative_filepath.parent
 
     @classmethod
-    def from_file(cls, path):
+    def from_file(cls, path: Path, datasite_path: Path):
         with open(path, "r") as f:
             rule_dicts = yaml.safe_load(f)
-            return cls.from_rule_dicts(path, rule_dicts)
+            relative_path = path.relative_to(datasite_path)
+            return cls.from_rule_dicts(relative_path, rule_dicts)
 
     @classmethod
     def from_rule_dicts(cls, permfile_file_path, rule_dicts):
@@ -262,7 +266,7 @@ class PermissionFile(BaseModel):
         for i, rule_dict in enumerate(rule_dicts):
             rule = PermissionRule.from_rule_dict(dir_path, rule_dict, priority=i)
             rules.append(rule)
-        return cls(filepath=permfile_file_path, rules=rules)
+        return cls(relative_filepath=permfile_file_path, rules=rules)
 
     @classmethod
     def from_string(cls, s, path):
