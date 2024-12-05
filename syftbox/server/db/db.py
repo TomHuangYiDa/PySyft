@@ -314,7 +314,7 @@ def link_existing_rules_to_file(connection: sqlite3.Connection, path: Path):
 
 
 def get_read_permissions_for_user(
-    connection: sqlite3.Connection, user: str, path_like: str | None = None
+    connection: sqlite3.Connection, user: str, path_like: Optional[str] = None
 ) -> list[sqlite3.Row]:
     cursor = connection.cursor()
 
@@ -390,7 +390,7 @@ def print_table(connection: sqlite3.Connection, table: str):
 
 
 def get_filemetadata_with_read_access(
-    connection: sqlite3.Connection, user: str, path: RelativePath | None = None
+    connection: sqlite3.Connection, user: str, path: Optional[RelativePath] = None
 ) -> list[FileMetadata]:
     res = get_read_permissions_for_user(connection, user, str(path))
     return [

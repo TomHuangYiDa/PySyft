@@ -1,6 +1,6 @@
 import sqlite3
 from pathlib import Path
-from typing import List
+from typing import List, Optional
 
 import yaml
 from fastapi import HTTPException
@@ -109,7 +109,7 @@ class FileStore:
         path: Path,
         contents: bytes,
         user: str,
-        check_permission: PermissionType | None = None,
+        check_permission: Optional[PermissionType] = None,
         skip_permission_check: bool = False,
     ) -> None:
         with get_db(self.db_path) as conn:
