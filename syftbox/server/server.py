@@ -29,7 +29,7 @@ from syftbox.lib.lib import (
     Jsonable,
     get_datasites,
 )
-from syftbox.lib.permissions import PermissionFile
+from syftbox.lib.permissions import PermissionFile, migrate_permissions
 from syftbox.server.analytics import log_analytics_event
 from syftbox.server.db import db
 from syftbox.server.db.schema import get_db
@@ -125,6 +125,9 @@ def create_folders(folders: list[str]) -> None:
 
 
 def init_db(settings: ServerSettings) -> None:
+    # remove this after the upcoming release
+    migrate_permissions(settings.snapshot_folder)
+
     # might take very long as snapshot folder grows
     logger.info(f"> Collecting Files from {settings.snapshot_folder.absolute()}")
     files = collect_files(settings.snapshot_folder.absolute())
@@ -152,6 +155,7 @@ def init_db(settings: ServerSettings) -> None:
             permfile_file_path=file.relative_to(settings.snapshot_folder), rule_dicts=rule_dicts
         )
         db.set_rules_for_permfile(con, perm_file)
+        db.link_existing_rules_to_file(con, file.relative_to(settings.snapshot_folder))
 
     cur.close()
     con.commit()
@@ -173,9 +177,8 @@ async def lifespan(app: FastAPI, settings: Optional[ServerSettings] = None):
 
     create_folders(settings.folders)
 
-    users = Users(path=settings.user_file_path)
     logger.info("> Loading Users")
-    logger.info(users)
+    users = Users(path=settings.user_file_path)
 
     init_db(settings)
 
