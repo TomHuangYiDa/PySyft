@@ -134,7 +134,7 @@ def query_rules_for_permfile(cursor, file: PermissionFile):
         """
         SELECT * FROM rules WHERE permfile_path = ? ORDER BY priority
     """,
-        (str(file.relative_filepath),),
+        (file.relative_filepath.as_posix(),),
     )
     return cursor.fetchall()
 

@@ -4,10 +4,12 @@ from typing import Optional
 
 import pytest
 
+from syftbox.lib.constants import PERM_FILE
 from syftbox.lib.permissions import PermissionFile, PermissionType
 from syftbox.server.db.db import (
     get_read_permissions_for_user,
     get_rules_for_permfile,
+    print_table,
     set_rules_for_permfile,
 )
 from syftbox.server.db.file_store import computed_permission_for_user_and_path
@@ -122,7 +124,7 @@ def test_insert_permissions_from_file(connection_with_tables: sqlite3.Connection
       type: disallow
       terminal: true
     """
-    file_path = "user@example.org/test2/.syftperm"
+    file_path = f"user@example.org/test2/{PERM_FILE}"
     file = PermissionFile.from_string(yaml_string, file_path)
 
     set_rules_for_permfile(connection_with_tables, file)
@@ -150,11 +152,15 @@ def test_overwrite_permissions_from_file(connection_with_tables: sqlite3.Connect
       type: disallow
       terminal: true
     """
-    file_path = "user@example.org/test2/.syftperm"
+    file_path = f"user@example.org/test2/{PERM_FILE}"
     file = PermissionFile.from_string(yaml_string, file_path)
     set_rules_for_permfile(connection_with_tables, file)
     connection_with_tables.commit()
     written_rules = get_rules_for_permfile(connection_with_tables, file)
+    # print all the tables
+    print_table(connection_with_tables, "rules")
+    print_table(connection_with_tables, "rule_files")
+    print_table(connection_with_tables, "file_metadata")
 
     permissions = [x.permissions for x in written_rules]
     users = [x.user for x in written_rules]
@@ -203,7 +209,7 @@ def test_overwrite_permissions_from_file(connection_with_tables: sqlite3.Connect
       terminal: true
     """
 
-    file_path = "user@example.org/test2/.syftperm"
+    file_path = f"user@example.org/test2/{PERM_FILE}"
     file = PermissionFile.from_string(yaml_string, file_path)
     set_rules_for_permfile(connection_with_tables, file)
     connection_with_tables.commit()
@@ -253,7 +259,7 @@ def test_computed_permissions(connection_with_tables: sqlite3.Connection):
       terminal: true
     """
 
-    file_path = "user@example.org/test2/.syftperm"
+    file_path = f"user@example.org/test2/{PERM_FILE}"
     file = PermissionFile.from_string(yaml_string, file_path)
     set_rules_for_permfile(connection_with_tables, file)
     connection_with_tables.commit()
@@ -290,7 +296,7 @@ def test_single_read_permission(connection_with_tables: sqlite3.Connection):
 
     insert_rule(
         cursor=cursor,
-        permfile_path="user@example.org/test2/.syftperm",
+        permfile_path=f"user@example.org/test2/{PERM_FILE}",
         priority=1,
         path="*",
         user="*",
@@ -302,7 +308,7 @@ def test_single_read_permission(connection_with_tables: sqlite3.Connection):
 
     insert_rule_files(
         cursor=cursor,
-        permfile_path="user@example.org/test2/.syftperm",
+        permfile_path=f"user@example.org/test2/{PERM_FILE}",
         priority=1,
         fileid=1,
     )
@@ -322,7 +328,7 @@ def test_single_admin_permission(connection_with_tables: sqlite3.Connection):
 
     insert_rule(
         cursor=cursor,
-        permfile_path="user@example.org/test2/.syftperm",
+        permfile_path=f"user@example.org/test2/{PERM_FILE}",
         priority=1,
         path="*",
         user="*",
@@ -334,7 +340,7 @@ def test_single_admin_permission(connection_with_tables: sqlite3.Connection):
 
     insert_rule_files(
         cursor=cursor,
-        permfile_path="user@example.org/test2/.syftperm",
+        permfile_path=f"user@example.org/test2/{PERM_FILE}",
         priority=1,
         fileid=1,
     )
@@ -354,7 +360,7 @@ def test_disallow_permission(connection_with_tables: sqlite3.Connection):
 
     insert_rule(
         cursor=cursor,
-        permfile_path="user@example.org/test2/.syftperm",
+        permfile_path=f"user@example.org/test2/{PERM_FILE}",
         priority=1,
         path="*",
         user="*",
@@ -366,7 +372,7 @@ def test_disallow_permission(connection_with_tables: sqlite3.Connection):
 
     insert_rule(
         cursor=cursor,
-        permfile_path="user@example.org/test2/.syftperm",
+        permfile_path=f"user@example.org/test2/{PERM_FILE}",
         priority=2,
         path="*",
         user="*",
@@ -378,14 +384,14 @@ def test_disallow_permission(connection_with_tables: sqlite3.Connection):
 
     insert_rule_files(
         cursor=cursor,
-        permfile_path="user@example.org/test2/.syftperm",
+        permfile_path=f"user@example.org/test2/{PERM_FILE}",
         priority=1,
         fileid=1,
     )
 
     insert_rule_files(
         cursor=cursor,
-        permfile_path="user@example.org/test2/.syftperm",
+        permfile_path=f"user@example.org/test2/{PERM_FILE}",
         priority=2,
         fileid=1,
     )
@@ -416,7 +422,7 @@ def test_terminal_permission(connection_with_tables: sqlite3.Connection):
 
     insert_rule(
         cursor=cursor,
-        permfile_path="user@example.org/test2/.syftperm",
+        permfile_path=f"user@example.org/test2/{PERM_FILE}",
         priority=1,
         path="*",
         user="*",
@@ -428,7 +434,7 @@ def test_terminal_permission(connection_with_tables: sqlite3.Connection):
 
     insert_rule(
         cursor=cursor,
-        permfile_path="user@example.org/test2/.syftperm",
+        permfile_path=f"user@example.org/test2/{PERM_FILE}",
         priority=2,
         path="*",
         user="*",
@@ -440,14 +446,14 @@ def test_terminal_permission(connection_with_tables: sqlite3.Connection):
 
     insert_rule_files(
         cursor=cursor,
-        permfile_path="user@example.org/test2/.syftperm",
+        permfile_path=f"user@example.org/test2/{PERM_FILE}",
         priority=1,
         fileid=1,
     )
 
     insert_rule_files(
         cursor=cursor,
-        permfile_path="user@example.org/test2/.syftperm",
+        permfile_path=f"user@example.org/test2/{PERM_FILE}",
         priority=2,
         fileid=1,
     )
@@ -465,7 +471,7 @@ def test_inheritance(connection_with_tables: sqlite3.Connection):
     insert_file_metadata(cursor=cursor, fileid=1, path="user@example.org/test2/subdir/a.txt")
     insert_rule(
         cursor=cursor,
-        permfile_path="user@example.org/test2/.syftperm",
+        permfile_path=f"user@example.org/test2/{PERM_FILE}",
         priority=1,
         path="*",
         user="*",
@@ -477,7 +483,7 @@ def test_inheritance(connection_with_tables: sqlite3.Connection):
 
     insert_rule(
         cursor=cursor,
-        permfile_path="user@example.org/test2/.syftperm",
+        permfile_path=f"user@example.org/test2/{PERM_FILE}",
         priority=2,
         path="subdir/*",
         user="*",
@@ -489,7 +495,7 @@ def test_inheritance(connection_with_tables: sqlite3.Connection):
 
     insert_rule(
         cursor=cursor,
-        permfile_path="user@example.org/test2/subdir/.syftperm",
+        permfile_path=f"user@example.org/test2/subdir/{PERM_FILE}",
         priority=1,
         path="*",
         user="*",
@@ -501,21 +507,21 @@ def test_inheritance(connection_with_tables: sqlite3.Connection):
 
     insert_rule_files(
         cursor=cursor,
-        permfile_path="user@example.org/test2/.syftperm",
+        permfile_path=f"user@example.org/test2/{PERM_FILE}",
         priority=1,
         fileid=1,
     )
 
     insert_rule_files(
         cursor=cursor,
-        permfile_path="user@example.org/test2/.syftperm",
+        permfile_path=f"user@example.org/test2/{PERM_FILE}",
         priority=2,
         fileid=1,
     )
 
     insert_rule_files(
         cursor=cursor,
-        permfile_path="user@example.org/test2/subdir/.syftperm",
+        permfile_path=f"user@example.org/test2/subdir/{PERM_FILE}",
         priority=1,
         fileid=1,
     )
@@ -536,7 +542,7 @@ def test_for_email(connection_with_tables: sqlite3.Connection):
     # Insert rule with {useremail} placeholder
     insert_rule(
         cursor=cursor,
-        permfile_path="alice@example.org/test/.syftperm",
+        permfile_path=f"alice@example.org/test/{PERM_FILE}",
         priority=1,
         path="{useremail}/data.txt",
         user="*",
@@ -549,7 +555,7 @@ def test_for_email(connection_with_tables: sqlite3.Connection):
     # Insert rule_file mapping that only applies for specific email
     insert_rule_files(
         cursor=cursor,
-        permfile_path="alice@example.org/test/.syftperm",
+        permfile_path=f"alice@example.org/test/{PERM_FILE}",
         priority=1,
         fileid=1,
         match_for_email="bob@example.org",

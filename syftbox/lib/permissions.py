@@ -172,7 +172,9 @@ class PermissionRule(BaseModel):
             emails_in_file_path = [part for part in relative_file_path.split("/") if "@" in part]  # todo: improve this
             for email in emails_in_file_path:
                 if globmatch(
-                    str(relative_file_path), self.path.replace("{useremail}", email), flags=wcmatch.glob.GLOBSTAR
+                    str(relative_file_path),
+                    self.path.replace("{useremail}", email),
+                    flags=wcmatch.glob.GLOBSTAR,
                 ):
                     match = True
                     match_for_email = email
@@ -214,6 +216,9 @@ class PermissionFile(BaseModel):
     def depth(self):
         return len(self.relative_filepath.parts)
 
+    def to_dict(self):
+        return [x.as_file_json() for x in self.rules]
+
     @classmethod
     def is_permission_file(cls, path: Path):
         return path.name == PERM_FILE
@@ -242,6 +247,24 @@ class PermissionFile(BaseModel):
                     "path": "**",
                     "user": "*",
                     "permissions": ["read"],
+                },
+            ],
+        )
+
+    @classmethod
+    def mine_with_public_rw(cls, email: str, filepath: Path):
+        return cls.from_rule_dicts(
+            filepath,
+            [
+                {
+                    "path": "**",
+                    "user": email,
+                    "permissions": ["admin"],
+                },
+                {
+                    "path": "**",
+                    "user": "*",
+                    "permissions": ["write", "read"],
                 },
             ],
         )
