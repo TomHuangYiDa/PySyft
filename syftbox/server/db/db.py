@@ -1,13 +1,9 @@
-import os
-import shutil
 import sqlite3
-import tempfile
 from pathlib import Path
 from typing import List, Optional
 
 from syftbox.lib.permissions import PermissionFile, PermissionRule
 from syftbox.server.models.sync_models import FileMetadata, RelativePath
-from syftbox.server.settings import ServerSettings
 
 
 def save_file_metadata(conn: sqlite3.Connection, metadata: FileMetadata):
@@ -88,45 +84,6 @@ def get_all_datasites(conn: sqlite3.Connection) -> list[str]:
         """
     )
     return [row[0] for row in cursor if row[0]]
-
-
-def move_with_transaction(
-    conn: sqlite3.Connection,
-    *,
-    origin_path: Path,
-    metadata: FileMetadata,
-    server_settings: ServerSettings,
-):
-    """The file system and database do not share transactions,
-    so this operation is not atomic.
-    Ideally, files (blobs) should be immutable,
-    and the path should update to a new location
-    whenever there is a change to the file contents.
-    """
-
-    # backup the original file
-    with tempfile.NamedTemporaryFile(delete=False) as temp_file:
-        temp_path = temp_file.name
-
-    shutil.copy(origin_path, temp_path)
-
-    # Update database entry
-    from_path = metadata.path
-    relative_path = origin_path.relative_to(server_settings.snapshot_folder)
-    metadata.path = relative_path
-
-    cur = conn.cursor()
-    save_file_metadata(cur, metadata)
-    cur.close()
-    conn.commit()
-
-    # WARNING: between the move and the commit
-    # the database will be in an inconsistent state
-
-    shutil.move(from_path, origin_path)
-    # Delete the temp file if it exists
-    if os.path.exists(temp_path):
-        os.remove(temp_path)
 
 
 def query_rules_for_permfile(cursor, file: PermissionFile):
@@ -240,6 +197,7 @@ def set_rules_for_permfile(connection, file: PermissionFile):
         cursor.executemany(
             """
             INSERT INTO rule_files (permfile_path, priority, file_id, match_for_email) VALUES (?, ?, ?, ?)
+            ON CONFLICT(permfile_path, priority, file_id) DO UPDATE SET match_for_email = excluded.match_for_email
         """,
             rule2files,
         )

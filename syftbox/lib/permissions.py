@@ -8,6 +8,7 @@ from typing import List, Optional, Tuple
 
 import wcmatch
 import yaml
+from loguru import logger
 from pydantic import BaseModel, model_validator
 from wcmatch.glob import globmatch
 
@@ -425,9 +426,8 @@ def migrate_permissions(snapshot_folder: Path):
         old_data = json.loads(file.read_text())
         new_data = convert_permission(old_data)
         new_file_path = file.with_name(file.name.replace(old_syftperm_filename, PERM_FILE))
-        print(new_file_path)
-        print(new_data)
+        logger.info(
+            f"migrating permission from {file.relative_to(snapshot_folder)} to {new_file_path.relative_to(snapshot_folder)}"
+        )
         new_file_path.write_text(yaml.dump(new_data))
-        # do we need to backup the old file?
-        # might be better to temporarily leave it for debugging purposes
-        # file.unlink()
+        file.unlink()
