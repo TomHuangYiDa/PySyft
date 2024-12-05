@@ -333,13 +333,13 @@ def test_invalid_sync_to_remote(server_client: TestClient, datasite_1: SyftClien
     assert len(items_to_sync) == 6  # 3 files + 3 permissions
 
     for item in items_to_sync:
-        decision_tuple = consumer.get_decisions(item)
+        sync_action = consumer.determine_action(item)
         abs_path = item.data.local_abs_path
 
         should_be_valid = item.data.path.parent.name in ["valid", "invalid_on_modify"]
         print(f"path: {abs_path}, should_be_valid: {should_be_valid}, parent: {item.data.path.parent}")
 
-        is_valid = decision_tuple.remote_decision.is_valid(abs_path=abs_path, show_warnings=True)
+        is_valid = sync_action.is_valid(client=sync_service_1.sync_client)
         assert is_valid == should_be_valid, f"path: {abs_path}, is_valid: {is_valid}"
 
     sync_service_1.run_single_thread()
@@ -359,10 +359,10 @@ def test_invalid_sync_to_remote(server_client: TestClient, datasite_1: SyftClien
     assert len(items_to_sync) == 4  # 2 invalid files + 2 invalid permissions
 
     for item in items_to_sync:
-        decision_tuple = consumer.get_decisions(item)
+        sync_action = consumer.determine_action(item)
         abs_path = item.data.local_abs_path
 
-        is_valid = decision_tuple.remote_decision.is_valid(abs_path=abs_path, show_warnings=True)
+        is_valid = sync_action.is_valid(client=sync_service_1.sync_client)
         assert not is_valid, f"path: {abs_path}, is_valid: {is_valid}"
 
 

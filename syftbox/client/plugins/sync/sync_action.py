@@ -112,6 +112,13 @@ class SyncAction(ABC):
         """Raises a SyncValidationError if the action is invalid."""
         validate_sync_action(client, self)
 
+    def is_valid(self, client: SyncClient) -> bool:
+        try:
+            self.validate(client)
+            return True
+        except SyncValidationError:
+            return False
+
     @abstractmethod
     def execute(self, client: SyncClient) -> None:
         pass
