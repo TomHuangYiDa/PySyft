@@ -16,18 +16,18 @@ from syftbox.server.sync.models import FileMetadata
 
 
 def determine_sync_action(
-    current_local_syncstate: Optional[FileMetadata],
-    previous_local_syncstate: Optional[FileMetadata],
-    current_remote_syncstate: Optional[FileMetadata],
+    current_local_metadata: Optional[FileMetadata],
+    previous_local_metadata: Optional[FileMetadata],
+    current_remote_metadata: Optional[FileMetadata],
 ) -> "SyncAction":
     """
     Determine the action syncing should take based on the local and remote states, and the previous local state.
 
     Args:
-        current_local_syncstate (Optional[FileMetadata]): Metadata of the local file, None if it does not exist.
-        previous_local_syncstate (Optional[FileMetadata]): Metadata of the local file when it was last synced,
+        current_local_metadata (Optional[FileMetadata]): Metadata of the local file, None if it does not exist.
+        previous_local_metadata (Optional[FileMetadata]): Metadata of the local file when it was last synced,
             None if it does not exist.
-        current_remote_syncstate (Optional[FileMetadata]): Metadata of the remote file, None if it does not exist.
+        current_remote_metadata (Optional[FileMetadata]): Metadata of the remote file, None if it does not exist.
 
     Raises:
         ValueError: If the action cannot be determined.
@@ -35,40 +35,45 @@ def determine_sync_action(
     Returns:
         SyncAction: The action to take to sync the local and remote states.
     """
-    local_modified = current_local_syncstate != previous_local_syncstate
-    remote_modified = previous_local_syncstate != current_remote_syncstate
-    in_sync = current_remote_syncstate == current_local_syncstate
+    local_modified = current_local_metadata != previous_local_metadata
+    remote_modified = previous_local_metadata != current_remote_metadata
+    in_sync = current_remote_metadata == current_local_metadata
     conflict = local_modified and remote_modified
     # If the remote is modified, the local should be updated (possible conflicts are overwritten)
     side_to_update = SyncSide.LOCAL if remote_modified else SyncSide.REMOTE
 
-    local_exists = current_local_syncstate is not None
-    remote_exists = current_remote_syncstate is not None
+    local_exists = current_local_metadata is not None
+    remote_exists = current_remote_metadata is not None
     both_exist = local_exists and remote_exists
 
     if in_sync:
-        action = NoopAction(local_metadata=current_local_syncstate, remote_metadata=current_remote_syncstate)
+        action = NoopAction(local_metadata=current_local_metadata, remote_metadata=current_remote_metadata)
 
     # Pull changes from remote
     elif side_to_update == SyncSide.LOCAL and not local_exists:
-        action = CreateLocalAction(local_metadata=None, remote_metadata=current_remote_syncstate)
+        action = CreateLocalAction(local_metadata=None, remote_metadata=current_remote_metadata)
     elif side_to_update == SyncSide.LOCAL and both_exist:
-        action = ModifyLocalAction(local_metadata=current_local_syncstate, remote_metadata=current_remote_syncstate)
+        action = ModifyLocalAction(local_metadata=current_local_metadata, remote_metadata=current_remote_metadata)
     elif side_to_update == SyncSide.LOCAL and not remote_exists:
-        action = DeleteLocalAction(local_metadata=current_local_syncstate, remote_metadata=None)
+        action = DeleteLocalAction(local_metadata=current_local_metadata, remote_metadata=None)
 
     # Push changes to remote
     elif side_to_update == SyncSide.REMOTE and not remote_exists:
-        action = CreateRemoteAction(local_metadata=current_local_syncstate, remote_metadata=None)
+        action = CreateRemoteAction(local_metadata=current_local_metadata, remote_metadata=None)
     elif side_to_update == SyncSide.REMOTE and both_exist:
-        action = ModifyRemoteAction(local_metadata=current_local_syncstate, remote_metadata=current_remote_syncstate)
+        action = ModifyRemoteAction(local_metadata=current_local_metadata, remote_metadata=current_remote_metadata)
     elif side_to_update == SyncSide.REMOTE and not local_exists:
-        action = DeleteRemoteAction(local_metadata=None, remote_metadata=current_remote_syncstate)
+        action = DeleteRemoteAction(local_metadata=None, remote_metadata=current_remote_metadata)
     else:
         raise ValueError("Could not determine sync action")
 
     logger.debug(
-        f"{action.path} local_modified: {local_modified}, remote_modified: {remote_modified}, in_sync: {in_sync}, conflict: {conflict}, action: {action.action_type.value}"
+        f"path: {action.path}, "
+        f"local_modified: {local_modified}, "
+        f"remote_modified: {remote_modified}, "
+        f"in_sync: {in_sync}, "
+        f"conflict: {conflict}, "
+        f"action: {action.action_type.name}"
     )
     return action
 
@@ -101,14 +106,11 @@ class SyncAction(ABC):
 
     @property
     def side_to_update(self) -> SyncSide:
-        if self.action_type in {
-            SyncActionType.CREATE_REMOTE,
-            SyncActionType.MODIFY_REMOTE,
-            SyncActionType.DELETE_REMOTE,
-        }:
-            return SyncSide.REMOTE
-        else:
-            return SyncSide.LOCAL
+        return self.action_type.target_side
+
+    def validate(self, client: SyncClient) -> None:
+        """Raises a SyncValidationError if the action is invalid."""
+        validate_sync_action(client, self)
 
     @abstractmethod
     def execute(self, client: SyncClient) -> None:

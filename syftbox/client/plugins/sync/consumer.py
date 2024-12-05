@@ -89,7 +89,7 @@ class SyncConsumer:
 
         return determine_sync_action(
             local_syncstate=local_syncstate,
-            previous_local_syncstate=previous_local_syncstate,
+            previous_local_metadata=previous_local_syncstate,
             server_syncstate=server_syncstate,
         )
 
