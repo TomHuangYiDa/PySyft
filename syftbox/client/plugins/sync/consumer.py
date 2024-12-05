@@ -108,9 +108,6 @@ class SyncConsumer:
             Errors could be either validation errors (file is too large, etc.) or server errors (connection issues, etc.)
         """
         try:
-            if action.is_noop():
-                return
-
             logger.info(action.info_message)
             action.validate(self.client)
             action.execute(self.client)
@@ -128,6 +125,9 @@ class SyncConsumer:
 
     def process_filechange(self, item: SyncQueueItem) -> None:
         action = self.determine_action(item)
+        if action.is_noop():
+            return
+
         action = self.process_action(action)
         self.local_state.insert_completed_action(action)
 
