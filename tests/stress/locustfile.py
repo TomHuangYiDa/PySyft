@@ -4,7 +4,7 @@ from pathlib import Path
 from locust import FastHttpUser, between, task
 
 import syftbox.client.exceptions
-from syftbox.client.core import LocalSyftBoxContext
+from syftbox.client.core import SyftBoxContext
 from syftbox.client.plugins.sync.sync_action import ModifyRemoteAction
 from syftbox.client.server_client import SyftBoxClient
 from syftbox.lib.workspace import SyftWorkspace
@@ -24,7 +24,7 @@ class SyftBoxUser(FastHttpUser):
         self.email = "aziz@openmined.org"
         self.remote_state: dict[str, list[FileMetadata]] = {}
 
-        self.syft_context = LocalSyftBoxContext(
+        self.syft_context = SyftBoxContext(
             email=self.email,
             client=SyftBoxClient(conn=self.client),
             workspace=SyftWorkspace(data_dir=Path(".")),

@@ -11,6 +11,11 @@ class SyftBoxClient(ClientBase):
         self.auth = AuthClient(conn)
         self.sync = SyncClient(conn)
 
+    def register(self, email: str) -> str:
+        response = self.conn.post("/register", json={"email": email})
+        self.raise_for_status()
+        return response.json().get("token")
+
     def info(self) -> dict:
         response = self.conn.get("/info")
         self.raise_for_status(response)

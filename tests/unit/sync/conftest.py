@@ -7,7 +7,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from syftbox.client.base import PluginManagerInterface, SyftBoxContextInterface
-from syftbox.client.core import LocalSyftBoxContext
+from syftbox.client.core import SyftBoxContext
 from syftbox.client.server_client import SyftBoxClient
 from syftbox.lib.client_config import SyftClientConfig
 from syftbox.lib.datasite import create_datasite
@@ -42,7 +42,7 @@ def setup_datasite(tmp_path: Path, server_client: TestClient, email: str) -> Syf
     ws.mkdirs()
     create_datasite(ws.datasites, email)
     authenticate_testclient(server_client, email)
-    return LocalSyftBoxContext(
+    return SyftBoxContext(
         config,
         ws,
         SyftBoxClient(conn=server_client),

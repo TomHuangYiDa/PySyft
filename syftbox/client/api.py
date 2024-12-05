@@ -22,7 +22,7 @@ async def lifespan(app: FastAPI):
     yield
 
 
-def create_api(client: SyftBoxContextInterface) -> FastAPI:
+def create_api(context: SyftBoxContextInterface) -> FastAPI:
     app = FastAPI(lifespan=lifespan)
 
     allow_origins = [
@@ -33,7 +33,7 @@ def create_api(client: SyftBoxContextInterface) -> FastAPI:
         "http://localhost:8083",
         "https://syftbox.openmined.org",
     ]
-    port = client.config.client_url.port
+    port = context.config.client_url.port
     if port:
         # Allow origins for client localhost client API
         allow_origins.extend(
@@ -53,7 +53,7 @@ def create_api(client: SyftBoxContextInterface) -> FastAPI:
         allow_headers=["*"],  # Allow all headers
     )
 
-    app.state.client = client
+    app.state.context = context
 
     # Include routers
     app.include_router(index_router.router, tags=["index"])

@@ -4,7 +4,7 @@ from typing import List, Optional
 
 from loguru import logger
 
-from syftbox.client.core import LocalSyftBoxContext
+from syftbox.client.core import SyftBoxContext
 from syftbox.client.plugins.sync.types import FileChangeInfo, SyncSide
 from syftbox.lib.ignore import filter_ignored_paths, get_syftignore_matches
 from syftbox.lib.lib import SyftPermission
@@ -44,7 +44,7 @@ class DatasiteChanges:
 class DatasiteState:
     def __init__(
         self,
-        context: LocalSyftBoxContext,
+        context: SyftBoxContext,
         email: str,
         remote_state: Optional[list[FileMetadata]] = None,
     ) -> None:

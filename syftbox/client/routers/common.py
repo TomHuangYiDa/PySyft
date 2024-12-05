@@ -8,7 +8,7 @@ __all__ = ["APIContext"]
 
 # Create a dependency for typed access to the client
 async def get_context(request: Request) -> SyftBoxContextInterface:
-    return request.app.state.client
+    return request.app.state.context
 
 
 APIContext = Annotated[SyftBoxContextInterface, Depends(get_context)]
