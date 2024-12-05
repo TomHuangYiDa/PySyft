@@ -76,6 +76,10 @@ class SyftClientInterface(Protocol):
         """Log an analytics event to the server."""
         ...  # pragma: no cover
 
+    def whoami(self) -> str:
+        """Get the email address of the current user from the server."""
+        ...  # pragma: no cover
+
 
 class MetricCollector(Protocol):
     """
