@@ -7,11 +7,10 @@ import httpx
 from loguru import logger
 
 from syftbox.client.base import SyftBoxContextInterface
-from syftbox.client.exceptions import SyftServerError
+from syftbox.client.exceptions import SyftPermissionError, SyftServerError
 from syftbox.client.plugins.sync.datasite_state import DatasiteState
 from syftbox.client.plugins.sync.exceptions import (
     FatalSyncError,
-    SyftPermissionError,
     SyncEnvironmentError,
     SyncValidationError,
 )

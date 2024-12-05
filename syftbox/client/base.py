@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 import httpx
 from typing_extensions import Protocol
 
-from syftbox.client.exceptions import SyftAuthenticationError, SyftServerError
+from syftbox.client.exceptions import SyftAuthenticationError, SyftPermissionError, SyftServerError
 from syftbox.lib.client_config import SyftClientConfig
 from syftbox.lib.workspace import SyftWorkspace
 
@@ -86,7 +86,7 @@ class ClientBase:
         if response.status_code == 401:
             raise SyftAuthenticationError()
         elif response.status == 403:
-            raise SyftAuthenticationError(f"No permission to access this resource: {response.text}")
+            raise SyftPermissionError(f"No permission to access this resource: {response.text}")
         elif response.status != 200:
             raise SyftServerError(f"[{endpoint}] Server returned {response.status_code}: {response.text}")
 

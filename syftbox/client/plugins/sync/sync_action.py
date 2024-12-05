@@ -8,8 +8,9 @@ import py_fast_rsync
 from loguru import logger
 
 from syftbox.client.base import SyftBoxContextInterface
+from syftbox.client.exceptions import SyftPermissionError
 from syftbox.client.plugins.sync.constants import MAX_FILE_SIZE_MB
-from syftbox.client.plugins.sync.exceptions import SyftPermissionError, SyncValidationError
+from syftbox.client.plugins.sync.exceptions import SyncValidationError
 from syftbox.client.plugins.sync.types import SyncActionType, SyncSide, SyncStatus
 from syftbox.lib.lib import SyftPermission
 from syftbox.server.sync.models import FileMetadata
