@@ -121,4 +121,30 @@ def test_delete_without_permission(
 def test_modify_without_permissions(
     server_client: TestClient, datasite_1: SyftClientInterface, datasite_2: SyftClientInterface
 ):
-    raise NotImplementedError
+    # server_settings: ServerSettings = server_client.app_state["server_settings"]
+    sync_service_1 = SyncManager(datasite_1)
+    sync_service_2 = SyncManager(datasite_2)
+
+    # Create a folder with only read permission for datasite_2
+    tree = {
+        "folder_1": {
+            PERM_FILE: PermissionFile.mine_with_public_read(datasite_1.email, Path("folder1") / PERM_FILE),
+            "file.txt": "Hello, World!",
+        },
+    }
+    create_dir_tree(Path(datasite_1.datasite), tree)
+
+    sync_service_1.run_single_thread()
+    sync_service_2.run_single_thread()
+
+    folder_on_ds1 = datasite_1.workspace.datasites / datasite_1.email / "folder_1"
+    folder_on_ds2 = datasite_2.workspace.datasites / datasite_1.email / "folder_1"
+
+    # Modify file.txt on datasite_2 is rejected
+    (folder_on_ds2 / "file.txt").write_text("Modified")
+    sync_service_2.run_single_thread()
+    sync_service_1.run_single_thread()
+
+    assert (folder_on_ds1 / "file.txt").read_text() == "Hello, World!"
+    assert (folder_on_ds2 / "file.txt").read_text() == "Hello, World!"
+    assert format_rejected_path(folder_on_ds2 / "file.txt").read_text() == "Modified"
