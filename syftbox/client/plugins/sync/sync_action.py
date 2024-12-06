@@ -199,9 +199,8 @@ class ModifyLocalAction(SyncAction):
         self.status = SyncStatus.SYNCED
 
     def process_rejection(self, client: SyncClient, reason: Optional[str] = None) -> None:
-        # Client doesnt have read permission, so the local file is deleted
-        abs_path = client.workspace.datasites / self.path
-        abs_path.unlink()
+        # Client doesnt have read permission, so we do not apply any diff
+        # This only happens in rare race-conditions where the permission is revoked after the action is determined.
         self.status = SyncStatus.REJECTED
         self.message = reason
 
