@@ -11,6 +11,7 @@ from syftbox.client.plugins.sync.constants import MAX_FILE_SIZE_MB
 from syftbox.client.plugins.sync.exceptions import SyftPermissionError, SyncValidationError
 from syftbox.client.plugins.sync.sync_client import SyncClient
 from syftbox.client.plugins.sync.types import SyncActionType, SyncSide, SyncStatus
+from syftbox.lib.constants import REJECTED_FILE_SUFFIX
 from syftbox.lib.permissions import PermissionFile
 from syftbox.server.models.sync_models import FileMetadata
 
@@ -79,7 +80,7 @@ def determine_sync_action(
 
 
 def format_rejected_path(path: Path) -> Path:
-    return path.with_suffix(path.suffix + ".rejected")
+    return path.with_suffix(REJECTED_FILE_SUFFIX + path.suffix)
 
 
 class SyncAction(ABC):

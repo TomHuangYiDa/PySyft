@@ -50,11 +50,17 @@ class FileStore:
                 # check admin permission
                 computed_perm = computed_permission_for_user_and_path(conn, user, path)
                 if not computed_perm.has_permission(PermissionType.ADMIN):
-                    raise PermissionError(f"User {user} does not have permission to edit syftperm file for {path}")
+                    raise HTTPException(
+                        status_code=403,
+                        detail=f"User {user} does not have permission to edit syftperm file for {path}",
+                    )
 
             computed_perm = computed_permission_for_user_and_path(conn, user, path)
             if not computed_perm.has_permission(PermissionType.WRITE):
-                raise PermissionError(f"User {user} does not have write permission for {path}")
+                raise HTTPException(
+                    status_code=403,
+                    detail=f"User {user} does not have write permission for {path}",
+                )
 
             cursor = conn.cursor()
             cursor.execute("BEGIN IMMEDIATE;")
@@ -77,7 +83,10 @@ class FileStore:
         with get_db(self.db_path) as conn:
             computed_perm = computed_permission_for_user_and_path(conn, user, path)
             if not computed_perm.has_permission(PermissionType.READ):
-                raise PermissionError(f"User {user} does not have read permission for {path}")
+                raise HTTPException(
+                    status_code=403,
+                    detail=f"User {user} does not have read permission for {path}",
+                )
 
             metadata = db.get_one_metadata(conn, path=str(path))
             abs_path = self.server_settings.snapshot_folder / metadata.path
@@ -105,7 +114,10 @@ class FileStore:
             if not skip_permission_check:
                 computed_perm = computed_permission_for_user_and_path(conn, user, path)
                 if not computed_perm.has_permission(PermissionType.READ):
-                    raise PermissionError(f"User {user} does not have read permission for {path}")
+                    raise HTTPException(
+                        status_code=403,
+                        detail=f"User {user} does not have read permission for {path}",
+                    )
             metadata = db.get_one_metadata(conn, path=str(path))
             return metadata
 
@@ -126,7 +138,10 @@ class FileStore:
                 # check admin permission
                 computed_perm = computed_permission_for_user_and_path(conn, user, path)
                 if not computed_perm.has_permission(PermissionType.ADMIN):
-                    raise PermissionError(f"User {user} does not have permission to edit syftperm file for {path}")
+                    raise HTTPException(
+                        status_code=403,
+                        detail=f"User {user} does not have permission to edit syftperm file for {path}",
+                    )
 
             if not skip_permission_check:
                 computed_perm = computed_permission_for_user_and_path(conn, user, path)
@@ -137,7 +152,10 @@ class FileStore:
                     raise ValueError(f"check_permission must be either WRITE or CREATE, got {check_permission}")
 
                 if not computed_perm.has_permission(check_permission):
-                    raise PermissionError(f"User {user} does not have write permission for {path}")
+                    raise HTTPException(
+                        status_code=403,
+                        detail=f"User {user} does not have write permission for {path}",
+                    )
 
             cursor = conn.cursor()
             cursor.execute("BEGIN IMMEDIATE;")
