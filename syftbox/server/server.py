@@ -19,6 +19,7 @@ from fastapi.responses import (
 )
 from jinja2 import Template
 from loguru import logger
+from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from typing_extensions import Any, Optional, Union
 
 from syftbox.__version__ import __version__
@@ -30,6 +31,7 @@ from syftbox.server.analytics import log_analytics_event
 from syftbox.server.logger import setup_logger
 from syftbox.server.middleware import LoguruMiddleware
 from syftbox.server.settings import ServerSettings, get_server_settings
+from syftbox.server.telemetry import instrument_otel_trace_exporter
 from syftbox.server.users.auth import get_current_user
 
 from .emails.router import router as emails_router
@@ -138,6 +140,8 @@ def init_db(settings: ServerSettings) -> None:
 
 @contextlib.asynccontextmanager
 async def lifespan(app: FastAPI, settings: Optional[ServerSettings] = None):
+    instrument_otel_trace_exporter()
+
     # Startup
     if settings is None:
         settings = ServerSettings()
@@ -166,6 +170,7 @@ async def lifespan(app: FastAPI, settings: Optional[ServerSettings] = None):
 
 
 app = FastAPI(lifespan=lifespan)
+FastAPIInstrumentor.instrument_app(app=app)
 app.include_router(emails_router)
 app.include_router(sync_router)
 app.include_router(users_router)
