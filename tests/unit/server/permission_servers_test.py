@@ -9,6 +9,7 @@ from syftbox.lib.permissions import PermissionFile, PermissionType
 from syftbox.server.db.db import (
     get_read_permissions_for_user,
     get_rules_for_permfile,
+    link_existing_rules_to_file,
     print_table,
     set_rules_for_permfile,
 )
@@ -114,6 +115,10 @@ def test_insert_permissions_from_file(connection_with_tables: sqlite3.Connection
       path: a.txt
       user: user@example.org
 
+    - permissions: read
+      path: "*"
+      user: user@example.org
+
     - permissions: write
       path: b.txt
       user: user@example.org
@@ -130,7 +135,16 @@ def test_insert_permissions_from_file(connection_with_tables: sqlite3.Connection
     set_rules_for_permfile(connection_with_tables, file)
     connection_with_tables.commit()
 
-    assert len(get_all_file_mappings(connection_with_tables)) == 2
+    assert len(get_all_file_mappings(connection_with_tables)) == 5
+
+    rules_before = len(get_all_file_mappings(connection_with_tables))
+
+    path = "user@example.org/test2/d.txt"
+    insert_file_mock(connection_with_tables, path)
+    assert len(get_all_file_mappings(connection_with_tables)) == rules_before
+
+    link_existing_rules_to_file(connection_with_tables, Path(path))
+    assert len(get_all_file_mappings(connection_with_tables)) == rules_before + 1
 
 
 def test_overwrite_permissions_from_file(connection_with_tables: sqlite3.Connection):

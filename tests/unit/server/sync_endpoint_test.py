@@ -12,8 +12,7 @@ from py_fast_rsync import signature
 
 from syftbox.client.exceptions import SyftServerError
 from syftbox.client.plugins.sync.sync_client import SyncClient
-from syftbox.lib.lib import FileMetadata
-from syftbox.server.models.sync_models import ApplyDiffResponse, DiffResponse
+from syftbox.server.models.sync_models import ApplyDiffResponse, DiffResponse, FileMetadata
 from tests.unit.server.conftest import PERM_FILE, TEST_DATASITE_NAME, TEST_FILE
 
 
