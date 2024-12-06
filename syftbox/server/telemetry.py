@@ -9,11 +9,12 @@ from opentelemetry.sdk.trace.export import BatchSpanProcessor
 
 
 def instrument_otel_trace_exporter():
-    # Step 1: Configure the OTLP Exporter
-    exporter = OTLPSpanExporter(
-        endpoint="http://localhost:4318/v1/traces",
-        # endpoint="http://135.224.170.18/v1/traces",
+    traces_endpoint = os.getenv(
+        key="OTEL_EXPORTER_OTLP_TRACES_ENDPOINT",
+        default="http://localhost:4318/v1/traces",  # TODO: "https://metrics.openmined.org/v1/traces"
     )
+    # Step 1: Configure the OTLP Exporter
+    exporter = OTLPSpanExporter(endpoint=traces_endpoint)
 
     # Step 2: Set up a Tracer Provider and Span Processor
     hostname: str = platform.node()
