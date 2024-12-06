@@ -10,9 +10,10 @@ def save_file_metadata(conn: sqlite3.Connection, metadata: FileMetadata):
     # Insert the metadata into the database or update if a conflict on 'path' occurs
     conn.execute(
         """
-    INSERT INTO file_metadata (path, hash, signature, file_size, last_modified)
-    VALUES (?, ?, ?, ?, ?)
+    INSERT INTO file_metadata (path, datasite, hash, signature, file_size, last_modified)
+    VALUES (?, ?, ?, ?, ?, ?)
     ON CONFLICT(path) DO UPDATE SET
+        datasite = excluded.datasite,
         hash = excluded.hash,
         signature = excluded.signature,
         file_size = excluded.file_size,
@@ -20,6 +21,7 @@ def save_file_metadata(conn: sqlite3.Connection, metadata: FileMetadata):
     """,
         (
             str(metadata.path),
+            metadata.datasite,
             metadata.hash,
             metadata.signature,
             metadata.file_size,
@@ -49,16 +51,7 @@ def get_all_metadata(conn: sqlite3.Connection, path_like: Optional[str] = None) 
 
     cursor = conn.execute(query, params)
     # would be nice to paginate
-    return [
-        FileMetadata(
-            path=row["path"],
-            hash=row["hash"],
-            signature=row["signature"],
-            file_size=row["file_size"],
-            last_modified=row["last_modified"],
-        )
-        for row in cursor
-    ]
+    return [FileMetadata.from_row(row) for row in cursor]
 
 
 def get_one_metadata(conn: sqlite3.Connection, path: str) -> FileMetadata:
@@ -67,13 +60,7 @@ def get_one_metadata(conn: sqlite3.Connection, path: str) -> FileMetadata:
     if len(rows) == 0 or len(rows) > 1:
         raise ValueError(f"Expected 1 metadata entry for {path}, got {len(rows)}")
     row = rows[0]
-    return FileMetadata(
-        path=row[1],
-        hash=row[2],
-        signature=row[3],
-        file_size=row[4],
-        last_modified=row[5],
-    )
+    return FileMetadata.from_row(row)
 
 
 def get_all_datasites(conn: sqlite3.Connection) -> list[str]:
@@ -120,13 +107,7 @@ def get_all_files_under_syftperm(cursor, permfile: PermissionFile) -> List[Path]
     return [
         (
             row["id"],
-            FileMetadata(
-                path=Path(row["path"]),
-                hash=row["hash"],
-                signature=row["signature"],
-                file_size=row["file_size"],
-                last_modified=row["last_modified"],
-            ),
+            FileMetadata.from_row(row),
         )
         for row in cursor.fetchall()
     ]
@@ -213,13 +194,7 @@ def get_metadata_for_file(connection: sqlite3.Connection, path: Path):
     row = cursor.fetchone()
     return (
         row["id"],
-        FileMetadata(
-            path=row["path"],
-            hash=row["hash"],
-            signature=row["signature"],
-            file_size=row["file_size"],
-            last_modified=row["last_modified"],
-        ),
+        FileMetadata.from_row(row),
     )
 
 
@@ -275,7 +250,7 @@ def get_read_permissions_for_user(
     """
     cursor = connection.cursor()
 
-    params = (user, user)
+    params = (user, user, user)
     like_clause = ""
     if path_like:
         if "%" in path_like:
@@ -283,7 +258,7 @@ def get_read_permissions_for_user(
         path_like = path_like + "%"
         escaped_path = path_like.replace("_", "\\_")
         like_clause += " WHERE path LIKE ? ESCAPE '\\' "
-        params = (user, user, escaped_path)
+        params = (user, user, user, escaped_path)
 
     query = """
     SELECT path, hash, signature, file_size, last_modified,
@@ -325,7 +300,7 @@ def get_read_permissions_for_user(
             JOIN rules ON rule_files.permfile_path = rules.permfile_path and rule_files.priority = rules.priority
             WHERE rule_files.file_id = f.id and (rules.user = ? or rules.user = "*" or rule_files.match_for_email = ?)
         )
-    ) AS read_permission
+    ) OR datasite = ? AS read_permission
     FROM file_metadata f
     {}
     """.format(like_clause)
@@ -349,15 +324,6 @@ def print_table(connection: sqlite3.Connection, table: str):
 def get_filemetadata_with_read_access(
     connection: sqlite3.Connection, user: str, path: Optional[RelativePath] = None
 ) -> list[FileMetadata]:
-    res = get_read_permissions_for_user(connection, user, str(path))
-    return [
-        FileMetadata(
-            path=row["path"],
-            hash=row["hash"],
-            signature=row["signature"],
-            file_size=row["file_size"],
-            last_modified=row["last_modified"],
-        )
-        for row in res
-        if row["read_permission"]
-    ]
+    rows = get_read_permissions_for_user(connection, user, str(path))
+    res = [FileMetadata.from_row(row) for row in rows if row["read_permission"]]
+    return res
