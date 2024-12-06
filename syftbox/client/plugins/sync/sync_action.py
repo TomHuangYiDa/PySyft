@@ -277,7 +277,7 @@ class DeleteRemoteAction(SyncAction):
 
     def process_rejection(self, client: SyncClient, reason: Optional[str] = None) -> None:
         # User does not have permission to delete the remote file, the delete is reverted
-        create_local_action = CreateLocalAction(local_metadata=self.local_metadata, remote_metadata=None)
+        create_local_action = CreateLocalAction(local_metadata=None, remote_metadata=self.remote_metadata)
         try:
             create_local_action.execute(client)
         except SyftPermissionError:
