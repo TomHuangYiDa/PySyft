@@ -4,7 +4,7 @@ from pathlib import Path
 
 from pydantic import BaseModel
 
-from syftbox.lib.lib import SyftPermission
+from syftbox.lib.permissions import PermissionFile
 
 # TODO cleanup duplicate types
 
@@ -35,7 +35,7 @@ class FileChangeInfo(BaseModel, frozen=True):
         return self.local_sync_folder / self.path
 
     def get_priority(self) -> int:
-        if SyftPermission.is_permission_file(self.path):
+        if PermissionFile.is_permission_file(self.path):
             return 0
         else:
             return max(1, self.file_size)

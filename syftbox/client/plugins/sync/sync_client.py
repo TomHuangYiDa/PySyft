@@ -8,7 +8,7 @@ from syftbox.client.base import SyftClientInterface
 from syftbox.client.exceptions import SyftServerError
 from syftbox.client.plugins.sync.exceptions import SyftPermissionError
 from syftbox.lib.workspace import SyftWorkspace
-from syftbox.server.sync.models import ApplyDiffResponse, DiffResponse, FileMetadata
+from syftbox.server.models.sync_models import ApplyDiffResponse, DiffResponse, FileMetadata
 
 
 class SyncClient:
@@ -65,7 +65,7 @@ class SyncClient:
     def get_metadata(self, path: Path) -> FileMetadata:
         response = self.server_client.post(
             "/sync/get_metadata",
-            json={"path_like": path.as_posix()},
+            json={"path": path.as_posix()},
         )
         self.raise_for_status(response)
         return FileMetadata(**response.json())

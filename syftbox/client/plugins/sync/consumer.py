@@ -19,9 +19,9 @@ from syftbox.client.plugins.sync.queue import SyncQueue, SyncQueueItem
 from syftbox.client.plugins.sync.sync_action import SyncAction, determine_sync_action
 from syftbox.client.plugins.sync.sync_client import SyncClient
 from syftbox.client.plugins.sync.types import SyncActionType
+from syftbox.lib.hash import hash_file
 from syftbox.lib.ignore import filter_ignored_paths
-from syftbox.server.sync.hash import hash_file
-from syftbox.server.sync.models import FileMetadata
+from syftbox.server.models.sync_models import FileMetadata
 
 
 def create_local_batch(sync_client: SyncClient, paths_to_download: list[Path]) -> list[str]:

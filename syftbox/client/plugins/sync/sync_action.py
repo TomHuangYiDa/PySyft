@@ -11,8 +11,8 @@ from syftbox.client.plugins.sync.constants import MAX_FILE_SIZE_MB
 from syftbox.client.plugins.sync.exceptions import SyftPermissionError, SyncValidationError
 from syftbox.client.plugins.sync.sync_client import SyncClient
 from syftbox.client.plugins.sync.types import SyncActionType, SyncSide, SyncStatus
-from syftbox.lib.lib import SyftPermission
-from syftbox.server.sync.models import FileMetadata
+from syftbox.lib.permissions import PermissionFile
+from syftbox.server.models.sync_models import FileMetadata
 
 
 def determine_sync_action(
@@ -334,8 +334,8 @@ def _validate_remote_action(client: SyncClient, action: SyncAction) -> None:
     # Create/modify with broken permissions is invalid
     if (
         action.action_type in {SyncActionType.CREATE_REMOTE, SyncActionType.MODIFY_REMOTE}
-        and SyftPermission.is_permission_file(abs_path)
-        and not SyftPermission.is_valid(abs_path)
+        and PermissionFile.is_permission_file(abs_path)
+        and not PermissionFile.is_valid(abs_path, abs_path.parent)  # Path does not matter for validation
     ):
         raise SyncValidationError(f"Encountered invalid permission file {abs_path}.")
 
