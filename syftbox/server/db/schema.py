@@ -18,6 +18,7 @@ def get_db(path: str):
             """
         CREATE TABLE IF NOT EXISTS file_metadata (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
+            datasite TEXT NOT NULL,
             path TEXT NOT NULL UNIQUE,
             hash TEXT NOT NULL,
             signature TEXT NOT NULL,
