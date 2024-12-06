@@ -22,16 +22,6 @@ from syftbox.server.settings import ServerSettings
 fake = faker.Faker()
 
 
-# def create_random_file(client_config: ClientConfig, sub_path: str = "") -> Path:
-#     relative_path = Path(sub_path) / fake.file_name(extension="json")
-#     file_path = client_config.datasite / relative_path
-#     content = {"body": fake.text()}
-#     file_path.write_text(json.dumps(content))
-
-#     path_in_datasite = file_path.relative_to(client_config.workspace.datasites)
-#     return path_in_datasite
-
-
 def assert_files_not_on_datasite(client: SyftClientInterface, files: list[Path]):
     for file in files:
         assert not (client.workspace.datasites / file).exists(), f"File {file} exists on datasite {client.email}"
