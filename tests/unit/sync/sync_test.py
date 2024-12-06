@@ -82,7 +82,7 @@ def test_enqueue_changes(datasite_1: SyftClientInterface):
     # Create two files in datasite_1
     tree = {
         "folder1": {
-            "_.syftperm": PermissionFile.mine_with_public_read(datasite_1.email, Path("folder1") / PERM_FILE),
+            PERM_FILE: PermissionFile.mine_with_public_read(datasite_1.email, Path("folder1") / PERM_FILE),
             "large.txt": fake.text(max_nb_chars=1000),
             "small.txt": fake.text(max_nb_chars=10),
         },
@@ -158,7 +158,7 @@ def test_modify(server_client: TestClient, datasite_1: SyftClientInterface):
     # Setup initial state
     tree = {
         "folder1": {
-            "_.syftperm": PermissionFile.mine_with_public_rw(datasite_1.email, Path("folder1") / PERM_FILE),
+            PERM_FILE: PermissionFile.mine_with_public_rw(datasite_1.email, Path("folder1") / PERM_FILE),
             "file.txt": "content",
         },
     }
@@ -185,7 +185,7 @@ def test_modify_and_pull(server_client: TestClient, datasite_1: SyftClientInterf
     # Setup initial state
     tree = {
         "folder1": {
-            "_.syftperm": PermissionFile.mine_with_public_rw(datasite_1.email, Path("folder1") / PERM_FILE),
+            PERM_FILE: PermissionFile.mine_with_public_rw(datasite_1.email, Path("folder1") / PERM_FILE),
             "file.txt": "content1",
         },
     }
@@ -220,7 +220,7 @@ def test_modify_with_conflict(
     # Setup initial state
     tree = {
         "folder1": {
-            "_.syftperm": PermissionFile.mine_with_public_rw(datasite_1.email, Path("folder1") / PERM_FILE),
+            PERM_FILE: PermissionFile.mine_with_public_rw(datasite_1.email, Path("folder1") / PERM_FILE),
             "file.txt": "content1",
         },
     }
@@ -273,7 +273,7 @@ def test_delete_file(server_client: TestClient, datasite_1: SyftClientInterface,
     # Setup initial state
     tree = {
         "folder1": {
-            "_.syftperm": PermissionFile.mine_with_public_rw(datasite_1.email, Path("folder1") / PERM_FILE),
+            PERM_FILE: PermissionFile.mine_with_public_rw(datasite_1.email, Path("folder1") / PERM_FILE),
             "file.txt": fake.text(max_nb_chars=1000),
         },
     }
@@ -307,15 +307,15 @@ def test_invalid_sync_to_remote(server_client: TestClient, datasite_1: SyftClien
     too_large_content = os.urandom((MAX_FILE_SIZE_MB * 1024 * 1024) + 1)
     tree = {
         "valid": {
-            "_.syftperm": PermissionFile.mine_with_public_rw(datasite_1.email, Path("valid") / PERM_FILE),
+            PERM_FILE: PermissionFile.mine_with_public_rw(datasite_1.email, Path("valid") / PERM_FILE),
             "file.txt": "valid content",
         },
         "invalid_on_modify": {
-            "_.syftperm": PermissionFile.mine_with_public_rw(datasite_1.email, Path("invalid_on_modify") / PERM_FILE),
+            PERM_FILE: PermissionFile.mine_with_public_rw(datasite_1.email, Path("invalid_on_modify") / PERM_FILE),
             "file.txt": "valid content",
         },
         "invalid_on_create": {
-            "_.syftperm": "invalid permission",
+            PERM_FILE: "invalid permission",
             "file.txt": too_large_content,
         },
     }
@@ -348,7 +348,7 @@ def test_invalid_sync_to_remote(server_client: TestClient, datasite_1: SyftClien
     # Modify invalid_on_modify to be invalid
     file_path = datasite_1.datasite / "invalid_on_modify" / "file.txt"
     file_path.write_bytes(too_large_content)
-    permission_path = datasite_1.datasite / "invalid_on_modify" / "_.syftperm"
+    permission_path = datasite_1.datasite / "invalid_on_modify" / PERM_FILE
     permission_path.write_text("invalid permission")
 
     sync_service_1.producer.enqueue_datasite_changes(
@@ -375,7 +375,7 @@ def test_sync_invalid_local_environment(datasite_1: SyftClientInterface):
     # Create a file in datasite_1
     tree = {
         "folder1": {
-            "_.syftperm": PermissionFile.mine_with_public_read(datasite_1.email, Path("folder1") / PERM_FILE),
+            PERM_FILE: PermissionFile.mine_with_public_read(datasite_1.email, Path("folder1") / PERM_FILE),
             "file.txt": fake.text(max_nb_chars=1000),
         },
     }
