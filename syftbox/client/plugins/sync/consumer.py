@@ -112,7 +112,7 @@ class SyncConsumer:
             action.validate(self.client)
             action.execute(self.client)
         except SyftPermissionError as e:
-            action.reject(self.client, reason=str(e))
+            action.process_rejection(self.client, reason=str(e))
         except SyncValidationError as e:
             # TODO Should we reject validation errors as well?
             action.error(e)

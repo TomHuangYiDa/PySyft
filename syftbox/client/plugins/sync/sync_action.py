@@ -124,7 +124,7 @@ class SyncAction(ABC):
         pass
 
     @abstractmethod
-    def reject(self, client: SyncClient, reason: Optional[str] = None) -> None:
+    def process_rejection(self, client: SyncClient, reason: Optional[str] = None) -> None:
         pass
 
     def error(self, exception: Exception) -> None:
@@ -157,7 +157,7 @@ class NoopAction(SyncAction):
     def execute(self, client: SyncClient) -> None:
         pass
 
-    def reject(self, client: SyncClient, reason: Optional[str] = None) -> None:
+    def process_rejection(self, client: SyncClient, reason: Optional[str] = None) -> None:
         pass
 
 
@@ -171,7 +171,7 @@ class CreateLocalAction(SyncAction):
         abs_path.write_bytes(content_bytes)
         self.status = SyncStatus.SYNCED
 
-    def reject(self, client: SyncClient, reason: Optional[str] = None) -> None:
+    def process_rejection(self, client: SyncClient, reason: Optional[str] = None) -> None:
         # Client doesnt have permission, so no new files are downloaded. Action is a noop.
         self.status = SyncStatus.REJECTED
         self.message = reason
@@ -198,7 +198,7 @@ class ModifyLocalAction(SyncAction):
         abs_path.write_bytes(new_data)
         self.status = SyncStatus.SYNCED
 
-    def reject(self, client: SyncClient, reason: Optional[str] = None) -> None:
+    def process_rejection(self, client: SyncClient, reason: Optional[str] = None) -> None:
         # Client doesnt have read permission, so the local file is deleted
         abs_path = client.workspace.datasites / self.path
         abs_path.unlink()
@@ -214,7 +214,7 @@ class DeleteLocalAction(SyncAction):
         abs_path.unlink()
         self.status = SyncStatus.SYNCED
 
-    def reject(self, client: SyncClient, reason: Optional[str] = None) -> None:
+    def process_rejection(self, client: SyncClient, reason: Optional[str] = None) -> None:
         # local delete cannot be rejected by server, this is a noop
         pass
 
@@ -228,7 +228,7 @@ class CreateRemoteAction(SyncAction):
         client.create(self.path, data)
         self.status = SyncStatus.SYNCED
 
-    def reject(self, client: SyncClient, reason: Optional[str] = None) -> None:
+    def process_rejection(self, client: SyncClient, reason: Optional[str] = None) -> None:
         # Attempted upload without permission, the local file is renamed to a rejected file
         abs_path = client.workspace.datasites / self.path
         rejected_abs_path = format_rejected_path(abs_path)
@@ -251,7 +251,7 @@ class ModifyRemoteAction(SyncAction):
         )
         self.status = SyncStatus.SYNCED
 
-    def reject(self, client: SyncClient, reason: Optional[str] = None) -> None:
+    def process_rejection(self, client: SyncClient, reason: Optional[str] = None) -> None:
         # Client doesnt have write permission, so the local changes are rejected and reverted to the remote state
         abs_path = client.workspace.datasites / self.path
         rejected_abs_path = format_rejected_path(abs_path)
@@ -263,7 +263,7 @@ class ModifyRemoteAction(SyncAction):
         except SyftPermissionError:
             # Could not download the remote file due to lack of permission,
             # so only the .rejected file is left locally
-            create_local_action.reject(client)
+            create_local_action.process_rejection(client)
         self.status = SyncStatus.REJECTED
         self.message = reason
 
@@ -275,14 +275,14 @@ class DeleteRemoteAction(SyncAction):
         client.delete(self.path)
         self.status = SyncStatus.SYNCED
 
-    def reject(self, client: SyncClient, reason: Optional[str] = None) -> None:
+    def process_rejection(self, client: SyncClient, reason: Optional[str] = None) -> None:
         # User does not have permission to delete the remote file, the delete is reverted
         create_local_action = CreateLocalAction(local_metadata=self.local_metadata, remote_metadata=None)
         try:
             create_local_action.execute(client)
         except SyftPermissionError:
             # Could not re-download the file due to lack of permissions,
-            create_local_action.reject(client)
+            create_local_action.process_rejection(client)
         self.status = SyncStatus.REJECTED
         self.message = reason
 
