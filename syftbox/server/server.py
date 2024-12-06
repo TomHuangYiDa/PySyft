@@ -29,7 +29,7 @@ from syftbox.lib.lib import (
 )
 from syftbox.server.analytics import log_analytics_event
 from syftbox.server.logger import setup_logger
-from syftbox.server.middleware import LoguruMiddleware
+from syftbox.server.middleware import EmailTracingMiddleware, LoguruMiddleware
 from syftbox.server.settings import ServerSettings, get_server_settings
 from syftbox.server.telemetry import instrument_otel_trace_exporter
 from syftbox.server.users.auth import get_current_user
@@ -140,8 +140,6 @@ def init_db(settings: ServerSettings) -> None:
 
 @contextlib.asynccontextmanager
 async def lifespan(app: FastAPI, settings: Optional[ServerSettings] = None):
-    instrument_otel_trace_exporter()
-
     # Startup
     if settings is None:
         settings = ServerSettings()
@@ -150,6 +148,9 @@ async def lifespan(app: FastAPI, settings: Optional[ServerSettings] = None):
 
     logger.info(f"> Starting SyftBox Server {__version__}. Python {platform.python_version()}")
     logger.info(settings)
+
+    logger.info("> Instrumenting FastAPI OTel Exporter")
+    instrument_otel_trace_exporter()
 
     logger.info("> Creating Folders")
 
@@ -170,6 +171,7 @@ async def lifespan(app: FastAPI, settings: Optional[ServerSettings] = None):
 
 
 app = FastAPI(lifespan=lifespan)
+app.add_middleware(EmailTracingMiddleware)
 FastAPIInstrumentor.instrument_app(app=app)
 app.include_router(emails_router)
 app.include_router(sync_router)
