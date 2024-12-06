@@ -216,3 +216,135 @@ reset:
 run-jupyter jupyter_args="":
     uv run --frozen --with "jupyterlab" \
         jupyter lab {{ jupyter_args }}
+
+
+# ---------------------------------------------------------------------------------------------------------------------
+# SigNoz
+# Reference: https://github.com/OpenMined/PySyft/blob/dev/justfile
+
+_name_signoz := "signoz"
+_ctx_signoz := "k3d-" + _name_signoz
+port_signoz_ui := "3301"
+port_signoz_otel := "4318"
+
+otel_config_path := "custom-otel-collector-config.yaml"
+signoz_otel_url := "http://host.k3d.internal:" + port_signoz_otel
+
+[group('cluster')]
+[private]
+delete-cluster *args='':
+    #!/bin/bash
+    set -euo pipefail
+
+    # remove the k3d- prefix
+    ARGS=$(echo "{{ args }}" | sed -e 's/k3d-//g')
+    k3d cluster delete $ARGS
+
+# Launch SigNoz. UI=http://localhost:3301 OTEL=http://localhost:4318 (port_signoz_ui=3301 port_signoz_otel=4318)
+[group('signoz')]
+start-signoz: && (apply-signoz _ctx_signoz) (setup-signoz _ctx_signoz)
+    k3d cluster create {{ _name_signoz }} \
+        --port {{ port_signoz_ui }}:3301@loadbalancer \
+        --port {{ port_signoz_otel }}:4318@loadbalancer \
+        --k3s-arg "--disable=metrics-server@server:*"
+
+# Remove SigNoz from the cluster
+[group('signoz')]
+delete-signoz: (delete-cluster _name_signoz)
+
+# Remove all SigNoz data without deleting
+[group('signoz')]
+reset-signoz:
+    @kubectl exec --context {{ _ctx_signoz }} -n platform chi-signoz-clickhouse-cluster-0-0-0 --container clickhouse -- \
+        clickhouse-client --multiline --multiquery "\
+        TRUNCATE TABLE signoz_analytics.rule_state_history_v0; \
+        TRUNCATE TABLE signoz_logs.logs_v2; \
+        TRUNCATE TABLE signoz_logs.logs; \
+        TRUNCATE TABLE signoz_logs.usage; \
+        TRUNCATE TABLE signoz_metrics.usage; \
+        TRUNCATE TABLE signoz_traces.durationSort; \
+        TRUNCATE TABLE signoz_traces.signoz_error_index_v2; \
+        TRUNCATE TABLE signoz_traces.signoz_index_v2; \
+        TRUNCATE TABLE signoz_traces.signoz_spans; \
+        TRUNCATE TABLE signoz_traces.top_level_operations; \
+        TRUNCATE TABLE signoz_traces.usage_explorer; \
+        TRUNCATE TABLE signoz_traces.usage;"
+
+    @echo "Done. Traces & logs are cleared, but graphs may still show old content."
+
+# K9s into the Signoz cluster
+[group('signoz')]
+k9s-signoz:
+    k9s --context {{ _ctx_signoz }}
+
+[group('signoz')]
+[private]
+apply-signoz kube_context:
+    @echo "Installing SigNoz in kube context {{ kube_context }}"
+    helm install signoz signoz \
+        --repo https://charts.signoz.io \
+        --kube-context {{ kube_context }} \
+        --namespace platform \
+        --create-namespace \
+        --version 0.58.0 \
+        --set frontend.service.type=LoadBalancer \
+        --set otelCollector.service.type=LoadBalancer \
+        --set otelCollectorMetrics.service.type=LoadBalancer
+
+[group('signoz')]
+[private]
+setup-signoz kube_context:
+    #!/bin/bash
+    set -euo pipefail
+
+    SIGNOZ_URL="http://localhost:3301"
+    USERNAME="admin@localhost"
+    PASSWORD="password"
+    DASHBOARDS=(
+        https://raw.githubusercontent.com/SigNoz/dashboards/refs/heads/main/hostmetrics/hostmetrics.json,
+    )
+
+    echo "Waiting for SigNoz frontend to be available..."
+    bash ./wait_for.sh service signoz-frontend \
+        --namespace platform --context {{ kube_context }} &> /dev/null
+
+    echo "Setting up SigNoz account..."
+    curl -s --retry 5 --retry-all-errors -X POST \
+        -H "Content-Type: application/json" \
+        --data "{\"email\":\"$USERNAME\",\"name\":\"admin\",\"orgName\":\"openmined\",\"password\":\"$PASSWORD\"}" \
+        "$SIGNOZ_URL/api/v1/register"
+
+    echo "Adding some dashboards..."
+    AUTH_TOKEN=$(curl -s -X POST \
+        -H "Content-Type: application/json" \
+        -d "{\"email\":\"$USERNAME\",\"password\":\"$PASSWORD\"}" \
+        "$SIGNOZ_URL/api/v1/login" | jq -r .accessJwt)
+
+    if [ -z "$AUTH_TOKEN" ] || [ "$AUTH_TOKEN" = "null" ]; then
+        echo "Could not set up dashboards. But you can do it manually from the dashboard."
+        exit 0
+    fi
+
+    for URL in "${DASHBOARDS[@]}"; do
+        curl -s -X POST \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer $AUTH_TOKEN" \
+            -d "$(curl -s --retry 3 --retry-all-errors "$URL")" \
+            "$SIGNOZ_URL/api/v1/dashboards" &> /dev/null
+    done
+
+    printf "\nSignoz is ready and running on %s\n" "$SIGNOZ_URL"
+    printf "Email: \033[1;36m%s\033[0m\n" "$USERNAME"
+    printf "Password: \033[1;36m%s\033[0m\n" "$PASSWORD"
+
+[group('signoz')]
+install-otel-collector:
+    #!/bin/bash
+    sudo apt-get update
+    sudo apt-get -y install wget
+    wget https://github.com/open-telemetry/opentelemetry-collector-releases/releases/download/v0.115.1/otelcol-contrib_0.115.1_linux_amd64.deb
+    sudo dpkg -i otelcol-contrib_0.115.1_linux_amd64.deb
+
+[group('signoz')]
+run-otel-collector:
+    otelcol-contrib --config {{ otel_config_path }}
