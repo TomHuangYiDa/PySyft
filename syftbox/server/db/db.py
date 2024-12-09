@@ -159,9 +159,8 @@ def set_rules_for_permfile(connection, file: PermissionFile):
             """
         INSERT INTO rules (
             permfile_path, permfile_dir, permfile_depth, priority, path, user,
-            can_read, can_create, can_write, admin,
-            disallow
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            can_read, can_create, can_write, admin, disallow
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(permfile_path, priority) DO UPDATE SET
             path = excluded.path,
             user = excluded.user,
@@ -169,7 +168,7 @@ def set_rules_for_permfile(connection, file: PermissionFile):
             can_create = excluded.can_create,
             can_write = excluded.can_write,
             admin = excluded.admin,
-            disallow = excluded.disallow,
+            disallow = excluded.disallow
         """,
             rule_rows,
         )
@@ -262,34 +261,36 @@ def get_read_permissions_for_user(
     query = """
     SELECT path, hash, signature, file_size, last_modified,
     (
-        SELECT COALESCE(max(
-            CASE
-                WHEN can_read AND NOT disallow THEN rule_prio
-                ELSE 0
-            END
-        ) >
-        max(
-            CASE
-                WHEN can_read AND disallow THEN rule_prio
-                ELSE 0
-            END
+        SELECT COALESCE(
+            max(
+                CASE
+                    WHEN can_read AND NOT disallow THEN rule_prio
+                    ELSE 0
+                END
+            ) >
+            max(
+                CASE
+                    WHEN can_read AND disallow THEN rule_prio
+                    ELSE 0
+                END
         ), 0)
         or
-        COALESCE(max(
-            CASE
-                WHEN admin AND NOT disallow THEN rule_prio
-                ELSE 0
-            END
-        ) >
-        max(
-            CASE
-                WHEN admin AND disallow THEN rule_prio
-                ELSE 0
-            END
+        COALESCE(
+            max(
+                CASE
+                    WHEN admin AND NOT disallow THEN rule_prio
+                    ELSE 0
+                END
+            ) >
+            max(
+                CASE
+                    WHEN admin AND disallow THEN rule_prio
+                    ELSE 0
+                END
         ), 0)
         FROM (
             SELECT can_read, admin, disallow,
-                row_number() OVER (ORDER BY rules.permfile_depth, rules.priority ASC) AS rule_prio,
+                row_number() OVER (ORDER BY rules.permfile_depth, rules.priority ASC) AS rule_prio
             FROM rule_files
             JOIN rules ON rule_files.permfile_path = rules.permfile_path and rule_files.priority = rules.priority
             WHERE rule_files.file_id = f.id and (rules.user = ? or rules.user = "*" or rule_files.match_for_email = ?)
