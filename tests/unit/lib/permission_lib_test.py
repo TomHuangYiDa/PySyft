@@ -2,6 +2,7 @@ from pathlib import Path
 
 import pytest
 
+from syftbox.lib.constants import PERM_FILE
 from syftbox.lib.permissions import (
     ComputedPermission,
     PermissionFile,
@@ -188,7 +189,7 @@ def test_computed_permission_permfile_access():
     rwc_rule = PermissionRule.from_rule_dict(
         dir_path=Path("."),
         rule_dict={
-            "path": "user@example.org/test/permfile.yaml",
+            "path": f"user@example.org/test/{PERM_FILE}",
             "permissions": ["read", "write", "create"],
             "user": "user_2@example.org",
         },
