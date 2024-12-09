@@ -155,6 +155,7 @@ def set_rules_for_permfile(connection, file: PermissionFile):
 
         rule_rows = [tuple(rule.to_db_row().values()) for rule in file.rules]
 
+        print(rule_rows, [len(rule_row) for rule_row in rule_rows])
         cursor.executemany(
             """
         INSERT INTO rules (
@@ -299,7 +300,7 @@ def get_read_permissions_for_user(
     FROM file_metadata f
     {}
     """.format(like_clause)
-
+    print(query)
     res = cursor.execute(query, params)
 
     return res.fetchall()
