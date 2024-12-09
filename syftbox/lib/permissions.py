@@ -37,7 +37,6 @@ class PermissionRule(BaseModel):
     path: str  # what paths does it apply to (e.g. **/*.txt)
     user: str  # can be *,
     allow: bool = True
-    terminal: bool = False
     permissions: List[PermissionType]  # read/write/create/admin
     priority: int
 
@@ -119,7 +118,6 @@ class PermissionRule(BaseModel):
             path=row["path"],
             user=row["user"],  # Default to all users since DB schema doesn't show user field
             allow=not row["disallow"],
-            terminal=bool(row["terminal"]),
             priority=row["priority"],
             permissions=permissions,
         )
@@ -138,7 +136,6 @@ class PermissionRule(BaseModel):
             "can_write": PermissionType.WRITE in self.permissions,
             "admin": PermissionType.ADMIN in self.permissions,
             "disallow": not self.allow,
-            "terminal": self.terminal,
         }
 
     @property
@@ -155,7 +152,6 @@ class PermissionRule(BaseModel):
             "path": self.path,
             "user": self.user,
             "permissions": [p.name.lower() for p in self.permissions],
-            "terminal": self.terminal,
         }
         if not self.allow:
             res["type"] = "disallow"
@@ -305,12 +301,6 @@ class PermissionFile(BaseModel):
 class ComputedPermission(BaseModel):
     user: str
     file_path: RelativePath
-    terminal: dict[PermissionType, bool] = {
-        PermissionType.READ: False,
-        PermissionType.CREATE: False,
-        PermissionType.WRITE: False,
-        PermissionType.ADMIN: False,
-    }
 
     perms: dict[PermissionType, bool] = {
         PermissionType.READ: False,
@@ -377,13 +367,9 @@ class ComputedPermission(BaseModel):
             return False
 
     def apply(self, rule: PermissionRule):
-        # TODO: is terminal on a rule level or on a permission level?
         if self.user_matches(rule) and self.rule_applies_to_path(rule):
             for permtype in rule.permissions:
-                if not self.terminal[permtype]:
-                    self.perms[permtype] = rule.allow
-                if rule.terminal:
-                    self.terminal[permtype] = True
+                self.perms[permtype] = rule.allow
 
 
 # migration code, can be deleted after prod migration is done
@@ -400,7 +386,6 @@ def map_email_to_permissions(json_data: dict) -> dict:
 
 
 def convert_permission(old_perm_dict: dict) -> dict:
-    terminal = old_perm_dict.pop("terminal", False)
     old_perm_dict.pop("filepath", None)  # not needed, we use the actual path of the perm file
 
     user_permissions = map_email_to_permissions(old_perm_dict)
@@ -412,8 +397,6 @@ def convert_permission(old_perm_dict: dict) -> dict:
             "path": "**",
             "user": (email if email != "GLOBAL" else "*"),  # "*" is a wildcard for all users
         }
-        if terminal:
-            new_perm_dict["terminal"] = terminal
         output.append(new_perm_dict)
 
     return output

@@ -187,7 +187,6 @@ def test_create_permfile(sync_client: SyncClient):
                 "path": "a",
                 "user": "*",
                 "permissions": ["write"],
-                "terminal": False,
             }
         ]
     ).encode()
@@ -201,7 +200,6 @@ def test_update_permfile_success(sync_client: SyncClient):
                 "path": "a",
                 "user": "*",
                 "permissions": ["write"],
-                "terminal": False,
             }
         ]
     ).encode()
@@ -216,7 +214,7 @@ def test_update_permfile_success(sync_client: SyncClient):
 
 
 def test_update_permfile_failure(sync_client: SyncClient):
-    local_data = b'3gwrehtytrterfewdw ["x@x.org"], "read": ["x@x.org"], "write": ["x@x.org"], "filepath": "~/syftperm.yaml", "terminal": false}'
+    local_data = b'3gwrehtytrterfewdw ["x@x.org"], "read": ["x@x.org"], "write": ["x@x.org"], "filepath": "~/syftperm.yaml",}'
 
     remote_metadata = sync_client.get_metadata(Path(TEST_DATASITE_NAME) / PERM_FILE)
 

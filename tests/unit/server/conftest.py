@@ -17,13 +17,11 @@ PERMFILE_DICT = [
         "path": "*",
         "user": "*",
         "permissions": ["admin", "read", "write"],
-        "terminal": False,
     },
     {
         "path": "**/*",
         "user": "*",
         "permissions": ["admin", "read", "write"],
-        "terminal": False,
     },
 ]
 

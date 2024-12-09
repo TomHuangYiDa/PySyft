@@ -19,7 +19,6 @@ def test_parsing_dicts():
     assert rule.path == "x.txt"
     assert rule.user == "user@example.org"
     assert rule.allow is True
-    assert rule.terminal is False
 
 
 def test_parsing():
@@ -32,7 +31,6 @@ def test_parsing():
       path: x.txt
       user: "*"
       type: disallow
-      terminal: true
     """
     file = PermissionFile.from_string(yaml_string, ".")
     assert len(file.rules) == 2
@@ -41,14 +39,12 @@ def test_parsing():
     assert file.rules[0].path == "x.txt"
     assert file.rules[0].user == "user@example.org"
     assert file.rules[0].allow is True
-    assert file.rules[0].terminal is False
 
     # check the same for the second rule
     assert file.rules[1].permissions == [PermissionType.READ, PermissionType.WRITE]
     assert file.rules[1].path == "x.txt"
     assert file.rules[1].user == "*"
     assert file.rules[1].allow is False
-    assert file.rules[1].terminal is True
 
 
 def test_parsing_fails():

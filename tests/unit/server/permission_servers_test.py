@@ -41,14 +41,13 @@ def insert_rule(
     can_read: bool,
     admin: bool,
     disallow: bool,
-    terminal: bool,
 ):
     permfile_dir = permfile_path.rsplit("/", 1)[0]
     permfile_depth = len(Path(permfile_path).parts)
     cursor.execute(
         """
-    INSERT INTO rules (permfile_path, permfile_dir, permfile_depth, priority, path, user, can_read, can_create, can_write, admin, disallow, terminal) VALUES
-          (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO rules (permfile_path, permfile_dir, permfile_depth, priority, path, user, can_read, can_create, can_write, admin, disallow) VALUES
+          (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """,
         (
             permfile_path,
@@ -62,7 +61,6 @@ def insert_rule(
             0,
             admin,
             disallow,
-            terminal,
         ),
     )
 
@@ -127,7 +125,6 @@ def test_insert_permissions_from_file(connection_with_tables: sqlite3.Connection
       path: z.txt
       user: "*"
       type: disallow
-      terminal: true
     """
     file_path = f"user@example.org/test2/{PERM_FILE}"
     file = PermissionFile.from_string(yaml_string, file_path)
@@ -164,7 +161,6 @@ def test_overwrite_permissions_from_file(connection_with_tables: sqlite3.Connect
       path: z.txt
       user: "*"
       type: disallow
-      terminal: true
     """
     file_path = f"user@example.org/test2/{PERM_FILE}"
     file = PermissionFile.from_string(yaml_string, file_path)
@@ -178,7 +174,6 @@ def test_overwrite_permissions_from_file(connection_with_tables: sqlite3.Connect
 
     permissions = [x.permissions for x in written_rules]
     users = [x.user for x in written_rules]
-    terminals = [x.terminal for x in written_rules]
     allows = [x.allow for x in written_rules]
     assert len(written_rules) == 3
     assert permissions == [
@@ -187,7 +182,6 @@ def test_overwrite_permissions_from_file(connection_with_tables: sqlite3.Connect
         [PermissionType.WRITE],
     ]
     assert users == ["user@example.org", "user@example.org", "*"]
-    assert terminals == [False, False, True]
     assert allows == [True, True, False]
 
     assert (
@@ -215,12 +209,10 @@ def test_overwrite_permissions_from_file(connection_with_tables: sqlite3.Connect
       path: z.txt
       user: "*"
       type: disallow
-      terminal: true
 
     - permissions: create
       path: d.txt
       user: "*"
-      terminal: true
     """
 
     file_path = f"user@example.org/test2/{PERM_FILE}"
@@ -231,7 +223,6 @@ def test_overwrite_permissions_from_file(connection_with_tables: sqlite3.Connect
     paths = [x.path for x in new_existing_rules]
     permissions = [x.permissions for x in new_existing_rules]
     users = [x.user for x in new_existing_rules]
-    terminals = [x.terminal for x in new_existing_rules]
     allows = [x.allow for x in new_existing_rules]
     assert len(new_existing_rules) == 4
     assert paths == ["a.txt", "x.txt", "z.txt", "d.txt"]
@@ -242,7 +233,6 @@ def test_overwrite_permissions_from_file(connection_with_tables: sqlite3.Connect
         [PermissionType.CREATE],
     ]
     assert users == ["user@example.org", "user@example.org", "*", "*"]
-    assert terminals == [False, False, True, True]
     assert allows == [True, True, False, True]
     assert len(get_all_file_mappings(connection_with_tables)) == 1
 
@@ -265,12 +255,10 @@ def test_computed_permissions(connection_with_tables: sqlite3.Connection):
       path: z.txt
       user: "*"
       type: disallow
-      terminal: true
 
     - permissions: create
       path: d.txt
       user: "*"
-      terminal: true
     """
 
     file_path = f"user@example.org/test2/{PERM_FILE}"
@@ -332,7 +320,6 @@ def test_single_read_permission(connection_with_tables: sqlite3.Connection):
         can_read=True,
         admin=False,
         disallow=False,
-        terminal=False,
     )
 
     insert_rule_files(
@@ -364,7 +351,6 @@ def test_single_admin_permission(connection_with_tables: sqlite3.Connection):
         can_read=False,
         admin=True,
         disallow=False,
-        terminal=False,
     )
 
     insert_rule_files(
@@ -396,7 +382,6 @@ def test_disallow_permission(connection_with_tables: sqlite3.Connection):
         can_read=True,
         admin=False,
         disallow=False,
-        terminal=False,
     )
 
     insert_rule(
@@ -408,7 +393,6 @@ def test_disallow_permission(connection_with_tables: sqlite3.Connection):
         can_read=True,
         admin=False,
         disallow=True,
-        terminal=False,
     )
 
     insert_rule_files(
@@ -445,56 +429,6 @@ def test_disallow_permission(connection_with_tables: sqlite3.Connection):
     assert not res[0]["read_permission"]
 
 
-def test_terminal_permission(connection_with_tables: sqlite3.Connection):
-    cursor = connection_with_tables.cursor()
-    insert_file_metadata(cursor=cursor, fileid=1, path="user@example.org/test2/a.txt")
-
-    insert_rule(
-        cursor=cursor,
-        permfile_path=f"user@example.org/test2/{PERM_FILE}",
-        priority=1,
-        path="*",
-        user="*",
-        can_read=True,
-        admin=False,
-        disallow=False,
-        terminal=True,
-    )
-
-    insert_rule(
-        cursor=cursor,
-        permfile_path=f"user@example.org/test2/{PERM_FILE}",
-        priority=2,
-        path="*",
-        user="*",
-        can_read=True,
-        admin=False,
-        disallow=True,
-        terminal=False,
-    )
-
-    insert_rule_files(
-        cursor=cursor,
-        permfile_path=f"user@example.org/test2/{PERM_FILE}",
-        priority=1,
-        fileid=1,
-    )
-
-    insert_rule_files(
-        cursor=cursor,
-        permfile_path=f"user@example.org/test2/{PERM_FILE}",
-        priority=2,
-        fileid=1,
-    )
-
-    connection_with_tables.commit()
-    res = [dict(x) for x in get_read_permissions_for_user(connection_with_tables, "user@example.org")]
-
-    assert len(res) == 1
-    assert res[0]["path"] == "user@example.org/test2/a.txt"
-    assert res[0]["read_permission"]
-
-
 def test_inheritance(connection_with_tables: sqlite3.Connection):
     cursor = connection_with_tables.cursor()
     insert_file_metadata(cursor=cursor, fileid=1, path="user@example.org/test2/subdir/a.txt")
@@ -507,7 +441,6 @@ def test_inheritance(connection_with_tables: sqlite3.Connection):
         can_read=True,
         admin=False,
         disallow=False,
-        terminal=False,
     )
 
     insert_rule(
@@ -519,7 +452,6 @@ def test_inheritance(connection_with_tables: sqlite3.Connection):
         can_read=True,
         admin=False,
         disallow=False,
-        terminal=False,
     )
 
     insert_rule(
@@ -531,7 +463,6 @@ def test_inheritance(connection_with_tables: sqlite3.Connection):
         can_read=True,
         admin=False,
         disallow=True,
-        terminal=False,
     )
 
     insert_rule_files(
@@ -578,7 +509,6 @@ def test_for_email(connection_with_tables: sqlite3.Connection):
         can_read=True,
         admin=False,
         disallow=False,
-        terminal=False,
     )
 
     # Insert rule_file mapping that only applies for specific email
