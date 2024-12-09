@@ -10,6 +10,7 @@ from syftbox.server.db.db import (
     get_filemetadata_with_read_access,
     get_read_permissions_for_user,
     get_rules_for_permfile,
+    link_existing_rules_to_file,
     print_table,
     set_rules_for_permfile,
 )
@@ -26,10 +27,10 @@ def connection_with_tables():
 def insert_file_metadata(cursor: sqlite3.Cursor, fileid: int, path: str):
     cursor.execute(
         """
-    INSERT INTO file_metadata (id, path, hash, signature, file_size, last_modified) VALUES
-        (?, ?, 'hash1', 'signature1', 100, '2024-01-01')
+    INSERT INTO file_metadata (id, path, datasite, hash, signature, file_size, last_modified) VALUES
+        (?, ?, ?, 'hash1', 'signature1', 100, '2024-01-01')
     """,
-        (fileid, path),
+        (fileid, path, path.split("/")[0]),
     )
 
 
@@ -88,10 +89,10 @@ def insert_file_mock(connection: sqlite3.Connection, path: str):
     cursor = connection.cursor()
     cursor.execute(
         """
-        INSERT INTO file_metadata (path, hash, signature, file_size, last_modified)
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO file_metadata (path, datasite, hash, signature, file_size, last_modified)
+        VALUES (?, ?, ?, ?, ?, ?)
         """,
-        (path, "hash", "sig", 0, "2021-01-01"),
+        (path, path.split("/")[0], "hash", "sig", 0, "2021-01-01"),
     )
     connection.commit()
 
@@ -116,6 +117,10 @@ def test_insert_permissions_from_file(connection_with_tables: sqlite3.Connection
       path: a.txt
       user: user@example.org
 
+    - permissions: read
+      path: "*"
+      user: user@example.org
+
     - permissions: write
       path: b.txt
       user: user@example.org
@@ -132,7 +137,16 @@ def test_insert_permissions_from_file(connection_with_tables: sqlite3.Connection
     set_rules_for_permfile(connection_with_tables, file)
     connection_with_tables.commit()
 
-    assert len(get_all_file_mappings(connection_with_tables)) == 2
+    assert len(get_all_file_mappings(connection_with_tables)) == 5
+
+    rules_before = len(get_all_file_mappings(connection_with_tables))
+
+    path = "user@example.org/test2/d.txt"
+    insert_file_mock(connection_with_tables, path)
+    assert len(get_all_file_mappings(connection_with_tables)) == rules_before
+
+    link_existing_rules_to_file(connection_with_tables, Path(path))
+    assert len(get_all_file_mappings(connection_with_tables)) == rules_before + 1
 
 
 def test_overwrite_permissions_from_file(connection_with_tables: sqlite3.Connection):
@@ -282,11 +296,28 @@ def test_get_all_read_permissions_for_user_default(
     insert_file_metadata(cursor=cursor, fileid=1, path="user@example.org/test2/a.txt")
 
     connection_with_tables.commit()
-    res = [dict(x) for x in get_read_permissions_for_user(connection_with_tables, "user@example.org")]
+    res = [dict(x) for x in get_read_permissions_for_user(connection_with_tables, "user2@example.org")]
 
     assert len(res) == 1
     assert res[0]["path"] == "user@example.org/test2/a.txt"
     assert not res[0]["read_permission"]
+
+
+def test_get_all_read_permissions_for_owner(
+    connection_with_tables: sqlite3.Connection,
+):
+    # Clear existing data
+    cursor = connection_with_tables.cursor()
+
+    # Insert some example file metadata
+    insert_file_metadata(cursor=cursor, fileid=1, path="user@example.org/test2/a.txt")
+
+    connection_with_tables.commit()
+    res = [dict(x) for x in get_read_permissions_for_user(connection_with_tables, "user@example.org")]
+
+    assert len(res) == 1
+    assert res[0]["path"] == "user@example.org/test2/a.txt"
+    assert res[0]["read_permission"]
 
 
 def test_single_read_permission(connection_with_tables: sqlite3.Connection):
@@ -397,7 +428,7 @@ def test_disallow_permission(connection_with_tables: sqlite3.Connection):
     )
 
     connection_with_tables.commit()
-    res = [dict(x) for x in get_read_permissions_for_user(connection_with_tables, "user@example.org")]
+    res = [dict(x) for x in get_read_permissions_for_user(connection_with_tables, "user2@example.org")]
 
     # Print all rule mappings
     cursor.execute("SELECT * FROM rule_files")
@@ -527,7 +558,7 @@ def test_inheritance(connection_with_tables: sqlite3.Connection):
     )
 
     connection_with_tables.commit()
-    res = [dict(x) for x in get_read_permissions_for_user(connection_with_tables, "user@example.org")]
+    res = [dict(x) for x in get_read_permissions_for_user(connection_with_tables, "otheruser@example.org")]
 
     assert len(res) == 1
     assert res[0]["path"] == "user@example.org/test2/subdir/a.txt"
@@ -571,20 +602,23 @@ def test_for_email(connection_with_tables: sqlite3.Connection):
 
     # Check get_filemetadata_with_read_access used in sync/dir_state
     dir_path = "alice@example.org/test"
-    email = 'bob@example.org'
+    email = "bob@example.org"
     res = get_filemetadata_with_read_access(connection_with_tables, email, dir_path)
     assert len(res) == 1
     file_metadata = res[0]
     assert isinstance(file_metadata, FileMetadata)
-    assert file_metadata.path == PosixPath(f"alice@example.org/test/bob@example.org/data.txt")
-    assert file_metadata.hash == 'hash1'
-    assert file_metadata.signature == 'signature1'
+    assert file_metadata.path == PosixPath("alice@example.org/test/bob@example.org/data.txt")
+    assert file_metadata.hash == "hash1"
+    assert file_metadata.signature == "signature1"
     assert file_metadata.file_size == 100
-    
-    
+
     # Check like clause
-    res = [dict(x) for x in get_read_permissions_for_user(connection_with_tables, "bob@example.org", path_like="alice@example.org/test")]
+    res = [
+        dict(x)
+        for x in get_read_permissions_for_user(
+            connection_with_tables, "bob@example.org", path_like="alice@example.org/test"
+        )
+    ]
     assert len(res) == 1
     assert res[0]["path"] == "alice@example.org/test/bob@example.org/data.txt"
     assert res[0]["read_permission"]
-    

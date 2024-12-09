@@ -1,10 +1,6 @@
 import contextlib
-import json
 import os
 import platform
-import random
-import sys
-from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
@@ -26,10 +22,9 @@ from syftbox.__version__ import __version__
 from syftbox.lib.constants import PERM_FILE
 from syftbox.lib.hash import collect_files, hash_files
 from syftbox.lib.lib import (
-    Jsonable,
     get_datasites,
 )
-from syftbox.lib.permissions import PermissionFile
+from syftbox.lib.permissions import PermissionFile, migrate_permissions
 from syftbox.server.analytics import log_analytics_event
 from syftbox.server.db import db
 from syftbox.server.db.schema import get_db
@@ -45,79 +40,6 @@ from .users.router import router as users_router
 current_dir = Path(__file__).parent
 
 
-def load_dict(cls, filepath: str) -> Optional[dict[str, Any]]:
-    try:
-        with open(filepath) as f:
-            data = f.read()
-            d = json.loads(data)
-            dicts = {}
-            for key, value in d.items():
-                dicts[key] = cls(**value)
-            return dicts
-    except Exception as e:
-        logger.info(f"Unable to load dict file: {filepath}. {e}")
-    return None
-
-
-def save_dict(obj: Any, filepath: str) -> None:
-    dicts = {}
-    for key, value in obj.items():
-        dicts[key] = value.to_dict()
-
-    with open(filepath, "w") as f:
-        f.write(json.dumps(dicts))
-
-
-@dataclass
-class User(Jsonable):
-    email: str
-    token: int  # TODO
-
-
-class Users:
-    def __init__(self, path: Path) -> None:
-        self.path = path
-        self.users = {}
-        self.load()
-
-    def load(self):
-        if os.path.exists(str(self.path)):
-            users = load_dict(User, str(self.path))
-        else:
-            users = None
-        if users:
-            self.users = users
-
-    def save(self):
-        save_dict(self.users, str(self.path))
-
-    def get_user(self, email: str) -> Optional[User]:
-        if email not in self.users:
-            return None
-        return self.users[email]
-
-    def create_user(self, email: str) -> int:
-        if email in self.users:
-            # for now just return the token
-            return self.users[email].token
-            # raise Exception(f"User already registered: {email}")
-        token = random.randint(0, sys.maxsize)
-        user = User(email=email, token=token)
-        self.users[email] = user
-        self.save()
-        return token
-
-    def __repr__(self) -> str:
-        string = ""
-        for email, user in self.users.items():
-            string += f"{email}: {user}"
-        return string
-
-
-def get_users(request: Request) -> Users:
-    return request.state.users
-
-
 def create_folders(folders: list[str]) -> None:
     for folder in folders:
         if not os.path.exists(folder):
@@ -125,6 +47,9 @@ def create_folders(folders: list[str]) -> None:
 
 
 def init_db(settings: ServerSettings) -> None:
+    # remove this after the upcoming release
+    migrate_permissions(settings.snapshot_folder)
+
     # might take very long as snapshot folder grows
     logger.info(f"> Collecting Files from {settings.snapshot_folder.absolute()}")
     files = collect_files(settings.snapshot_folder.absolute())
@@ -152,6 +77,7 @@ def init_db(settings: ServerSettings) -> None:
             permfile_file_path=file.relative_to(settings.snapshot_folder), rule_dicts=rule_dicts
         )
         db.set_rules_for_permfile(con, perm_file)
+        db.link_existing_rules_to_file(con, file.relative_to(settings.snapshot_folder))
 
     cur.close()
     con.commit()
@@ -173,15 +99,12 @@ async def lifespan(app: FastAPI, settings: Optional[ServerSettings] = None):
 
     create_folders(settings.folders)
 
-    users = Users(path=settings.user_file_path)
     logger.info("> Loading Users")
-    logger.info(users)
 
     init_db(settings)
 
     yield {
         "server_settings": settings,
-        "users": users,
     }
 
     logger.info("> Shutting down server")
@@ -344,21 +267,19 @@ async def browse_datasite(
 @app.post("/register")
 async def register(
     request: Request,
-    users: Users = Depends(get_users),
     server_settings: ServerSettings = Depends(get_server_settings),
 ):
     data = await request.json()
     email = data["email"]
-    token = users.create_user(email)
 
     # create datasite snapshot folder
     datasite_folder = Path(server_settings.snapshot_folder) / email
     os.makedirs(datasite_folder, exist_ok=True)
 
-    logger.info(f"> {email} registering: {token}, snapshot folder: {datasite_folder}")
+    logger.info(f"> {email} registering, snapshot folder: {datasite_folder}")
     log_analytics_event("/register", email)
 
-    return JSONResponse({"status": "success", "token": token}, status_code=200)
+    return JSONResponse({"status": "success", "token": "0"}, status_code=200)
 
 
 @app.post("/log_event")

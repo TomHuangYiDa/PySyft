@@ -12,8 +12,7 @@ from py_fast_rsync import signature
 
 from syftbox.client.exceptions import SyftServerError
 from syftbox.client.plugins.sync.sync_client import SyncClient
-from syftbox.lib.lib import FileMetadata
-from syftbox.server.models.sync_models import ApplyDiffResponse, DiffResponse
+from syftbox.server.models.sync_models import ApplyDiffResponse, DiffResponse, FileMetadata
 from tests.unit.server.conftest import PERM_FILE, TEST_DATASITE_NAME, TEST_FILE
 
 
@@ -217,7 +216,7 @@ def test_update_permfile_success(sync_client: SyncClient):
 
 
 def test_update_permfile_failure(sync_client: SyncClient):
-    local_data = b'3gwrehtytrterfewdw ["x@x.org"], "read": ["x@x.org"], "write": ["x@x.org"], "filepath": "~/_.syftperm", "terminal": false}'
+    local_data = b'3gwrehtytrterfewdw ["x@x.org"], "read": ["x@x.org"], "write": ["x@x.org"], "filepath": "~/syftperm.yaml", "terminal": false}'
 
     remote_metadata = sync_client.get_metadata(Path(TEST_DATASITE_NAME) / PERM_FILE)
 
