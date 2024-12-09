@@ -7,6 +7,11 @@ from opentelemetry.sdk.trace.export import BatchSpanProcessor
 
 from syftbox.server import __version__
 
+OTEL_ATTR_CLIENT_VERSION = "syftbox.client.version"
+OTEL_ATTR_CLIENT_PYTHON = "syftbox.client.python"
+OTEL_ATTR_CLIENT_EMAIL = "syftbox.client.email"
+OTEL_ATTR_SERVER_VERSION = "syftbox.server.version"
+
 
 def setup_otel_exporter(env: str):
     exporter = OTLPSpanExporter()
@@ -16,7 +21,7 @@ def setup_otel_exporter(env: str):
         {
             "service.name": "syftbox-server",
             "deployment.environment": env.lower(),
-            "syftbox.server.version": __version__,
+            OTEL_ATTR_SERVER_VERSION: __version__,
         }
     )
     resource = resource.merge(OTELResourceDetector().detect())

@@ -1,7 +1,6 @@
 from datetime import timedelta
 from enum import Enum
 from pathlib import Path
-from secrets import token_hex
 from typing import Optional
 
 from fastapi import Request
@@ -9,7 +8,7 @@ from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing_extensions import Self, Union
 
-DEV_JWT_SECRET = token_hex(32)
+DEV_JWT_SECRET = "changethis"
 
 
 class ServerEnv(Enum):

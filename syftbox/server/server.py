@@ -21,9 +21,11 @@ from jinja2 import Template
 from loguru import logger
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from opentelemetry.instrumentation.sqlite3 import SQLite3Instrumentor
+from opentelemetry.trace import Span
 from typing_extensions import Any, Optional, Union
 
 from syftbox.__version__ import __version__
+from syftbox.lib.http import HEADER_SYFTBOX_PYTHON, HEADER_SYFTBOX_USER, HEADER_SYFTBOX_VERSION
 from syftbox.lib.lib import (
     Jsonable,
     get_datasites,
@@ -139,6 +141,14 @@ def init_db(settings: ServerSettings) -> None:
     con.close()
 
 
+def server_request_hook(span: Span, scope: dict[str, Any]):
+    if not span.is_recording():
+        headers = dict(scope.get("headers", {}))
+        span.set_attribute("syftbox.client.version", headers.get(HEADER_SYFTBOX_VERSION, "-"))
+        span.set_attribute("syftbox.client.python", headers.get(HEADER_SYFTBOX_PYTHON, "-"))
+        span.set_attribute("syftbox.client.email", headers.get(HEADER_SYFTBOX_USER, "-"))
+
+
 @contextlib.asynccontextmanager
 async def lifespan(app: FastAPI, settings: Optional[ServerSettings] = None):
     # Startup
@@ -180,7 +190,7 @@ app.include_router(users_router)
 app.add_middleware(GZipMiddleware, minimum_size=1000, compresslevel=5)
 app.add_middleware(LoguruMiddleware)
 
-FastAPIInstrumentor.instrument_app(app, http_capture_headers_server_request=["email"])
+FastAPIInstrumentor.instrument_app(app, server_request_hook=server_request_hook)
 SQLite3Instrumentor().instrument()
 
 # Define the ASCII art

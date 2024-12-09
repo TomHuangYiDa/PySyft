@@ -7,6 +7,9 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 import httpx
 import jwt
 from syftbox.server.settings import ServerSettings, get_server_settings
+from opentelemetry import trace
+
+from syftbox.server.telemetry import OTEL_ATTR_CLIENT_EMAIL
 
 bearer_scheme = HTTPBearer()
 
@@ -91,6 +94,7 @@ def get_user_from_email_token(
     server_settings: Annotated[ServerSettings, Depends(get_server_settings)],
 ) -> str:
     payload = validate_email_token(server_settings, credentials.credentials)
+    trace.get_current_span().set_attribute(OTEL_ATTR_CLIENT_EMAIL, payload["email"])
     return payload["email"]
 
 
@@ -99,4 +103,5 @@ def get_current_user(
     server_settings: Annotated[ServerSettings, Depends(get_server_settings)],
 ) -> str:
     payload = validate_access_token(server_settings, credentials.credentials)
+    trace.get_current_span().set_attribute(OTEL_ATTR_CLIENT_EMAIL, payload["email"])
     return payload["email"]
