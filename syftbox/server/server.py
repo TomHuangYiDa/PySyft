@@ -29,7 +29,7 @@ from syftbox.lib.lib import (
 )
 from syftbox.server.analytics import log_analytics_event
 from syftbox.server.logger import setup_logger
-from syftbox.server.middleware import EmailTracingMiddleware, LoguruMiddleware
+from syftbox.server.middleware import LoguruMiddleware
 from syftbox.server.settings import ServerSettings, get_server_settings
 from syftbox.server.telemetry import instrument_otel_trace_exporter
 from syftbox.server.users.auth import get_current_user
@@ -171,8 +171,7 @@ async def lifespan(app: FastAPI, settings: Optional[ServerSettings] = None):
 
 
 app = FastAPI(lifespan=lifespan)
-app.add_middleware(EmailTracingMiddleware)
-FastAPIInstrumentor.instrument_app(app=app)
+FastAPIInstrumentor.instrument_app(app=app, http_capture_headers_server_request=["email"])
 app.include_router(emails_router)
 app.include_router(sync_router)
 app.include_router(users_router)
