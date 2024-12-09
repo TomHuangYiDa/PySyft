@@ -1,5 +1,5 @@
 import sqlite3
-from pathlib import Path, PosixPath
+from pathlib import Path
 from typing import Optional
 
 import pytest
@@ -7,7 +7,6 @@ import pytest
 from syftbox.lib.constants import PERM_FILE
 from syftbox.lib.permissions import PermissionFile, PermissionType
 from syftbox.server.db.db import (
-    get_filemetadata_with_read_access,
     get_read_permissions_for_user,
     get_rules_for_permfile,
     link_existing_rules_to_file,
@@ -16,7 +15,6 @@ from syftbox.server.db.db import (
 )
 from syftbox.server.db.file_store import computed_permission_for_user_and_path
 from syftbox.server.db.schema import get_db
-from syftbox.server.models.sync_models import FileMetadata
 
 
 @pytest.fixture
@@ -594,31 +592,68 @@ def test_for_email(connection_with_tables: sqlite3.Connection):
 
     connection_with_tables.commit()
 
-    # Check that alice@example.org has read permission
+    # Check that bob@example.org has read permission
     res = [dict(x) for x in get_read_permissions_for_user(connection_with_tables, "bob@example.org")]
     assert len(res) == 1
     assert res[0]["path"] == "alice@example.org/test/bob@example.org/data.txt"
     assert res[0]["read_permission"]
 
-    # Check get_filemetadata_with_read_access used in sync/dir_state
-    dir_path = "alice@example.org/test"
-    email = "bob@example.org"
-    res = get_filemetadata_with_read_access(connection_with_tables, email, dir_path)
-    assert len(res) == 1
-    file_metadata = res[0]
-    assert isinstance(file_metadata, FileMetadata)
-    assert file_metadata.path == PosixPath("alice@example.org/test/bob@example.org/data.txt")
-    assert file_metadata.hash == "hash1"
-    assert file_metadata.signature == "signature1"
-    assert file_metadata.file_size == 100
+
+def test_like_clause(connection_with_tables: sqlite3.Connection):
+    cursor = connection_with_tables.cursor()
+    # Insert file metadata for specific user email
+    insert_file_metadata(cursor=cursor, fileid=1, path="alice@example.org/data.txt")
+    insert_file_metadata(cursor=cursor, fileid=2, path="bob@example.org/data.txt")
+
+    insert_rule(
+        cursor=cursor,
+        permfile_path=f"alice@example.org/{PERM_FILE}",
+        priority=1,
+        path="*",
+        user="*",
+        can_read=True,
+        admin=False,
+        disallow=False,
+        terminal=False,
+    )
+
+    insert_rule(
+        cursor=cursor,
+        permfile_path=f"bob@example.org/{PERM_FILE}",
+        priority=1,
+        path="*",
+        user="*",
+        can_read=True,
+        admin=False,
+        disallow=False,
+        terminal=False,
+    )
+
+    # Insert rule_file mapping that only applies for specific email
+    insert_rule_files(
+        cursor=cursor,
+        permfile_path=f"alice@example.org/{PERM_FILE}",
+        priority=1,
+        fileid=1,
+    )
+    # Insert rule_file mapping that only applies for specific email
+    insert_rule_files(
+        cursor=cursor,
+        permfile_path=f"bob@example.org/{PERM_FILE}",
+        priority=1,
+        fileid=2,
+    )
+
+    connection_with_tables.commit()
 
     # Check like clause
     res = [
         dict(x)
         for x in get_read_permissions_for_user(
-            connection_with_tables, "bob@example.org", path_like="alice@example.org/test"
+            connection_with_tables, "bob@example.org", path_like="alice@example.org/"
         )
     ]
+
     assert len(res) == 1
-    assert res[0]["path"] == "alice@example.org/test/bob@example.org/data.txt"
+    assert res[0]["path"] == "alice@example.org/data.txt"
     assert res[0]["read_permission"]
