@@ -332,10 +332,19 @@ class ComputedPermission(BaseModel):
         return str(self.file_path).split("/", 1)[0]
 
     def has_permission(self, permtype: PermissionType):
+        # exception for owners: they can always read and write to their own datasite
         if self.path_owner == self.user:
             return True
+        # exception for admins: they can do anything for this path
         if self.perms[PermissionType.ADMIN]:
             return True
+        # exception for permfiles: any modifications to permfiles are only allowed for admins
+        if self.file_path.name == PERM_FILE and permtype in [PermissionType.CREATE, PermissionType.WRITE]:
+            return self.perms[PermissionType.ADMIN]
+        # exception for read/write, they are only allowed if read is also allowed
+        if permtype in [PermissionType.CREATE, PermissionType.WRITE]:
+            return self.perms[PermissionType.READ] and self.perms[permtype]
+        # default case
         return self.perms[permtype]
 
     def user_matches(self, rule: PermissionRule):
@@ -356,6 +365,10 @@ class ComputedPermission(BaseModel):
 
         # target file path (the one that we want to check permissions for relative to the syftperm file
         # we need this because the syftperm file specifies path patterns relative to its own location
+
+        # excecption for permfiles: only admins permissions matter
+        if self.file_path.name == PERM_FILE and PermissionType.ADMIN not in rule.permissions:
+            return False
 
         if issubpath(rule.dir_path, self.file_path):
             relative_file_path = self.file_path.relative_to(rule.dir_path)
