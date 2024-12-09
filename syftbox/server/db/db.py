@@ -228,18 +228,12 @@ def get_read_permissions_for_user(
     """
     Get all files that the user has read access to. First we get all files, then we do a subquery for every file.
     For every file, we join all the rules that apply to it for this user. As an intermediate result, we get all those
-    rules, which we reduce into a single value. To do this, we add extra columns to the table indicating rule priority
-    and terminal priority. For non-terminal rules, later rules overwrite earlier ones, so you only need to check the
+    rules, which we reduce into a single value. To do this, we add extra columns to the table indicating rule priority.
+    For all rules, later rules overwrite earlier ones, so you only need to check the
     last rule for a permission. By overwriting, we mean that if a disallow comes after an allow, you have no read
     permission. The default is no read permission.
 
-    For terminal rules, only the first rule counts because it's terminal. To indicate these orderings we add row_number
-    and inverse row_number columns called priority. For terminal rules we multiply the prio by 1000000 since they weigh
-    infinitely more.
-
-    We use these row orderings to find:
-    1) If the last terminal read is either a disallow or allow
-    2) If the first terminal is either a disallow or allow
+    We use these row orderings to find if the last read is either a disallow or allow
 
     We do the same for admin permissions. We then compute two things:
     - The admin "bit" (indicating whether a user has admin permissions)

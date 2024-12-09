@@ -544,7 +544,6 @@ def test_like_clause(connection_with_tables: sqlite3.Connection):
         can_read=True,
         admin=False,
         disallow=False,
-        terminal=False,
     )
 
     insert_rule(
@@ -556,7 +555,6 @@ def test_like_clause(connection_with_tables: sqlite3.Connection):
         can_read=True,
         admin=False,
         disallow=False,
-        terminal=False,
     )
 
     # Insert rule_file mapping that only applies for specific email

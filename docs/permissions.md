@@ -50,7 +50,3 @@ Permissions "bits" (`read`, `create`, `write`, `admin`) are stored using bitwise
 ## Aliases (future)
 
 Currently not supported: we are planning to add aliases like `creator` which implies `read+create` and `updater` which implies `read+write`.
-
-## Terminal permissions (future)
-
-Currently not supported: we are planning to add a `terminal` boolean value that indicates that permissions cannot be changed for a particular path.
