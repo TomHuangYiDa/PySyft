@@ -43,7 +43,6 @@ def get_db(path: str):
                 can_write bool NOT NULL,
                 admin bool NOT NULL,
                 disallow bool NOT NULL,
-                terminal bool not null,
                 PRIMARY KEY (permfile_path, priority)
             )
         """
