@@ -31,6 +31,7 @@ dependencies = [
     "pyjwt>=2.10.0",
     "wcmatch>=10.0",
     "opentelemetry-instrumentation-fastapi>=0.49b2",
+    "opentelemetry-instrumentation-sqlite3>=0.49b2",
     "opentelemetry-exporter-otlp>=1.28.2",
 ]
 

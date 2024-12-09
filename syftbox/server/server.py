@@ -20,6 +20,7 @@ from fastapi.responses import (
 from jinja2 import Template
 from loguru import logger
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
+from opentelemetry.instrumentation.sqlite3 import SQLite3Instrumentor
 from typing_extensions import Any, Optional, Union
 
 from syftbox.__version__ import __version__
@@ -31,7 +32,7 @@ from syftbox.server.analytics import log_analytics_event
 from syftbox.server.logger import setup_logger
 from syftbox.server.middleware import LoguruMiddleware
 from syftbox.server.settings import ServerSettings, get_server_settings
-from syftbox.server.telemetry import instrument_otel_trace_exporter
+from syftbox.server.telemetry import setup_otel_exporter
 from syftbox.server.users.auth import get_current_user
 
 from .emails.router import router as emails_router
@@ -149,11 +150,13 @@ async def lifespan(app: FastAPI, settings: Optional[ServerSettings] = None):
     logger.info(f"> Starting SyftBox Server {__version__}. Python {platform.python_version()}")
     logger.info(settings)
 
-    logger.info("> Instrumenting FastAPI OTel Exporter")
-    instrument_otel_trace_exporter()
+    if settings.otel_enabled:
+        logger.info("> OTel Exporter is ENABLED")
+        setup_otel_exporter(settings.env.value)
+    else:
+        logger.info("> OTel Exporter is DISABLED")
 
     logger.info("> Creating Folders")
-
     create_folders(settings.folders)
 
     users = Users(path=settings.user_file_path)
@@ -171,12 +174,14 @@ async def lifespan(app: FastAPI, settings: Optional[ServerSettings] = None):
 
 
 app = FastAPI(lifespan=lifespan)
-FastAPIInstrumentor.instrument_app(app=app, http_capture_headers_server_request=["email"])
 app.include_router(emails_router)
 app.include_router(sync_router)
 app.include_router(users_router)
 app.add_middleware(GZipMiddleware, minimum_size=1000, compresslevel=5)
 app.add_middleware(LoguruMiddleware)
+
+FastAPIInstrumentor.instrument_app(app, http_capture_headers_server_request=["email"])
+SQLite3Instrumentor().instrument()
 
 # Define the ASCII art
 ascii_art = rf"""

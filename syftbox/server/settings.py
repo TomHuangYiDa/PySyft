@@ -1,5 +1,7 @@
 from datetime import timedelta
+from enum import Enum
 from pathlib import Path
+from secrets import token_hex
 from typing import Optional
 
 from fastapi import Request
@@ -7,7 +9,13 @@ from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing_extensions import Self, Union
 
-DEV_JWT_SECRET = "changethis"
+DEV_JWT_SECRET = token_hex(32)
+
+
+class ServerEnv(Enum):
+    STAGE = "STAGE"
+    PROD = "PROD"
+    DEV = "DEV"
 
 
 class ServerSettings(BaseSettings):
@@ -23,6 +31,9 @@ class ServerSettings(BaseSettings):
 
     model_config = SettingsConfigDict(env_prefix="SYFTBOX_", env_file="server.env")
 
+    env: ServerEnv = ServerEnv.DEV
+    """Server environment"""
+
     sendgrid_secret: Optional[SecretStr] = None
     """API key for sendgrid email service"""
 
@@ -33,9 +44,19 @@ class ServerSettings(BaseSettings):
     """Secret key for the JWT tokens. Dev secret is not allowed in production"""
 
     jwt_email_token_exp: timedelta = timedelta(hours=1)
+    """Expiration time for the email token"""
+
     jwt_access_token_exp: Optional[timedelta] = None
+    """Expiration time for the access token"""
+
     jwt_algorithm: str = "HS256"
+    """Algorithm used for the JWT tokens"""
+
     auth_enabled: bool = False
+    """Enable/Disable authentication"""
+
+    otel_enabled: bool = True
+    """Enable/Disable OpenTelemetry tracing"""
 
     @field_validator("data_folder", mode="after")
     def data_folder_abs(cls, v):
