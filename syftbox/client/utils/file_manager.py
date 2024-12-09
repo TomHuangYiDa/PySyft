@@ -92,11 +92,9 @@ def _convert_to_windows_path(folder_path: str) -> str:
     """
     try:
         # Use wslpath to convert the path
-        result = subprocess.run(
-            ["wslpath", "-w", folder_path], capture_output=True, text=True, check=True
-        )
+        result = subprocess.run(["wslpath", "-w", folder_path], capture_output=True, text=True, check=True)
         return result.stdout.strip()
-    except Exception as e:
+    except Exception:
         return ""
 
 
