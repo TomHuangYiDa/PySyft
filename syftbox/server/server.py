@@ -126,11 +126,11 @@ def create_folders(folders: list[str]) -> None:
 
 def init_db(settings: ServerSettings) -> None:
     # might take very long as snapshot folder grows
-    logger.info(f"> Collecting Files from {settings.snapshot_folder.absolute()}")
+    logger.info(f"Collecting Files from {settings.snapshot_folder.absolute()}")
     files = hash.collect_files(settings.snapshot_folder.absolute())
-    logger.info("> Hashing files")
+    logger.info("Hashing files")
     metadata = hash.hash_files(files, settings.snapshot_folder)
-    logger.info(f"> Updating file hashes at {settings.file_db_path.absolute()}")
+    logger.info(f"Updating file hashes at {settings.file_db_path.absolute()}")
     con = db.get_db(settings.file_db_path.absolute())
     cur = con.cursor()
     for m in metadata:
@@ -157,21 +157,20 @@ async def lifespan(app: FastAPI, settings: Optional[ServerSettings] = None):
 
     setup_logger(logs_folder=settings.logs_folder)
 
-    logger.info(f"> Starting SyftBox Server {__version__}. Python {platform.python_version()}")
+    logger.info(f"Starting SyftBox Server {__version__}. Python {platform.python_version()}")
     logger.info(settings)
 
     if settings.otel_enabled:
-        logger.info("> OTel Exporter is ENABLED")
+        logger.info("OTel Exporter is ENABLED")
         setup_otel_exporter(settings.env.value)
     else:
-        logger.info("> OTel Exporter is DISABLED")
+        logger.info("OTel Exporter is DISABLED")
 
-    logger.info("> Creating Folders")
+    logger.info("Creating Folders")
     create_folders(settings.folders)
 
     users = Users(path=settings.user_file_path)
-    logger.info("> Loading Users")
-    logger.info(users)
+    logger.info(f"Loaded {len(users.users)} users")
 
     init_db(settings)
 
@@ -180,7 +179,7 @@ async def lifespan(app: FastAPI, settings: Optional[ServerSettings] = None):
         "users": users,
     }
 
-    logger.info("> Shutting down server")
+    logger.info("Shutting down server")
 
 
 app = FastAPI(lifespan=lifespan)
@@ -204,7 +203,7 @@ ascii_art = rf"""
 
 
 # Install Syftbox (MacOS and Linux)
-curl -LsSf https://syftbox.openmined.org/install.sh | sh
+curl -LsSf [[SERVER_URL]]/install.sh | sh
 
 # Run the client
 syftbox client
@@ -213,22 +212,7 @@ syftbox client
 
 @app.get("/", response_class=PlainTextResponse)
 async def get_ascii_art(request: Request):
-    req_host = request.headers.get("host", "")
-    if "syftboxstage" in req_host:
-        return ascii_art.replace("syftbox.openmined.org", "syftboxstage.openmined.org")
-    return ascii_art
-
-
-@app.get("/wheel/{path:path}", response_class=HTMLResponse)
-async def get_wheel(path: str):
-    if path == "":  # Check if path is empty (meaning "/datasites/")
-        return RedirectResponse(url="/")
-
-    filename = path.split("/")[0]
-    if filename.endswith(".whl"):
-        wheel_path = os.path.expanduser("~/syftbox-0.1.0-py3-none-any.whl")
-        return FileResponse(wheel_path, media_type="application/octet-stream")
-    return filename
+    return ascii_art.replace("[[SERVER_URL]]", str(request.url).rstrip("/"))
 
 
 def get_file_list(directory: Union[str, Path] = ".") -> list[dict[str, Any]]:
@@ -354,7 +338,7 @@ async def register(
     datasite_folder = Path(server_settings.snapshot_folder) / email
     os.makedirs(datasite_folder, exist_ok=True)
 
-    logger.info(f"> {email} registering: {token}, snapshot folder: {datasite_folder}")
+    logger.info(f"{email} registering: {token}, snapshot folder: {datasite_folder}")
     log_analytics_event("/register", email)
 
     return JSONResponse({"status": "success", "token": token}, status_code=200)
