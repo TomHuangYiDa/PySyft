@@ -47,7 +47,7 @@ def insert_rule(
     cursor.execute(
         """
     INSERT INTO rules (permfile_path, permfile_dir, permfile_depth, priority, path, user, can_read, can_create, can_write, admin, disallow) VALUES
-          (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """,
         (
             permfile_path,
