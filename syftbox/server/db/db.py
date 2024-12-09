@@ -294,7 +294,6 @@ def get_read_permissions_for_user(
     FROM file_metadata f
     {}
     """.format(like_clause)
-    print(query)
     res = cursor.execute(query, params)
 
     return res.fetchall()

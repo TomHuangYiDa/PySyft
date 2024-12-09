@@ -356,8 +356,8 @@ class ComputedPermission(BaseModel):
         # target file path (the one that we want to check permissions for relative to the syftperm file
         # we need this because the syftperm file specifies path patterns relative to its own location
 
-        # excecption for permfiles: only admins permissions matter
-        if self.file_path.name == PERM_FILE and PermissionType.ADMIN not in rule.permissions:
+        # excecption for permfiles: only admin and read permissions are applied
+        if self.file_path.name == PERM_FILE and {PermissionType.CREATE, PermissionType.WRITE} & set(rule.permissions):
             return False
 
         if issubpath(rule.dir_path, self.file_path):
