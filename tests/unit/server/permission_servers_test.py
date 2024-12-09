@@ -522,11 +522,68 @@ def test_for_email(connection_with_tables: sqlite3.Connection):
 
     connection_with_tables.commit()
 
-    # Check that alice@example.org has read permission
+    # Check that bob@example.org has read permission
     res = [dict(x) for x in get_read_permissions_for_user(connection_with_tables, "bob@example.org")]
     assert len(res) == 1
     assert res[0]["path"] == "alice@example.org/test/bob@example.org/data.txt"
     assert res[0]["read_permission"]
 
-    # TODO: test like clause
-    # TODO: add dir state test
+
+def test_like_clause(connection_with_tables: sqlite3.Connection):
+    cursor = connection_with_tables.cursor()
+    # Insert file metadata for specific user email
+    insert_file_metadata(cursor=cursor, fileid=1, path="alice@example.org/data.txt")
+    insert_file_metadata(cursor=cursor, fileid=2, path="bob@example.org/data.txt")
+
+    insert_rule(
+        cursor=cursor,
+        permfile_path=f"alice@example.org/{PERM_FILE}",
+        priority=1,
+        path="*",
+        user="*",
+        can_read=True,
+        admin=False,
+        disallow=False,
+        terminal=False,
+    )
+
+    insert_rule(
+        cursor=cursor,
+        permfile_path=f"bob@example.org/{PERM_FILE}",
+        priority=1,
+        path="*",
+        user="*",
+        can_read=True,
+        admin=False,
+        disallow=False,
+        terminal=False,
+    )
+
+    # Insert rule_file mapping that only applies for specific email
+    insert_rule_files(
+        cursor=cursor,
+        permfile_path=f"alice@example.org/{PERM_FILE}",
+        priority=1,
+        fileid=1,
+    )
+    # Insert rule_file mapping that only applies for specific email
+    insert_rule_files(
+        cursor=cursor,
+        permfile_path=f"bob@example.org/{PERM_FILE}",
+        priority=1,
+        fileid=2,
+    )
+
+    connection_with_tables.commit()
+
+    # Check like clause
+    res = [
+        dict(x)
+        for x in get_read_permissions_for_user(
+            connection_with_tables, "bob@example.org", path_like="alice@example.org/"
+        )
+    ]
+
+    assert len(res) == 1
+    assert res[0]["path"] == "alice@example.org/data.txt"
+    assert res[0]["read_permission"]
