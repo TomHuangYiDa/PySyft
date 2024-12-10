@@ -1,6 +1,6 @@
 import platform
 
-from syftbox.__version__ import __version__
+from syftbox import __version__
 
 HEADER_SYFTBOX_VERSION = "x-syftbox-version"
 HEADER_SYFTBOX_PYTHON = "x-syftbox-python"
