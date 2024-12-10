@@ -12,7 +12,7 @@ HEADER_OS_ARCH = "x-os-arch"
 _PYTHON_VERSION = platform.python_version()
 
 SYFTBOX_HEADERS = {
-    HEADER_SYFTBOX_VERSION: __version__,
+    HEADER_SYFTBOX_VERSION: str(__version__),
     HEADER_SYFTBOX_PYTHON: _PYTHON_VERSION,
     # todo - os
 }
