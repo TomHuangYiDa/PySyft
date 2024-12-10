@@ -18,8 +18,7 @@ jobs:
     strategy:
       max-parallel: 99
       matrix:
-        e2e-test:
-          [
+        e2e-test: [
             "basic_aggregator",
             "model_aggregator",
             "aggregator_with_local_training",
@@ -33,7 +32,6 @@ jobs:
     # runs-on: ${{ matrix.runner }}
     runs-on: ${{ matrix.os }}
     steps:
-
       - name: Free Disk Space
         run: |
           sudo rm -rf /Users/runner/Library/Android/sdk || true
