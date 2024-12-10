@@ -1,73 +1,130 @@
 import socket
+import threading
 import time
-from collections import defaultdict
+from collections import defaultdict, deque
 from concurrent.futures import ThreadPoolExecutor
+from contextlib import contextmanager
+from dataclasses import dataclass
+from datetime import datetime, timedelta
 from io import BytesIO
-from statistics import mean, median, stdev
+from statistics import mean, quantiles, stdev
 
 import certifi
 import pycurl
+from typing_extensions import Deque, Generator, Optional
 
 MAX_THREAD_POOL_SIZE = 20
 
 
-def calculate_percentile(values: list[float], percentile: float) -> float:
-    """
-    Calculate percentile using linear interpolation between closest ranks.
-    Implementation follows the C=1 method from Wikipedia's percentile article.
-    """
-    if not values:
-        return 0.0
-    sorted_values = sorted(values)
-    n = len(sorted_values)
+@dataclass
+class ConnectionMetadata:
+    timestamp: datetime
+    host: str
+    port: int
 
-    # Convert percentile to a fraction between 0 and 1
-    fraction = percentile / 100.0
 
-    # Calculate the theoretical position
-    position = fraction * (n - 1)
+class RateLimiter:
+    """Manages connection rate limiting"""
 
-    # Find the integers below and above the position
-    lower_idx = int(position)
-    upper_idx = min(lower_idx + 1, n - 1)
+    def __init__(self, max_requests_per_minute: int):
+        self.max_requests = max_requests_per_minute
+        self.requests: Deque[datetime] = deque()
+        self.lock = threading.Lock()
 
-    # Calculate weights for interpolation
-    weight = position - lower_idx
+    def _clean_old_requests(self) -> None:
+        """Remove requests older than 1 minute"""
+        cutoff = datetime.now() - timedelta(minutes=1)
+        while self.requests and self.requests[0] < cutoff:
+            self.requests.popleft()
 
-    # Interpolate between the values
-    return (1 - weight) * sorted_values[lower_idx] + weight * sorted_values[upper_idx]
+    @contextmanager
+    def rate_limit(self) -> Generator[None, None, None]:
+        """Context manager for rate limiting"""
+        with self.lock:
+            self._clean_old_requests()
+            while len(self.requests) >= self.max_requests:
+                time.sleep(0.1)
+                self._clean_old_requests()
+            self.requests.append(datetime.now())
+            yield
+
+
+@dataclass
+class TCPConnection:
+    """Handles single TCP connection measurement"""
+
+    host: str
+    port: int
+    timeout: float
+    previous_latency: Optional[float] = None
+
+    def connect(self) -> tuple[float, float]:
+        """Establish TCP connection and measure performance"""
+        try:
+            start_time = time.time()
+            with socket.create_connection((self.host, self.port), timeout=self.timeout):
+                latency = (time.time() - start_time) * 1000
+
+                # Calculate jitter
+                jitter = 0
+                if self.previous_latency is not None:
+                    jitter = abs(latency - self.previous_latency)
+
+                return latency, jitter
+
+        except socket.error:
+            return -1, -1
 
 
 class TCPPerfStats:
     """Measure TCP connection performance"""
+
+    max_connections_per_minute: int = 30
+    max_concurrent_connections: int = 3
+    connection_timeout: float = 10.0
+    min_delay_between_requests: float = 0.5
 
     def __init__(self, host: str, port: int):
         self.host = host
         self.port = port
         self.previous_latency = None
         self.jitter_values = []
+        self.request_history: Deque[ConnectionMetadata] = deque()
+        self.__post_init__()
 
-    def measure_tcp_connection(self) -> tuple[float, float]:
-        """
-        Measure TCP connection time and calculate jitter.
-        Returns (latency, jitter) in milliseconds.
-        """
+    def __post_init__(self):
+        self.rate_limiter = RateLimiter(self.max_connections_per_minute)
+        self.connection_lock = threading.Lock()
+
+    @contextmanager
+    def _connection_context(self) -> Generator[None, None, None]:
+        """Context manager for connection tracking"""
+        metadata = ConnectionMetadata(datetime.now(), self.host, self.port)
         try:
-            start_time = time.time()
-            with socket.create_connection((self.host, self.port), timeout=10) as _:
-                latency = (time.time() - start_time) * 1000  # Convert to ms
+            with self.connection_lock:
+                self.request_history.append(metadata)
+            yield
+        finally:
+            # Clean old history
+            with self.connection_lock:
+                cutoff = datetime.now() - timedelta(minutes=1)
+                while self.request_history and self.request_history[0].timestamp < cutoff:
+                    self.request_history.popleft()
 
-                # Calculate jitter
-                jitter = 0
-                if self.previous_latency is not None:
-                    jitter = abs(latency - self.previous_latency)
-                    self.jitter_values.append(jitter)
+    def measure_single_connection(self) -> tuple[float, float]:
+        """Measure a single TCP connection with rate limiting"""
+        with self.rate_limiter.rate_limit():
+            with self._connection_context():
+                conn = TCPConnection(self.host, self.port, self.connection_timeout, self.previous_latency)
+                latency, jitter = conn.connect()
 
-                self.previous_latency = latency
+                if latency >= 0:
+                    self.previous_latency = latency
+                    if jitter >= 0:
+                        self.jitter_values.append(jitter)
+
+                time.sleep(self.min_delay_between_requests)
                 return latency, jitter
-
-        except socket.error:
-            return -1, -1
 
     def get_stats(self, num_runs: int) -> dict:
         """Perform multiple TCP connections and gather statistics."""
@@ -77,14 +134,18 @@ class TCPPerfStats:
         print(f"Measuring TCP performance for {self.host}:{self.port}...")
 
         # Use ThreadPoolExecutor for parallel connections
-        with ThreadPoolExecutor(max_workers=min(num_runs, MAX_THREAD_POOL_SIZE)) as _:
-            for _ in range(num_runs):
-                latency, jitter = self.measure_tcp_connection()
-                if latency >= 0:
-                    latencies.append(latency)
-                if jitter >= 0:
-                    jitters.append(jitter)
-                time.sleep(0.1)  # Small delay between connections
+        with ThreadPoolExecutor(max_workers=self.max_concurrent_connections) as executor:
+            futures = [executor.submit(self.measure_single_connection) for _ in range(num_runs)]
+
+            for future in futures:
+                try:
+                    latency, jitter = future.result()
+                    if latency >= 0:
+                        latencies.append(latency)
+                    if jitter >= 0:
+                        jitters.append(jitter)
+                except Exception as e:
+                    print(f"Connection error: {e}")
 
         if not latencies:
             return {}
@@ -99,15 +160,30 @@ class TCPPerfStats:
         }
 
         for metric_name, values in [("tcp_latency", latencies), ("tcp_jitter", jitters)]:
-            stats[metric_name]["min"] = min(values) if values else 0
-            stats[metric_name]["max"] = max(values) if values else 0
-            stats[metric_name]["avg"] = mean(values) if values else 0
-            stats[metric_name]["median"] = median(values) if values else 0
-            stats[metric_name]["stddev"] = stdev(values) if len(values) > 1 else 0
-            stats[metric_name]["p95"] = calculate_percentile(values, 95)
-            stats[metric_name]["p99"] = calculate_percentile(values, 99)
+            if not values:
+                continue
+
+            quants = quantiles(values, n=100)
+            stats[metric_name].update(
+                {
+                    "min": min(values),
+                    "max": max(values),
+                    "avg": mean(values),
+                    "median": quants[49],
+                    "stddev": stdev(values) if len(values) > 1 else 0,
+                    "p95": quants[94],
+                    "p99": quants[98],
+                }
+            )
 
         stats["connection_success_rate"] = len(latencies) / num_connections * 100
+
+        # Add rate limiting stats
+        stats["rate_limiting"] = {
+            "requests_in_last_minute": len(self.request_history),
+            "max_requests_per_minute": self.max_connections_per_minute,
+            "max_concurrent_connections": self.max_concurrent_connections,
+        }
 
         return stats
 
@@ -223,12 +299,13 @@ class HTTPPerfStats:
             if col not in all_stats[0]:
                 continue
             values = [s[col] for s in all_stats if col in s]
+            quants = quantiles(values, n=100)
             agg_stats[col]["min"] = min(values) if values else 0
             agg_stats[col]["max"] = max(values) if values else 0
             agg_stats[col]["avg"] = mean(values) if values else 0
-            agg_stats[col]["median"] = median(values) if values else 0
+            agg_stats[col]["median"] = quants[49]  # median
             agg_stats[col]["stddev"] = stdev(values) if len(values) > 1 else 0
-            agg_stats[col]["p95"] = calculate_percentile(values, 99)
-            agg_stats[col]["p99"] = calculate_percentile(values, 99)
+            agg_stats[col]["p95"] = quants[94]  # 95th percentile
+            agg_stats[col]["p99"] = quants[98]  # 99th percentile
 
         return agg_stats
