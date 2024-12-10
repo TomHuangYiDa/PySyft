@@ -30,7 +30,7 @@ dependencies = [
     "ruamel-yaml>=0.18.6",
     "pyjwt>=2.10.0",
     "wcmatch>=10.0",
-    "pycurl>=7.45.3",
+    "curl-cffi>=0.7.4",
 ]
 
 [project.optional-dependencies]
