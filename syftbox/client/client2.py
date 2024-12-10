@@ -181,6 +181,8 @@ class SyftClient:
         }
         if self.config.access_token is not None:
             headers["Authorization"] = f"Bearer {self.config.access_token}"
+
+        logger.info(f"Server headers: {headers}")
         return headers
 
     # utils

@@ -2,12 +2,13 @@ import platform
 
 from syftbox import __version__
 
-HEADER_SYFTBOX_VERSION = "x-syftbox-version"
-HEADER_SYFTBOX_PYTHON = "x-syftbox-python"
-HEADER_SYFTBOX_USER = "x-syftbox-user"
-HEADER_OS_NAME = "x-os-name"
-HEADER_OS_VERSION = "x-os-ver"
-HEADER_OS_ARCH = "x-os-arch"
+# keep these as bytes
+HEADER_SYFTBOX_VERSION = b"x-syftbox-version"
+HEADER_SYFTBOX_PYTHON = b"x-syftbox-python"
+HEADER_SYFTBOX_USER = b"x-syftbox-user"
+HEADER_OS_NAME = b"x-os-name"
+HEADER_OS_VERSION = b"x-os-ver"
+HEADER_OS_ARCH = b"x-os-arch"
 
 _PYTHON_VERSION = platform.python_version()
 

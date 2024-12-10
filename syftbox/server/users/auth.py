@@ -7,7 +7,7 @@ from opentelemetry import trace
 from typing_extensions import Annotated
 
 from syftbox.server.settings import ServerSettings, get_server_settings
-from syftbox.server.telemetry import OTEL_ATTR_CLIENT_EMAIL
+from syftbox.server.telemetry import OTEL_ATTR_CLIENT_USER
 
 bearer_scheme = HTTPBearer()
 
@@ -93,7 +93,7 @@ def get_user_from_email_token(
     server_settings: Annotated[ServerSettings, Depends(get_server_settings)],
 ) -> str:
     payload = validate_email_token(server_settings, credentials.credentials)
-    trace.get_current_span().set_attribute(OTEL_ATTR_CLIENT_EMAIL, payload["email"])
+    trace.get_current_span().set_attribute(OTEL_ATTR_CLIENT_USER, payload["email"])
     return payload["email"]
 
 
@@ -102,5 +102,5 @@ def get_current_user(
     server_settings: Annotated[ServerSettings, Depends(get_server_settings)],
 ) -> str:
     payload = validate_access_token(server_settings, credentials.credentials)
-    trace.get_current_span().set_attribute(OTEL_ATTR_CLIENT_EMAIL, payload["email"])
+    trace.get_current_span().set_attribute(OTEL_ATTR_CLIENT_USER, payload["email"])
     return payload["email"]

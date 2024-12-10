@@ -34,7 +34,12 @@ from syftbox.server.analytics import log_analytics_event
 from syftbox.server.logger import setup_logger
 from syftbox.server.middleware import LoguruMiddleware
 from syftbox.server.settings import ServerSettings, get_server_settings
-from syftbox.server.telemetry import setup_otel_exporter
+from syftbox.server.telemetry import (
+    OTEL_ATTR_CLIENT_PYTHON,
+    OTEL_ATTR_CLIENT_USER,
+    OTEL_ATTR_CLIENT_VERSION,
+    setup_otel_exporter,
+)
 from syftbox.server.users.auth import get_current_user
 
 from .emails.router import router as emails_router
@@ -143,17 +148,20 @@ def init_db(settings: ServerSettings) -> None:
 
 def server_request_hook(span: Span, scope: dict[str, Any]):
     if not span.is_recording():
-        headers = dict(scope.get("headers", {}))
-        span.set_attribute("syftbox.client.version", headers.get(HEADER_SYFTBOX_VERSION, "-"))
-        span.set_attribute("syftbox.client.python", headers.get(HEADER_SYFTBOX_PYTHON, "-"))
-        span.set_attribute("syftbox.client.email", headers.get(HEADER_SYFTBOX_USER, "-"))
+        logger.info("Span is not recording")
+        return
+
+    # headers k/v pairs are bytes
+    headers: dict[bytes, bytes] = dict(scope.get("headers", {}))
+    span.set_attribute(OTEL_ATTR_CLIENT_VERSION, headers.get(HEADER_SYFTBOX_VERSION, ""))
+    span.set_attribute(OTEL_ATTR_CLIENT_PYTHON, headers.get(HEADER_SYFTBOX_PYTHON, ""))
+    span.set_attribute(OTEL_ATTR_CLIENT_USER, headers.get(HEADER_SYFTBOX_USER, ""))
 
 
 @contextlib.asynccontextmanager
 async def lifespan(app: FastAPI, settings: Optional[ServerSettings] = None):
     # Startup
-    if settings is None:
-        settings = ServerSettings()
+    settings = settings or ServerSettings()
 
     setup_logger(logs_folder=settings.logs_folder)
 
