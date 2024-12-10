@@ -24,7 +24,7 @@ from opentelemetry.instrumentation.sqlite3 import SQLite3Instrumentor
 from opentelemetry.trace import Span
 from typing_extensions import Any, Optional, Union
 
-from syftbox.__version__ import __version__
+from syftbox import __version__
 from syftbox.lib.http import HEADER_SYFTBOX_PYTHON, HEADER_SYFTBOX_USER, HEADER_SYFTBOX_VERSION
 from syftbox.lib.lib import (
     Jsonable,

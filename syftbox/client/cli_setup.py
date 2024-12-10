@@ -11,7 +11,7 @@ import typer
 from rich import print as rprint
 from rich.prompt import Confirm, Prompt
 
-from syftbox.__version__ import __version__
+from syftbox import __version__
 from syftbox.client.auth import authenticate_user
 from syftbox.client.client2 import METADATA_FILENAME
 from syftbox.lib.client_config import SyftClientConfig

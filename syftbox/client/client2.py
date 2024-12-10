@@ -9,7 +9,7 @@ import uvicorn
 from loguru import logger
 from pid import PidFile, PidFileAlreadyLockedError, PidFileAlreadyRunningError
 
-from syftbox.__version__ import __version__
+from syftbox import __version__
 from syftbox.client.api import create_api
 from syftbox.client.base import Plugins, SyftClientInterface
 from syftbox.client.env import syftbox_env

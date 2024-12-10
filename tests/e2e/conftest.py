@@ -226,7 +226,7 @@ def get_random_port():
         return s.getsockname()[1]
 
 
-@pytest_asyncio.fixture
+@pytest_asyncio.fixture(loop_scope="function")
 async def e2e_context(request):
     try:
         ctx = E2EContext(**request.param)
