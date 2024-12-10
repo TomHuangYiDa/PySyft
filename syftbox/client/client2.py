@@ -8,7 +8,6 @@ import httpx
 import uvicorn
 from loguru import logger
 from pid import PidFile, PidFileAlreadyLockedError, PidFileAlreadyRunningError
-from typing_extensions import Optional
 
 from syftbox import __version__
 from syftbox.client.api import create_api
@@ -89,7 +88,7 @@ class SyftClient:
     def context(self) -> "SyftClientContext":
         return self.__ctx
 
-    def start(self):
+    def start(self) -> None:
         try:
             self.pid.create()
         except PidFileAlreadyLockedError:
@@ -153,7 +152,7 @@ class SyftClient:
         except Exception as e:
             raise SyftBoxException(f"Failed to register with the server - {e}") from e
 
-    def __run_local_server(self):
+    def __run_local_server(self) -> None:
         logger.info(f"Starting local server on {self.config.client_url}")
         app = create_api(self.__ctx)
         self.__local_server = uvicorn.Server(
@@ -172,7 +171,7 @@ class SyftClient:
         response.raise_for_status()
         return response.json().get("token")
 
-    def __get_server_headers(self):
+    def __get_server_headers(self) -> dict:
         # TODO make access token required for initializing the client
         headers = {"email": self.config.email}
         if self.config.access_token is not None:
@@ -188,7 +187,7 @@ class SyftClient:
         if platform.system() == "Darwin":
             macos.copy_icon_file(ICON_FOLDER, self.workspace.data_dir)
 
-    def log_system_info(self):
+    def log_system_info(self) -> None:
         if _is_wsl():
             os_name = "WSL"
         else:
@@ -206,10 +205,10 @@ class SyftClient:
             },
         )
 
-    def __enter__(self):
+    def __enter__(self) -> "SyftClient":
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
         self.shutdown()
 
 
@@ -354,9 +353,12 @@ def run_client(
     try:
         client = SyftClient(client_config, log_level=log_level)
         # we don't want to run migration if another instance of client is already running
-        bool(client.check_pidfile()) and run_migration(client_config, migrate_datasite=migrate_datasite)
-        (not syftbox_env.DISABLE_ICONS) and client.copy_icons()
-        open_dir and client.open_datasites_dir()
+        if bool(client.check_pidfile()):
+            run_migration(client_config, migrate_datasite=migrate_datasite)
+        if not syftbox_env.DISABLE_ICONS:
+            client.copy_icons()
+        if open_dir:
+            client.open_datasites_dir()
         client.log_system_info()
         client.start()
     except SyftBoxAlreadyRunning as e:

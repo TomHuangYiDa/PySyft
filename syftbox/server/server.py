@@ -345,7 +345,7 @@ async def register(
 async def log_event(
     request: Request,
     email: str = Depends(get_current_user),
-):
+) -> JSONResponse:
     data = await request.json()
     log_analytics_event("/log_event", email, **data)
     return JSONResponse({"status": "success"}, status_code=200)
@@ -358,7 +358,7 @@ async def install() -> FileResponse:
 
 
 @app.get("/icon.png")
-async def icon():
+async def icon() -> FileResponse:
     icon_path = current_dir / "assets" / "icon.png"
     return FileResponse(icon_path, media_type="image/png")
 
