@@ -5,37 +5,36 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.9"
 dependencies = [
-    "fastapi>=0.114.0",
-    "uvicorn>=0.30.6",
-    "jinja2>=3.1.4",
-    "typing-extensions>=4.12.2",
-    "markdown>=3.7",
-    "pandas>=2.2.2",
-    "postmarker>=1.0",
-    "watchdog>=5.0.2",
-    "pydantic-settings>=2.5.2",
-    "pytest>=8.3.3",
-    "httpx>=0.27.2",
-    "pyyaml>=6.0.2",
-    "psutil>=6.0.0",
-    "loguru>=0.7.2",
-    "py-fast-rsync",
-    "pathspec>=0.12.1",
-    "python-multipart>=0.0.12",
-    "rich>=13.9.2",
-    "croniter>=3.0.0",
-    "typer>=0.12.5",
-    "pid>=3.0.4",
-    "pydantic[email]>=2.9.2",
-    "ruamel-yaml>=0.18.6",
-    "pyjwt>=2.10.0",
-    "wcmatch>=10.0",
+    "fastapi==0.115.0",
+    "uvicorn==0.31.0",
+    "jinja2==3.1.4",
+    "typing-extensions==4.12.2",
+    "pydantic-settings==2.5.2",
+    "httpx==0.27.2",
+    "pyyaml==6.0.2",
+    "psutil==6.0.0",
+    "loguru==0.7.2",
+    "py-fast-rsync==0.1.0",
+    "pathspec==0.12.1",
+    "python-multipart==0.0.12",
+    "rich==13.9.4",
+    "croniter==3.0.3",
+    "typer==0.15.1",
+    "pid==3.0.4",
+    "pydantic[email]==2.9.2",
+    "pyjwt==2.10.0",
+    "wcmatch==10.0",
 ]
 
-[project.optional-dependencies]
-# add using `uv add --optional <group> <pip package>`
-# will be referenced in the built wheel
+# Local dependencies for development
+# Add using `uv add --group <group> <pip package>`
+[dependency-groups]
+ds = ["pandas>=2.2.3"]
 
+# Published optional dependencies, or "extras". Will be referenced in the built wheel
+# add using `uv add --optional <group> <pip package>`
+[project.optional-dependencies]
+server = ["gunicorn>=23.0.0"]
 
 [project.scripts]
 syftbox = "syftbox.main:main"
@@ -70,6 +69,7 @@ syftbox = ["*.css", ".js", ".html", ".zip", ".sh"]
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
+asyncio_default_fixture_loop_scope = "function"
 
 [tool.ruff]
 line-length = 120
