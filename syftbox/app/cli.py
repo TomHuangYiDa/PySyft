@@ -5,7 +5,7 @@ from rich import print as rprint
 from typer import Argument, Exit, Option, Typer
 from typing_extensions import Annotated
 
-from syftbox.__version__ import __version__
+from syftbox import __version__
 from syftbox.app.manager import install_app, list_app, uninstall_app
 from syftbox.client.base import SyftClientInterface
 from syftbox.client.client2 import SyftClient
@@ -131,7 +131,8 @@ def env(with_syftbox: bool = False) -> None:
 def get_client(config_path: Path) -> SyftClientInterface:
     try:
         conf = SyftClientConfig.load(config_path)
-        return SyftClient(conf).as_context()
+        client = SyftClient(conf)
+        return client.context
     except ClientConfigException:
         msg = (
             f"[bold red]Error:[/bold red] Couldn't load config at: [yellow]'{config_path}'[/yellow]\n"

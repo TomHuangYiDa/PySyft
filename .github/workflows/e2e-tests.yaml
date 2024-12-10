@@ -18,7 +18,12 @@ jobs:
     strategy:
       max-parallel: 99
       matrix:
-        e2e-test: ["ring", "basic_aggregator", "model_aggregator"]
+        e2e-test: [
+            "basic_aggregator",
+            "model_aggregator",
+            "aggregator_with_local_training",
+            # "fl_model_training",
+          ]
         python-version: ["3.9", "3.12"]
         os: [ubuntu-latest, macos-latest]
         # runner: [syftbox-sh-linux-x64, scaleway-macOS-arm64]
@@ -27,6 +32,14 @@ jobs:
     # runs-on: ${{ matrix.runner }}
     runs-on: ${{ matrix.os }}
     steps:
+      - name: Free Disk Space
+        run: |
+          sudo rm -rf /Users/runner/Library/Android/sdk || true
+          sudo rm -rf /usr/local/lib/android || true
+          sudo rm -rf /usr/share/dotnet || true
+          sudo rm -rf /opt/ghc || true
+          sudo rm -rf /usr/local/.ghcup || true
+
       - uses: actions/checkout@v4
 
       - name: Install uv

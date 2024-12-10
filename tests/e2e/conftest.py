@@ -56,6 +56,11 @@ class Client:
         return self.data_dir / "apis"
 
     @property
+    def private_dir(self):
+        """data_dir/private"""
+        return self.data_dir / "private"
+
+    @property
     def my_datasite(self):
         """data_dir/datasites/{email}"""
         return self.datasite_dir / self.email
@@ -219,7 +224,7 @@ def get_random_port():
         return s.getsockname()[1]
 
 
-@pytest_asyncio.fixture
+@pytest_asyncio.fixture(loop_scope="function")
 async def e2e_context(request):
     try:
         ctx = E2EContext(**request.param)

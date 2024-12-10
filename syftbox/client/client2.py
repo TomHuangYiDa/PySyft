@@ -2,7 +2,6 @@ import asyncio
 import json
 import platform
 import shutil
-from functools import lru_cache
 from pathlib import Path
 
 import httpx
@@ -11,15 +10,15 @@ from loguru import logger
 from pid import PidFile, PidFileAlreadyLockedError, PidFileAlreadyRunningError
 from typing_extensions import Optional
 
-from syftbox.__version__ import __version__
+from syftbox import __version__
 from syftbox.client.api import create_api
-from syftbox.client.base import SyftClientInterface
+from syftbox.client.base import Plugins, SyftClientInterface
 from syftbox.client.env import syftbox_env
-from syftbox.client.exceptions import SyftBoxAlreadyRunning, SyftInitializationError, SyftServerError
+from syftbox.client.exceptions import SyftAuthenticationError, SyftBoxAlreadyRunning, SyftServerError
 from syftbox.client.logger import setup_logger
-from syftbox.client.plugins.apps import AppRunner
-from syftbox.client.plugins.sync.manager import SyncManager
+from syftbox.client.plugin_manager import PluginManager
 from syftbox.client.utils import error_reporting, file_manager, macos
+from syftbox.client.utils.file_manager import _is_wsl
 from syftbox.lib.client_config import SyftClientConfig
 from syftbox.lib.datasite import create_datasite
 from syftbox.lib.exceptions import SyftBoxException
@@ -54,37 +53,22 @@ class SyftClient:
 
         self.workspace = SyftWorkspace(self.config.data_dir)
         self.pid = PidFile(pidname="syftbox.pid", piddir=self.workspace.data_dir)
+
         self.server_client = httpx.Client(
             base_url=str(self.config.server_url),
             follow_redirects=True,
-            headers={"email": self.config.email, "Authorization": f"Bearer {self.config.access_token}"},
+            headers=self.__get_server_headers(),
         )
+
+        # create a single client context shared across components
+        self.__ctx = SyftClientContext(self.config, self.workspace, self.server_client, plugins=None)
+        self.plugins = PluginManager(self.__ctx, **kwargs)
+        # make plugins available to the context
+        self.__ctx.plugins = self.plugins
 
         # kwargs for making customization/unit testing easier
         # this will be replaced with a sophisticated plugin system
-        self.__sync_manager: Optional[SyncManager] = kwargs.get("sync_manager", None)  # type: ignore
-        self.__app_runner: Optional[AppRunner] = kwargs.get("app_runner", None)  # type: ignore
         self.__local_server: uvicorn.Server = None
-
-    @property
-    def sync_manager(self) -> SyncManager:
-        """the sync manager. lazily initialized"""
-        if self.__sync_manager is None:
-            try:
-                self.__sync_manager = SyncManager(self.as_context())
-            except Exception as e:
-                raise SyftInitializationError(f"Failed to initialize sync manager - {e}") from e
-        return self.__sync_manager
-
-    @property
-    def app_runner(self) -> AppRunner:
-        """the app runner. lazily initialized"""
-        if self.__app_runner is None:
-            try:
-                self.__app_runner = AppRunner(self.as_context())
-            except Exception as e:
-                raise SyftInitializationError(f"Failed to initialize app runner - {e}") from e
-        return self.__app_runner
 
     @property
     def is_registered(self) -> bool:
@@ -101,7 +85,11 @@ class SyftClient:
         """The public directory in the datasite of the current user"""
         return self.datasite / "public"
 
-    def start(self) -> None:
+    @property
+    def context(self) -> "SyftClientContext":
+        return self.__ctx
+
+    def start(self):
         try:
             self.pid.create()
         except PidFileAlreadyLockedError:
@@ -116,8 +104,7 @@ class SyftClient:
         self.init_datasite()  # init the datasite on local machine
 
         # start plugins/components
-        self.sync_manager.start()
-        self.app_runner.start()
+        self.plugins.start()
         return self.__run_local_server()
 
     @property
@@ -133,11 +120,7 @@ class SyftClient:
         if self.__local_server:
             _result = asyncio.run(self.__local_server.shutdown())
 
-        if self.__sync_manager:
-            self.__sync_manager.stop()
-
-        if self.__app_runner:
-            self.__app_runner.stop()
+        self.plugins.stop()
 
         self.pid.close()
         logger.info("SyftBox client shutdown complete")
@@ -170,14 +153,9 @@ class SyftClient:
         except Exception as e:
             raise SyftBoxException(f"Failed to register with the server - {e}") from e
 
-    @lru_cache(1)
-    def as_context(self) -> "SyftClientContext":
-        """Return a implementation of SyftClientInterface to be injected into sub-systems"""
-        return SyftClientContext(self.config, self.workspace, self.server_client)
-
-    def __run_local_server(self) -> None:
+    def __run_local_server(self):
         logger.info(f"Starting local server on {self.config.client_url}")
-        app = create_api(self.as_context())
+        app = create_api(self.__ctx)
         self.__local_server = uvicorn.Server(
             config=uvicorn.Config(
                 app=app,
@@ -194,11 +172,12 @@ class SyftClient:
         response.raise_for_status()
         return response.json().get("token")
 
-    def __enter__(self) -> "SyftClient":
-        return self
-
-    def __exit__(self) -> None:
-        self.shutdown()
+    def __get_server_headers(self):
+        # TODO make access token required for initializing the client
+        headers = {"email": self.config.email}
+        if self.config.access_token is not None:
+            headers["Authorization"] = f"Bearer {self.config.access_token}"
+        return headers
 
     # utils
     def open_datasites_dir(self) -> None:
@@ -208,6 +187,30 @@ class SyftClient:
         self.workspace.mkdirs()
         if platform.system() == "Darwin":
             macos.copy_icon_file(ICON_FOLDER, self.workspace.data_dir)
+
+    def log_system_info(self):
+        if _is_wsl():
+            os_name = "WSL"
+        else:
+            os_name = platform.system()
+            os_name = "macOS" if os_name == "Darwin" else os_name
+
+        self.server_client.post(
+            "/log_event",
+            json={
+                "event_name": "system_info",
+                "os_name": os_name,
+                "os_version": platform.release(),
+                "syftbox_version": __version__,
+                "python_version": platform.python_version(),
+            },
+        )
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.shutdown()
 
 
 class SyftClientContext(SyftClientInterface):
@@ -226,10 +229,12 @@ class SyftClientContext(SyftClientInterface):
         config: SyftClientConfig,
         workspace: SyftWorkspace,
         server_client: httpx.Client,
+        plugins: Plugins,
     ):
         self.config = config
         self.workspace = workspace
         self.server_client = server_client
+        self.plugins = plugins
 
     @property
     def email(self) -> str:
@@ -254,9 +259,26 @@ class SyftClientContext(SyftClientInterface):
             **kwargs,
         }
 
-        response = self.server_client.post("/log_event", headers={"email": self.email}, json=event_data)
+        response = self.server_client.post("/log_event", json=event_data)
         if response.status_code != 200:
             raise SyftServerError(f"Failed to log event: {response.text}")
+
+    def whoami(self) -> str:
+        try:
+            response = self.server_client.post("/auth/whoami")
+            if response.status_code == 401:
+                raise SyftAuthenticationError()
+            if response.status_code != 200:
+                raise SyftServerError(f"[/whoami] Server error: {response.status_code}, {response.text}")
+
+            data = response.json()
+            if "email" not in data:
+                raise SyftServerError("[/whoami] Missing email in response")
+
+            return data["email"]
+
+        except httpx.RequestError as e:
+            raise SyftServerError(f"[/whoami] Request failed: {e}") from e
 
 
 def run_apps_to_api_migration(new_ws: SyftWorkspace) -> None:
@@ -320,7 +342,9 @@ def run_client(
     setup_logger(log_level, log_dir=client_config.data_dir / "logs")
 
     error_config = error_reporting.make_error_report(client_config)
-    logger.info(f"Client metadata\n{error_config.model_dump_json(indent=2)}")
+    logger.info(
+        f"Client metadata\n{error_config.model_dump_json(indent=2, exclude={'client_config': {'access_token'}})}"
+    )
 
     # a flag to disable icons
     # GitHub CI needs to zip sync dir in tests and fails when it encounters Icon\r files
@@ -330,12 +354,10 @@ def run_client(
     try:
         client = SyftClient(client_config, log_level=log_level)
         # we don't want to run migration if another instance of client is already running
-        if client.check_pidfile():
-            run_migration(client_config, migrate_datasite=migrate_datasite)
-        if not syftbox_env.DISABLE_ICONS:
-            client.copy_icons()
-        if open_dir:
-            client.open_datasites_dir()
+        bool(client.check_pidfile()) and run_migration(client_config, migrate_datasite=migrate_datasite)
+        (not syftbox_env.DISABLE_ICONS) and client.copy_icons()
+        open_dir and client.open_datasites_dir()
+        client.log_system_info()
         client.start()
     except SyftBoxAlreadyRunning as e:
         logger.error(e)

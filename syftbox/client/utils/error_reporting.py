@@ -4,16 +4,14 @@ from platform import platform
 
 import httpx
 from pydantic import BaseModel, Field
-from typing_extensions import Optional
 
-from syftbox.__version__ import __version__
+from syftbox import __version__
 from syftbox.client.env import syftbox_env
 from syftbox.lib.client_config import SyftClientConfig
 
 
 class ErrorReport(BaseModel):
     client_config: SyftClientConfig
-    server_syftbox_version: Optional[str] = None
     client_syftbox_version: str = __version__
     python_version: str = sys.version
     platform: str = platform()
