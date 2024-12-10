@@ -9,11 +9,8 @@ from datetime import datetime, timedelta
 from io import BytesIO
 from statistics import mean, quantiles, stdev
 
-import certifi
-import pycurl
+from curl_cffi import Curl, CurlInfo, CurlOpt
 from typing_extensions import Deque, Generator, Optional
-
-MAX_THREAD_POOL_SIZE = 20
 
 
 @dataclass
@@ -188,124 +185,145 @@ class TCPPerfStats:
         return stats
 
 
+@dataclass
+class HTTPStats:
+    """Container for HTTP timing statistics"""
+
+    dns_time: float = 0.0
+    connect_time: float = 0.0
+    ssl_time: float = 0.0
+    starttransfer_time: float = 0.0
+    total_time: float = 0.0
+    header_size: int = 0
+    request_size: int = 0
+    http_code: int = 0
+    primary_ip: str = ""
+    primary_port: int = 0
+    tcp_time: float = 0.0
+    content_transfer_time: float = 0.0
+    server_processing_time: float = 0.0
+
+
 class HTTPPerfStats:
-    """Measure HTTP connection performance"""
+    """Measure HTTP connection performance using curl_cffi"""
 
     def __init__(self, url: str):
         self.url = url
-        self.buffer = BytesIO()
+        self.buffer: BytesIO = BytesIO()
+        self.connect_timeout: int = 30
+        self.total_timeout: int = 60
+        self.max_redirects: int = 5
 
-    def _create_curl(self) -> pycurl.Curl:
-        """Create and configure a PycURL object."""
-        c = pycurl.Curl()
-        for option, value in self._get_default_options().items():
-            c.setopt(option, value)
-        return c
-
-    def _get_default_options(self) -> dict:
-        """Get default options for PycURL object."""
+    def _get_default_options(self) -> dict[CurlOpt, any]:
+        """Get default options for curl_cffi"""
         return {
-            pycurl.URL: self.url,
-            pycurl.WRITEDATA: self.buffer,
-            pycurl.CAINFO: certifi.where(),
-            pycurl.FOLLOWLOCATION: 1,
-            pycurl.MAXREDIRS: 5,
-            pycurl.CONNECTTIMEOUT: 30,
-            pycurl.TIMEOUT: 60,
-            pycurl.SSL_VERIFYPEER: 1,
-            pycurl.SSL_VERIFYHOST: 2,
+            CurlOpt.URL: self.url.encode(),
+            CurlOpt.WRITEDATA: self.buffer,
+            CurlOpt.FOLLOWLOCATION: 1,
+            CurlOpt.MAXREDIRS: self.max_redirects,
+            CurlOpt.CONNECTTIMEOUT: self.connect_timeout,
+            CurlOpt.TIMEOUT: self.total_timeout,
+            CurlOpt.SSL_VERIFYPEER: 1,
+            CurlOpt.SSL_VERIFYHOST: 2,
         }
 
-    def __calc_server_processing_time(self, stats: dict) -> float:
+    @contextmanager
+    def _create_curl(self):
+        """Context manager for curl_cffi handle"""
+        curl = Curl()
+        try:
+            for option, value in self._get_default_options().items():
+                curl.setopt(option, value)
+            yield curl
+        finally:
+            curl.close()
+
+    def _calc_server_processing_time(self, stats: HTTPStats) -> float:
         """
         Calculate actual server processing time by subtracting connection times from TTFB.
         Server Processing Time = TTFB - (DNS + TCP + SSL)
         """
+        server_processing = stats.starttransfer_time - (stats.dns_time + stats.tcp_time + stats.ssl_time)
+        return max(0, server_processing)
 
-        ttfb = stats["starttransfer_time"]
-        dns_time = stats["dns_time"]
-        tcp_time = stats["tcp_time"]
-        ssl_time = stats["ssl_time"]
-
-        server_processing = ttfb - (dns_time + tcp_time + ssl_time)
-        return max(0, server_processing)  # Ensure we don't return negative values
-
-    def _get_stats(self) -> dict:
-        """HTTP performance stats using PycURL."""
-
-        curl = self._create_curl()
-
-        # Clear buffer before each request
+    def _get_stats(self) -> Optional[HTTPStats]:
+        """Get HTTP performance stats for a single request"""
         self.buffer.seek(0)
         self.buffer.truncate()
 
-        try:
-            curl.perform()
+        with self._create_curl() as curl:
+            try:
+                curl.perform()
 
-            # Standard HTTP stats
-            stats = {
-                "dns_time": curl.getinfo(pycurl.NAMELOOKUP_TIME) * 1000,
-                "connect_time": curl.getinfo(pycurl.CONNECT_TIME) * 1000,
-                "ssl_time": (curl.getinfo(pycurl.APPCONNECT_TIME) - curl.getinfo(pycurl.CONNECT_TIME)) * 1000,
-                "starttransfer_time": curl.getinfo(pycurl.STARTTRANSFER_TIME) * 1000,
-                "total_time": curl.getinfo(pycurl.TOTAL_TIME) * 1000,
-                "size_download": curl.getinfo(pycurl.SIZE_DOWNLOAD),
-                "speed_download": curl.getinfo(pycurl.SPEED_DOWNLOAD),
-                "header_size": curl.getinfo(pycurl.HEADER_SIZE),
-                "request_size": curl.getinfo(pycurl.REQUEST_SIZE),
-                "http_code": curl.getinfo(pycurl.HTTP_CODE),
-                "primary_ip": curl.getinfo(pycurl.PRIMARY_IP),
-                "primary_port": curl.getinfo(pycurl.PRIMARY_PORT),
-                "tcp_time": (curl.getinfo(pycurl.CONNECT_TIME) - curl.getinfo(pycurl.NAMELOOKUP_TIME)) * 1000,
-                "content_transfer_time": (curl.getinfo(pycurl.TOTAL_TIME) - curl.getinfo(pycurl.STARTTRANSFER_TIME))
-                * 1000,
-            }
-            stats["server_processing_time"] = self.__calc_server_processing_time(stats)
+                # Convert times to milliseconds
+                stats = HTTPStats(
+                    dns_time=curl.getinfo(CurlInfo.NAMELOOKUP_TIME) * 1000,
+                    connect_time=curl.getinfo(CurlInfo.CONNECT_TIME) * 1000,
+                    ssl_time=(curl.getinfo(CurlInfo.APPCONNECT_TIME) - curl.getinfo(CurlInfo.CONNECT_TIME)) * 1000,
+                    starttransfer_time=curl.getinfo(CurlInfo.STARTTRANSFER_TIME) * 1000,
+                    total_time=curl.getinfo(CurlInfo.TOTAL_TIME) * 1000,
+                    header_size=curl.getinfo(CurlInfo.HEADER_SIZE),
+                    request_size=curl.getinfo(CurlInfo.REQUEST_SIZE),
+                    http_code=curl.getinfo(CurlInfo.RESPONSE_CODE),
+                    primary_ip=curl.getinfo(CurlInfo.PRIMARY_IP),
+                    primary_port=curl.getinfo(CurlInfo.PRIMARY_PORT),
+                    tcp_time=(curl.getinfo(CurlInfo.CONNECT_TIME) - curl.getinfo(CurlInfo.NAMELOOKUP_TIME)) * 1000,
+                    content_transfer_time=(
+                        curl.getinfo(CurlInfo.TOTAL_TIME) - curl.getinfo(CurlInfo.STARTTRANSFER_TIME)
+                    )
+                    * 1000,
+                )
 
-        except pycurl.error as e:
-            stats = {}
-            print(f"Error: {e}")
-        finally:
-            curl.close()
+                stats.server_processing_time = self._calc_server_processing_time(stats)
+                return stats
 
-        return stats
+            except Exception as e:
+                print(f"Error during request: {e}")
+                return None
 
-    def get_stats(self, n_runs: int) -> dict:
-        """Aggregate percentile stats from multiple runs."""
-        print("Measuring HTTP performance for", self.url)
+    def get_stats(self, n_runs: int) -> dict[str, dict[str, float]]:
+        """Aggregate performance stats from multiple runs"""
+        print(f"Measuring HTTP performance for {self.url}")
 
-        all_stats = []
+        stats_list: list[HTTPStats] = []
         for _ in range(n_runs):
-            stats = self._get_stats()
-            all_stats.append(stats)
+            if stats := self._get_stats():
+                stats_list.append(stats)
+            time.sleep(0.1)  # Small delay between requests
 
-        agg_stats = defaultdict(dict)
+        if not stats_list:
+            return {}
 
-        # Aggregate stats
-        cols = [
+        # Metrics to analyze
+        metrics = [
             "dns_time",
             "connect_time",
             "ssl_time",
             "starttransfer_time",
             "total_time",
-            "speed_download",
             "tcp_time",
             "content_transfer_time",
             "server_processing_time",
         ]
 
-        # Calculate percentiles for each metric
-        for col in cols:
-            if col not in all_stats[0]:
+        # Calculate aggregated stats
+        agg_stats = defaultdict(dict)
+        for metric in metrics:
+            values = [getattr(s, metric) for s in stats_list]
+            if not values:
                 continue
-            values = [s[col] for s in all_stats if col in s]
-            quants = quantiles(values, n=100)
-            agg_stats[col]["min"] = min(values) if values else 0
-            agg_stats[col]["max"] = max(values) if values else 0
-            agg_stats[col]["avg"] = mean(values) if values else 0
-            agg_stats[col]["median"] = quants[49]  # median
-            agg_stats[col]["stddev"] = stdev(values) if len(values) > 1 else 0
-            agg_stats[col]["p95"] = quants[94]  # 95th percentile
-            agg_stats[col]["p99"] = quants[98]  # 99th percentile
 
-        return agg_stats
+            quants = quantiles(values, n=100)
+            agg_stats[metric].update(
+                {
+                    "min": min(values),
+                    "max": max(values),
+                    "avg": mean(values),
+                    "median": quants[49],
+                    "stddev": stdev(values) if len(values) > 1 else 0,
+                    "p95": quants[94],
+                    "p99": quants[98],
+                }
+            )
+
+        return dict(agg_stats)
