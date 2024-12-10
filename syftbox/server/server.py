@@ -18,7 +18,7 @@ from jinja2 import Template
 from loguru import logger
 from typing_extensions import Any, Optional, Union
 
-from syftbox.__version__ import __version__
+from syftbox import __version__
 from syftbox.lib.constants import PERM_FILE
 from syftbox.lib.hash import collect_files, hash_files
 from syftbox.lib.lib import (
