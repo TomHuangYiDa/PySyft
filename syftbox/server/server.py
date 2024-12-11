@@ -48,6 +48,11 @@ def create_folders(folders: list[str]) -> None:
 
 def init_db(settings: ServerSettings) -> None:
     # remove this after the upcoming release
+    if __version__ in ["0.2.11", "0.2.12"]:
+        # Delete existing DB to avoid conflicts
+        db_path = settings.file_db_path.absolute()
+        if db_path.exists():
+            db_path.unlink()
     migrate_permissions(settings.snapshot_folder)
 
     # might take very long as snapshot folder grows
