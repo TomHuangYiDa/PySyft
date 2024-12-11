@@ -2,7 +2,7 @@ import sqlite3
 from pathlib import Path
 from typing import List, Optional
 
-from syftbox.lib.permissions import PermissionFile, PermissionRule
+from syftbox.lib.permissions import PermissionRule, SyftPermission
 from syftbox.server.models.sync_models import FileMetadata, RelativePath
 
 
@@ -73,7 +73,7 @@ def get_all_datasites(conn: sqlite3.Connection) -> list[str]:
     return [row[0] for row in cursor if row[0]]
 
 
-def query_rules_for_permfile(cursor, file: PermissionFile):
+def query_rules_for_permfile(cursor, file: SyftPermission):
     cursor.execute(
         """
         SELECT * FROM rules WHERE permfile_path = ? ORDER BY priority
@@ -83,7 +83,7 @@ def query_rules_for_permfile(cursor, file: PermissionFile):
     return cursor.fetchall()
 
 
-def get_rules_for_permfile(connection: sqlite3.Connection, file: PermissionFile):
+def get_rules_for_permfile(connection: sqlite3.Connection, file: SyftPermission):
     cursor = connection.cursor()
     return [PermissionRule.from_db_row(row) for row in query_rules_for_permfile(cursor, file)]
 
@@ -97,7 +97,7 @@ def get_all_files(cursor):
     return cursor.fetchall()
 
 
-def get_all_files_under_syftperm(cursor, permfile: PermissionFile) -> List[Path]:
+def get_all_files_under_syftperm(cursor, permfile: SyftPermission) -> List[Path]:
     cursor.execute(
         """
         SELECT * FROM file_metadata WHERE path LIKE ?
@@ -126,7 +126,7 @@ def get_rules_for_path(connection: sqlite3.Connection, path: Path):
     return [PermissionRule.from_db_row(row) for row in cursor.fetchall()]
 
 
-def set_rules_for_permfile(connection, file: PermissionFile):
+def set_rules_for_permfile(connection, file: SyftPermission):
     """
     Atomically set the rules for a permission file. Basically its just a write operation, but
     we also make sure we delete the rules that are no longer in the file.

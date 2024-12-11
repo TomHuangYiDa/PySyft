@@ -5,7 +5,7 @@ from typing import Optional
 import pytest
 
 from syftbox.lib.constants import PERM_FILE
-from syftbox.lib.permissions import PermissionFile, PermissionType
+from syftbox.lib.permissions import PermissionType, SyftPermission
 from syftbox.server.db.db import (
     get_read_permissions_for_user,
     get_rules_for_permfile,
@@ -127,7 +127,7 @@ def test_insert_permissions_from_file(connection_with_tables: sqlite3.Connection
       type: disallow
     """
     file_path = f"user@example.org/test2/{PERM_FILE}"
-    file = PermissionFile.from_string(yaml_string, file_path)
+    file = SyftPermission.from_string(yaml_string, file_path)
 
     set_rules_for_permfile(connection_with_tables, file)
     connection_with_tables.commit()
@@ -163,7 +163,7 @@ def test_overwrite_permissions_from_file(connection_with_tables: sqlite3.Connect
       type: disallow
     """
     file_path = f"user@example.org/test2/{PERM_FILE}"
-    file = PermissionFile.from_string(yaml_string, file_path)
+    file = SyftPermission.from_string(yaml_string, file_path)
     set_rules_for_permfile(connection_with_tables, file)
     connection_with_tables.commit()
     written_rules = get_rules_for_permfile(connection_with_tables, file)
@@ -216,7 +216,7 @@ def test_overwrite_permissions_from_file(connection_with_tables: sqlite3.Connect
     """
 
     file_path = f"user@example.org/test2/{PERM_FILE}"
-    file = PermissionFile.from_string(yaml_string, file_path)
+    file = SyftPermission.from_string(yaml_string, file_path)
     set_rules_for_permfile(connection_with_tables, file)
     connection_with_tables.commit()
     new_existing_rules = get_rules_for_permfile(connection_with_tables, file)
@@ -262,7 +262,7 @@ def test_computed_permissions(connection_with_tables: sqlite3.Connection):
     """
 
     file_path = f"user@example.org/test2/{PERM_FILE}"
-    file = PermissionFile.from_string(yaml_string, file_path)
+    file = SyftPermission.from_string(yaml_string, file_path)
     set_rules_for_permfile(connection_with_tables, file)
     connection_with_tables.commit()
 

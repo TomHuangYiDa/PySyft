@@ -10,9 +10,9 @@ from syftbox.lib.constants import PERM_FILE
 from syftbox.lib.hash import hash_file
 from syftbox.lib.permissions import (
     ComputedPermission,
-    PermissionFile,
     PermissionRule,
     PermissionType,
+    SyftPermission,
 )
 from syftbox.server.db import db
 from syftbox.server.db.db import (
@@ -71,7 +71,7 @@ class FileStore:
 
             if path.name.endswith(PERM_FILE):
                 # todo: implement delete for permfile
-                permfile = PermissionFile(relative_filepath=path, rules=[])
+                permfile = SyftPermission(relative_filepath=path, rules=[])
                 set_rules_for_permfile(conn, permfile)
 
             abs_path = self.server_settings.snapshot_folder / path
@@ -174,7 +174,7 @@ class FileStore:
 
             if path.name.endswith(PERM_FILE):
                 try:
-                    permfile = PermissionFile.from_bytes(contents, path)
+                    permfile = SyftPermission.from_bytes(contents, path)
                 except (yaml.YAMLError, ValueError):
                     raise HTTPException(
                         status_code=400,

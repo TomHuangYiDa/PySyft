@@ -188,7 +188,7 @@ class PermissionRule(BaseModel):
         return self.path.replace("{useremail}", email)
 
 
-class PermissionFile(BaseModel):
+class SyftPermission(BaseModel):
     relative_filepath: RelativePath
     rules: List[PermissionRule]
 
@@ -198,7 +198,7 @@ class PermissionFile(BaseModel):
 
     @classmethod
     def datasite_default(cls, email: str):
-        return PermissionFile.from_rule_dicts(
+        return SyftPermission.from_rule_dicts(
             Path(email) / PERM_FILE,
             [
                 {
@@ -208,6 +208,11 @@ class PermissionFile(BaseModel):
                 }
             ],
         )
+
+    def ensure(self, path=None) -> bool:
+        """For backwards compatibility, we ensure that the permission file exists with these permissions"""
+        self.save(path)
+        return True
 
     @property
     def depth(self):

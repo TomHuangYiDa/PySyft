@@ -5,10 +5,10 @@ import pytest
 from syftbox.lib.constants import PERM_FILE
 from syftbox.lib.permissions import (
     ComputedPermission,
-    PermissionFile,
     PermissionParsingError,
     PermissionRule,
     PermissionType,
+    SyftPermission,
 )
 
 
@@ -32,7 +32,7 @@ def test_parsing():
       user: "*"
       type: disallow
     """
-    file = PermissionFile.from_string(yaml_string, ".")
+    file = SyftPermission.from_string(yaml_string, ".")
     assert len(file.rules) == 2
 
     assert file.rules[0].permissions == [PermissionType.READ]
@@ -54,7 +54,7 @@ def test_parsing_fails():
       user: user@example.org
     """
     with pytest.raises(PermissionParsingError):
-        PermissionFile.from_string(yaml_string, ".")
+        SyftPermission.from_string(yaml_string, ".")
 
 
 def test_parsing_useremail():
@@ -64,7 +64,7 @@ def test_parsing_useremail():
           user: user@example.org
     """
 
-    file = PermissionFile.from_string(yaml_string, ".")
+    file = SyftPermission.from_string(yaml_string, ".")
     rule = file.rules[0]
     assert rule.has_email_template
     assert rule.resolve_path_pattern("user@example.org") == "user@example.org/*"
