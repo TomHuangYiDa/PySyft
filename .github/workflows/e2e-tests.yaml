@@ -18,8 +18,7 @@ jobs:
     strategy:
       max-parallel: 99
       matrix:
-        e2e-test:
-          [
+        e2e-test: [
             "basic_aggregator",
             "model_aggregator",
             "aggregator_with_local_training",
@@ -33,7 +32,6 @@ jobs:
     # runs-on: ${{ matrix.runner }}
     runs-on: ${{ matrix.os }}
     steps:
-
       - name: Free Disk Space
         run: |
           sudo rm -rf /Users/runner/Library/Android/sdk || true
@@ -45,7 +43,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v3
+        uses: astral-sh/setup-uv@v4
         with:
           version: "0.4.25"
 
@@ -55,7 +53,7 @@ jobs:
           just-version: "1.36.0"
 
       - name: "Setup jq"
-        uses: dcarbone/install-jq-action@v2
+        uses: dcarbone/install-jq-action@v3
         with:
           version: "1.7"
 
