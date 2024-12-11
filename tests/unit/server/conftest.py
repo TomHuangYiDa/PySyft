@@ -4,17 +4,24 @@ import pytest
 from fastapi.testclient import TestClient
 
 from syftbox.client.server_client import SyncClient
+from syftbox.lib.constants import PERM_FILE
 from syftbox.server.server import app
 from syftbox.server.settings import ServerSettings
 
 TEST_DATASITE_NAME = "test_datasite@openmined.org"
 TEST_FILE = "test_file.txt"
-PERMFILE_FILE = "_.syftperm"
-PERMFILE_DICT = {
-    "admin": [TEST_DATASITE_NAME],
-    "read": [TEST_DATASITE_NAME],
-    "write": [TEST_DATASITE_NAME],
-}
+PERMFILE_DICT = [
+    {
+        "path": "*",
+        "user": "*",
+        "permissions": ["admin", "read", "write"],
+    },
+    {
+        "path": "**/*",
+        "user": "*",
+        "permissions": ["admin", "read", "write"],
+    },
+]
 
 
 def get_access_token(client: TestClient, email: str) -> str:
@@ -53,7 +60,7 @@ def client(monkeypatch, tmp_path):
     datafile.touch()
     datafile.write_bytes(b"Hello, World!")
 
-    permfile = datasite / PERMFILE_FILE
+    permfile = datasite / PERM_FILE
     permfile.touch()
     permfile.write_text(json.dumps(PERMFILE_DICT))
 
@@ -84,7 +91,7 @@ def client_without_perms(monkeypatch, tmp_path):
     datafile.touch()
     datafile.write_bytes(b"Hello, World!")
 
-    permfile = datasite / PERMFILE_FILE
+    permfile = datasite / PERM_FILE
     permfile.touch()
     permfile.write_text("")
 

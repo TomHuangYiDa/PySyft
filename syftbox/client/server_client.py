@@ -7,7 +7,7 @@ import httpx
 from syftbox.client.base import ClientBase
 
 # TODO move shared models to lib/models
-from syftbox.server.sync.models import ApplyDiffResponse, DiffResponse, FileMetadata
+from syftbox.server.models.sync_models import ApplyDiffResponse, DiffResponse, FileMetadata
 
 
 class SyftBoxClient(ClientBase):
@@ -69,7 +69,7 @@ class SyncClient(ClientBase):
     def get_metadata(self, path: Path) -> FileMetadata:
         response = self.conn.post(
             "/sync/get_metadata",
-            json={"path_like": path.as_posix()},
+            json={"path": path.as_posix()},
         )
         self.raise_for_status(response)
         return FileMetadata(**response.json())

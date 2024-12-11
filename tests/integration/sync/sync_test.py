@@ -1,4 +1,3 @@
-import json
 import os
 import shutil
 import time
@@ -6,6 +5,7 @@ from pathlib import Path
 
 import faker
 import pytest
+import yaml
 from fastapi.testclient import TestClient
 
 from syftbox.client.base import SyftBoxContextInterface
@@ -15,20 +15,11 @@ from syftbox.client.plugins.sync.exceptions import FatalSyncError
 from syftbox.client.plugins.sync.manager import SyncManager
 from syftbox.client.plugins.sync.queue import SyncQueueItem
 from syftbox.client.utils.dir_tree import DirTree, create_dir_tree
-from syftbox.lib.lib import SyftPermission
+from syftbox.lib.constants import PERM_FILE
+from syftbox.lib.permissions import SyftPermission
 from syftbox.server.settings import ServerSettings
 
 fake = faker.Faker()
-
-
-# def create_random_file(client_config: ClientConfig, sub_path: str = "") -> Path:
-#     relative_path = Path(sub_path) / fake.file_name(extension="json")
-#     file_path = client_config.datasite / relative_path
-#     content = {"body": fake.text()}
-#     file_path.write_text(json.dumps(content))
-
-#     path_in_datasite = file_path.relative_to(client_config.workspace.datasites)
-#     return path_in_datasite
 
 
 def assert_files_not_on_datasite(client: SyftBoxContextInterface, files: list[Path]):
@@ -54,7 +45,7 @@ def assert_dirtree_exists(base_path: Path, tree: DirTree) -> None:
         if isinstance(content, str):
             assert local_path.read_text() == content
         elif isinstance(content, SyftPermission):
-            assert json.loads(local_path.read_text()) == content.to_dict()
+            assert yaml.safe_load(local_path.read_text()) == content.to_dict()
         elif isinstance(content, dict):
             assert local_path.is_dir()
             assert_dirtree_exists(local_path, content)
@@ -81,7 +72,7 @@ def test_enqueue_changes(datasite_1: SyftBoxContextInterface):
     # Create two files in datasite_1
     tree = {
         "folder1": {
-            "_.syftperm": SyftPermission.mine_with_public_read(datasite_1.email),
+            PERM_FILE: SyftPermission.mine_with_public_read(datasite_1.email, Path("folder1") / PERM_FILE),
             "large.txt": fake.text(max_nb_chars=1000),
             "small.txt": fake.text(max_nb_chars=10),
         },
@@ -119,7 +110,7 @@ def test_create_file(
     # Create a file in datasite_1
     tree = {
         "folder1": {
-            "_.syftperm": SyftPermission.mine_with_public_read(datasite_1.email),
+            PERM_FILE: SyftPermission.mine_with_public_read(datasite_1.email, Path("folder1") / PERM_FILE),
             "file.txt": fake.text(max_nb_chars=1000),
         },
     }
@@ -159,7 +150,7 @@ def test_modify(server_client: TestClient, datasite_1: SyftBoxContextInterface):
     # Setup initial state
     tree = {
         "folder1": {
-            "_.syftperm": SyftPermission.mine_with_public_write(datasite_1.email),
+            PERM_FILE: SyftPermission.mine_with_public_rw(datasite_1.email, Path("folder1") / PERM_FILE),
             "file.txt": "content",
         },
     }
@@ -188,7 +179,7 @@ def test_modify_and_pull(
     # Setup initial state
     tree = {
         "folder1": {
-            "_.syftperm": SyftPermission.mine_with_public_write(datasite_1.email),
+            PERM_FILE: SyftPermission.mine_with_public_rw(datasite_1.email, Path("folder1") / PERM_FILE),
             "file.txt": "content1",
         },
     }
@@ -223,7 +214,7 @@ def test_modify_with_conflict(
     # Setup initial state
     tree = {
         "folder1": {
-            "_.syftperm": SyftPermission.mine_with_public_write(datasite_1.email),
+            PERM_FILE: SyftPermission.mine_with_public_rw(datasite_1.email, Path("folder1") / PERM_FILE),
             "file.txt": "content1",
         },
     }
@@ -278,7 +269,7 @@ def test_delete_file(
     # Setup initial state
     tree = {
         "folder1": {
-            "_.syftperm": SyftPermission.mine_with_public_write(datasite_1.email),
+            PERM_FILE: SyftPermission.mine_with_public_rw(datasite_1.email, Path("folder1") / PERM_FILE),
             "file.txt": fake.text(max_nb_chars=1000),
         },
     }
@@ -312,15 +303,15 @@ def test_invalid_sync_to_remote(server_client: TestClient, datasite_1: SyftBoxCo
     too_large_content = os.urandom((MAX_FILE_SIZE_MB * 1024 * 1024) + 1)
     tree = {
         "valid": {
-            "_.syftperm": SyftPermission.mine_with_public_write(datasite_1.email),
+            PERM_FILE: SyftPermission.mine_with_public_rw(datasite_1.email, Path("valid") / PERM_FILE),
             "file.txt": "valid content",
         },
         "invalid_on_modify": {
-            "_.syftperm": SyftPermission.mine_with_public_write(datasite_1.email),
+            PERM_FILE: SyftPermission.mine_with_public_rw(datasite_1.email, Path("invalid_on_modify") / PERM_FILE),
             "file.txt": "valid content",
         },
         "invalid_on_create": {
-            "_.syftperm": "invalid permission",
+            PERM_FILE: "invalid permission",
             "file.txt": too_large_content,
         },
     }
@@ -356,7 +347,7 @@ def test_invalid_sync_to_remote(server_client: TestClient, datasite_1: SyftBoxCo
     # Modify invalid_on_modify to be invalid
     file_path = datasite_1.datasite / "invalid_on_modify" / "file.txt"
     file_path.write_bytes(too_large_content)
-    permission_path = datasite_1.datasite / "invalid_on_modify" / "_.syftperm"
+    permission_path = datasite_1.datasite / "invalid_on_modify" / PERM_FILE
     permission_path.write_text("invalid permission")
 
     sync_service_1.producer.enqueue_datasite_changes(
@@ -383,7 +374,7 @@ def test_sync_invalid_local_environment(datasite_1: SyftBoxContextInterface):
     # Create a file in datasite_1
     tree = {
         "folder1": {
-            "_.syftperm": SyftPermission.mine_with_public_read(datasite_1.email),
+            PERM_FILE: SyftPermission.mine_with_public_read(datasite_1.email, Path("folder1") / PERM_FILE),
             "file.txt": fake.text(max_nb_chars=1000),
         },
     }

@@ -6,10 +6,10 @@ from loguru import logger
 
 from syftbox.client.base import SyftBoxContextInterface
 from syftbox.client.plugins.sync.types import FileChangeInfo, SyncSide
+from syftbox.lib.hash import collect_files, hash_dir
 from syftbox.lib.ignore import filter_ignored_paths, get_syftignore_matches
-from syftbox.lib.lib import SyftPermission
-from syftbox.server.sync.hash import collect_files, hash_dir
-from syftbox.server.sync.models import FileMetadata
+from syftbox.lib.permissions import SyftPermission
+from syftbox.server.models.sync_models import FileMetadata
 
 
 def format_paths(path_list: list[Path]) -> str:

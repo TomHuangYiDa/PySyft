@@ -4,7 +4,7 @@ from pathlib import Path
 
 from pydantic import BaseModel
 
-from syftbox.lib.lib import SyftPermission
+from syftbox.lib.permissions import SyftPermission
 
 # TODO cleanup duplicate types
 

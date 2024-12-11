@@ -11,7 +11,7 @@ from syftbox.client.base import SyftBoxContextInterface
 from syftbox.client.plugins.sync.exceptions import SyncEnvironmentError
 from syftbox.client.plugins.sync.sync_action import SyncAction
 from syftbox.client.plugins.sync.types import SyncActionType, SyncStatus
-from syftbox.server.sync.models import FileMetadata
+from syftbox.server.models.sync_models import FileMetadata
 
 LOCAL_STATE_FILENAME = "local_syncstate.json"
 

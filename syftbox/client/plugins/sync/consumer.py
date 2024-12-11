@@ -18,9 +18,9 @@ from syftbox.client.plugins.sync.local_state import LocalState
 from syftbox.client.plugins.sync.queue import SyncQueue, SyncQueueItem
 from syftbox.client.plugins.sync.sync_action import SyncAction, determine_sync_action
 from syftbox.client.plugins.sync.types import SyncActionType
+from syftbox.lib.hash import hash_file
 from syftbox.lib.ignore import filter_ignored_paths
-from syftbox.server.sync.hash import hash_file
-from syftbox.server.sync.models import FileMetadata
+from syftbox.server.models.sync_models import FileMetadata
 
 
 def create_local_batch(context: SyftBoxContextInterface, paths_to_download: list[Path]) -> list[str]:
@@ -111,7 +111,7 @@ class SyncConsumer:
             action.validate(self.context)
             action.execute(self.context)
         except SyftPermissionError as e:
-            action.reject(self.context, reason=str(e))
+            action.process_rejection(self.context, reason=str(e))
         except SyncValidationError as e:
             # TODO Should we reject validation errors as well?
             action.error(e)
