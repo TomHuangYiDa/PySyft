@@ -101,7 +101,6 @@ def init_db(settings: ServerSettings) -> None:
 
 def server_request_hook(span: Span, scope: dict[str, Any]):
     if not span.is_recording():
-        logger.info("Span is not recording")
         return
 
     # headers k/v pairs are bytes

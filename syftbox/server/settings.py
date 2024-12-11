@@ -28,7 +28,7 @@ class ServerSettings(BaseSettings):
     see: https://docs.pydantic.dev/latest/concepts/pydantic_settings/#parsing-environment-variable-values
     """
 
-    model_config = SettingsConfigDict(env_prefix="SYFTBOX_", env_file="server.env")
+    model_config = SettingsConfigDict(env_prefix="SYFTBOX_", env_file="server.env", extra="ignore")
 
     env: ServerEnv = ServerEnv.DEV
     """Server environment"""
@@ -68,10 +68,6 @@ class ServerSettings(BaseSettings):
 
         if self.auth_enabled and not secret_val_is_set:
             raise ValueError("auth is enabled, but jwt_secret is not set")
-
-        # ensure auth is always enabled when jwt_secret is set
-        if not self.auth_enabled and secret_val_is_set:
-            raise ValueError("jwt_secret is defined, but no_auth is enabled")
 
         return self
 
