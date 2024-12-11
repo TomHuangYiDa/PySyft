@@ -1,11 +1,22 @@
-from datetime import datetime
+from dataclasses import dataclass
+from datetime import datetime, timezone
 from urllib.parse import urlparse
 
 import requests
 
-from syftbox.client.base import MetricCollector
+from syftbox.client.base import BaseMetric, MetricCollector
 from syftbox.lib.client_config import SyftClientConfig
-from syftbox.lib.metrics import HTTPPerfStats, TCPPerfStats
+from syftbox.lib.metrics import HTTPMetrics, HTTPPerfStats, TCPMetrics, TCPPerfStats
+
+
+@dataclass
+class NetworkMetric(BaseMetric):
+    """Dataclass for network performance metrics."""
+
+    timestamp: str
+    url: str
+    http_stats: HTTPMetrics
+    tcp_stats: TCPMetrics
 
 
 class ServerNetworkMetricCollector(MetricCollector):
@@ -32,7 +43,7 @@ class ServerNetworkMetricCollector(MetricCollector):
         self.tcp_perf = TCPPerfStats(host, port)
         self.http_perf = HTTPPerfStats(self.url)
 
-    def collect_metrics(self, num_runs: int) -> dict:
+    def collect_metrics(self, num_runs: int) -> NetworkMetric:
         """Calculate network performance metrics."""
 
         # Check if the server is reachable
@@ -46,14 +57,13 @@ class ServerNetworkMetricCollector(MetricCollector):
         # Collect HTTP performance stats
         http_stats = self.http_perf.get_stats(num_runs)
 
-        network_metrics = {
-            "url": self.url,
-            "timestamp": datetime.now().isoformat(),
-            "num_runs": num_runs,
-            "stats": {"HTTP": http_stats, "TCP": tcp_stats},
-        }
-
-        return network_metrics
+        return NetworkMetric(
+            timestamp=datetime.now(timezone.utc).isoformat(),
+            num_runs=num_runs,
+            url=self.url,
+            http_stats=http_stats,
+            tcp_stats=tcp_stats,
+        )
 
     def ping(self) -> bool:
         """Check if the server is reachable."""
