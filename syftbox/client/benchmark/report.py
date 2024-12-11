@@ -43,8 +43,8 @@ class HumanReadableBenchmarkReport(BenchmarkReporter):
             if isinstance(metric, NetworkMetric):
                 sections.extend(
                     [
-                        f"Nerwork Metrics for : {metric.url}",
-                        f"Timestamp: {metric.timestamp}",
+                        f"Network Metrics for : {metric.url}",
+                        f"Timestamp: {metric.timestamp} UTC",
                         f"Number of runs: {metric.num_runs}",
                         "\nHTTP Statistics: ",
                         "--------------------",
