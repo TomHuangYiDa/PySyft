@@ -8,6 +8,7 @@ from syftbox.client.base import SyftBoxContextInterface
 from syftbox.client.exceptions import SyftAuthenticationError
 from syftbox.client.plugins.sync.consumer import SyncConsumer
 from syftbox.client.plugins.sync.exceptions import FatalSyncError, SyncEnvironmentError
+from syftbox.client.plugins.sync.local_state import LocalState
 from syftbox.client.plugins.sync.producer import SyncProducer
 from syftbox.client.plugins.sync.queue import SyncQueue, SyncQueueItem
 from syftbox.client.plugins.sync.types import FileChangeInfo
@@ -17,6 +18,7 @@ class SyncManager:
     def __init__(self, context: SyftBoxContextInterface, health_check_interval: int = 300):
         self.context = context
         self.queue = SyncQueue()
+        self.local_state = LocalState.for_context(context)
         self.producer = SyncProducer(context=self.context, queue=self.queue, local_state=self.local_state)
         self.consumer = SyncConsumer(context=self.context, queue=self.queue, local_state=self.local_state)
 

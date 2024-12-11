@@ -13,13 +13,9 @@ class SyncProducer:
         self.queue = queue
         self.local_state = local_state
 
-    @property
-    def sync_client(self):
-        return self.context.client.sync
-
     def get_datasite_states(self) -> list[DatasiteState]:
         try:
-            remote_datasite_states = self.sync_client.get_datasite_states()
+            remote_datasite_states = self.context.client.sync.get_datasite_states()
         except Exception as e:
             logger.error(f"Failed to retrieve datasites from server, only syncing own datasite. Reason: {e}")
             remote_datasite_states = {}

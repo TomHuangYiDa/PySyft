@@ -13,7 +13,7 @@ class SyftBoxClient(ClientBase):
 
     def register(self, email: str) -> str:
         response = self.conn.post("/register", json={"email": email})
-        self.raise_for_status()
+        self.raise_for_status(response)
         return response.json().get("token")
 
     def info(self) -> dict:

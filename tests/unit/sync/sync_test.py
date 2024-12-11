@@ -327,7 +327,10 @@ def test_invalid_sync_to_remote(server_client: TestClient, datasite_1: SyftBoxCo
 
     create_dir_tree(Path(datasite_1.datasite), tree)
     sync_service_1.producer.enqueue_datasite_changes(
-        datasite=DatasiteState(sync_service_1.sync_client, email=datasite_1.email),
+        datasite=DatasiteState(
+            sync_service_1.context,
+            email=datasite_1.email,
+        ),
     )
 
     queue = sync_service_1.queue
@@ -345,7 +348,7 @@ def test_invalid_sync_to_remote(server_client: TestClient, datasite_1: SyftBoxCo
         should_be_valid = item.data.path.parent.name in ["valid", "invalid_on_modify"]
         print(f"path: {abs_path}, should_be_valid: {should_be_valid}, parent: {item.data.path.parent}")
 
-        is_valid = sync_action.is_valid(client=sync_service_1.sync_client)
+        is_valid = sync_action.is_valid(context=sync_service_1.context)
         assert is_valid == should_be_valid, f"path: {abs_path}, is_valid: {is_valid}"
 
     sync_service_1.run_single_thread()
@@ -357,7 +360,7 @@ def test_invalid_sync_to_remote(server_client: TestClient, datasite_1: SyftBoxCo
     permission_path.write_text("invalid permission")
 
     sync_service_1.producer.enqueue_datasite_changes(
-        datasite=DatasiteState(sync_service_1.sync_client, email=datasite_1.email),
+        datasite=DatasiteState(sync_service_1.context, email=datasite_1.email),
     )
     items_to_sync = []
     while not queue.empty():
@@ -368,7 +371,7 @@ def test_invalid_sync_to_remote(server_client: TestClient, datasite_1: SyftBoxCo
         sync_action = consumer.determine_action(item)
         abs_path = item.data.local_abs_path
 
-        is_valid = sync_action.is_valid(client=sync_service_1.sync_client)
+        is_valid = sync_action.is_valid(context=sync_service_1.context)
         assert not is_valid, f"path: {abs_path}, is_valid: {is_valid}"
 
 
@@ -470,6 +473,6 @@ def test_sync_health_check(datasite_1: SyftBoxContextInterface):
     sync_service = SyncManager(datasite_1)
     sync_service.check_server_status()
 
-    sync_service.sync_client.server_client.headers["Authorization"] = "Bearer invalid_token"
+    sync_service.context.client.conn.headers["Authorization"] = "Bearer invalid_token"
     with pytest.raises(FatalSyncError):
         sync_service.check_server_status()

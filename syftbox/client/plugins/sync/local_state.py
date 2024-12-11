@@ -32,8 +32,8 @@ class LocalState(BaseModel):
     status_info: dict[Path, SyncStatusInfo] = {}
 
     @classmethod
-    def for_client(cls: Type[Self], client: SyftBoxContextInterface) -> Self:
-        return cls(path=client.workspace.plugins / LOCAL_STATE_FILENAME)
+    def for_context(cls: Type[Self], context: SyftBoxContextInterface) -> Self:
+        return cls(path=context.workspace.plugins / LOCAL_STATE_FILENAME)
 
     def insert_completed_action(self, action: SyncAction) -> None:
         """Insert action result into local state."""

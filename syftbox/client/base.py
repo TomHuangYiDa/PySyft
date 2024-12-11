@@ -85,20 +85,18 @@ class ClientBase:
         endpoint = response.request.url.path
         if response.status_code == 401:
             raise SyftAuthenticationError()
-        elif response.status == 403:
+        elif response.status_code == 403:
             raise SyftPermissionError(f"No permission to access this resource: {response.text}")
-        elif response.status != 200:
+        elif response.status_code != 200:
             raise SyftServerError(f"[{endpoint}] Server returned {response.status_code}: {response.text}")
 
     @staticmethod
     def _make_headers(config: SyftClientConfig) -> dict[str, str]:
-        if config.access_token is None:
-            raise ValueError("Missing access token in config, please login first")
+        headers = {"email": config.email}
+        if config.access_token is not None:
+            headers["Authorization"] = f"Bearer {config.access_token}"
 
-        return {
-            "email": config.email,
-            "Authorization": f"Bearer {config.access_token}",
-        }
+        return headers
 
     @classmethod
     def from_config(cls, config: SyftClientConfig):
