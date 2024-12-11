@@ -12,7 +12,7 @@ from syftbox.server.sync.models import ApplyDiffResponse, DiffResponse, FileMeta
 
 class SyftBoxClient(ClientBase):
     def __init__(self, conn: httpx.Client):
-        self.conn: httpx.Client = conn
+        super().__init__(conn)
 
         self.auth = AuthClient(conn)
         self.sync = SyncClient(conn)
