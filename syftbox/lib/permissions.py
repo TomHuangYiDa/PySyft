@@ -4,7 +4,7 @@ import traceback
 from collections import defaultdict
 from enum import Enum
 from pathlib import Path
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, Union
 
 import wcmatch
 import yaml
@@ -275,6 +275,15 @@ class SyftPermission(BaseModel):
                 },
             ],
         )
+
+    def add_rule(self, path: str, user: str, permission: Union[list[str], list[PermissionType]], allow=True):
+        priority = len(self.rules)
+        if isinstance(permission, list) and isinstance(permission[0], PermissionType):
+            permission = [PermissionType[p.upper()] for p in permission]
+        rule = PermissionRule(
+            dir_path=self.dir_path, path=path, user=user, allow=allow, permissions=permission, priority=priority
+        )
+        self.rules.append(rule)
 
     @property
     def dir_path(self):

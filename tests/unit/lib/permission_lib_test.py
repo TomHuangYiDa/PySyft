@@ -199,3 +199,35 @@ def test_computed_permission_permfile_access():
     assert not computed_permission.has_permission(PermissionType.READ)
     assert not computed_permission.has_permission(PermissionType.WRITE)
     assert not computed_permission.has_permission(PermissionType.CREATE)
+
+
+def test_permission_file_add_rule():
+    perm_file = SyftPermission.from_rule_dicts(
+        Path("test") / PERM_FILE,
+        [
+            {
+                "path": "**",
+                "user": "user@example.org",
+                "permissions": ["read"],
+            }
+        ],
+    )
+
+    # Initially only has read permission
+    computed_permission = ComputedPermission.from_user_rules_and_path(
+        rules=perm_file.rules, user="user@example.org", path=Path("test/text.txt")
+    )
+    assert computed_permission.has_permission(PermissionType.READ)
+    assert not computed_permission.has_permission(PermissionType.WRITE)
+    assert not computed_permission.has_permission(PermissionType.CREATE)
+
+    # Add write and create permissions
+    perm_file.add_rule(path="**", user="user@example.org", allow=True, permission=["write", "create"])
+
+    # Check permissions are updated
+    computed_permission = ComputedPermission.from_user_rules_and_path(
+        rules=perm_file.rules, user="user@example.org", path=Path("test/test.txt")
+    )
+    assert computed_permission.has_permission(PermissionType.READ)
+    assert computed_permission.has_permission(PermissionType.WRITE)
+    assert computed_permission.has_permission(PermissionType.CREATE)
