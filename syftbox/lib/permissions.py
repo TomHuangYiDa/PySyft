@@ -425,7 +425,11 @@ def migrate_permissions(snapshot_folder: Path):
     files = list(snapshot_folder.rglob(old_syftperm_filename))
     for file in files:
         old_data = json.loads(file.read_text())
-        new_data = convert_permission(old_data)
+        try:
+            new_data = convert_permission(old_data)
+        except Exception as e:
+            logger.error(f"Failed to migrate old permission: {old_data}, {e} skipping")
+            continue
         new_file_path = file.with_name(file.name.replace(old_syftperm_filename, PERM_FILE))
         logger.info(
             f"migrating permission from {file.relative_to(snapshot_folder)} to {new_file_path.relative_to(snapshot_folder)}"
