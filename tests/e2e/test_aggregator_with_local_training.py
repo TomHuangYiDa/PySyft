@@ -1,6 +1,5 @@
 import asyncio
 import json
-import os
 import secrets
 import shutil
 from pathlib import Path
@@ -8,7 +7,7 @@ from pathlib import Path
 import pytest
 from loguru import logger
 
-from tests.e2e.conftest import Client, E2EContext, Server, E2ETimeoutError
+from tests.e2e.conftest import Client, E2EContext, E2ETimeoutError, Server
 
 AGGREGATOR_CONFIG = {
     "participants": ["user1@openmined.org", "user2@openmined.org", "user3@openmined.org"],
@@ -123,7 +122,7 @@ async def test_e2e_aggregator_with_local_training(e2e_context: E2EContext):
     agg_private_dir.mkdir(parents=True, exist_ok=True)
     agg_priv_data_path = agg_private_dir / "mnist_dataset.pt"
     test_dataset_path = agg_client.api_path(AGGREGATOR_API_NAME) / "samples" / "test_data" / "mnist_dataset.pt"
-    with open(test_dataset_path, 'rb') as src, open(agg_priv_data_path, 'wb') as dst:
+    with open(test_dataset_path, "rb") as src, open(agg_priv_data_path, "wb") as dst:
         shutil.copyfileobj(src, dst)
     await verify_file_sizes(test_dataset_path, agg_priv_data_path)
     await e2e_context.wait_for_path(agg_priv_data_path, timeout=60, interval=1)
