@@ -383,6 +383,8 @@ class ComputedPermission(BaseModel):
 def map_email_to_permissions(json_data: dict) -> dict:
     email_permissions = defaultdict(list)
     for permission, emails in json_data.items():
+        if permission not in ["read", "write", "create", "admin"]:
+            continue
         for email in emails:
             if email is None:
                 continue
