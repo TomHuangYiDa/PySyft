@@ -1,7 +1,7 @@
 import socket
 import threading
 import time
-from collections import defaultdict, deque
+from collections import deque
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -18,6 +18,47 @@ class ConnectionMetadata:
     timestamp: datetime
     host: str
     port: int
+
+
+@dataclass
+class AggregateStats:
+    """Common statistics structure."""
+
+    min: float
+    max: float
+    avg: float
+    median: float
+    stddev: float
+    p95: float
+    p99: float
+
+
+@dataclass
+class TCPMetrics:
+    """TCP performance metrics."""
+
+    latency_stats: AggregateStats
+    jitter_stats: AggregateStats
+    connection_success_rate: float
+    requests_per_minute: int
+    max_requests_per_minute: int
+    max_concurrent_connections: int
+    requests_in_last_minute: int
+
+
+@dataclass
+class HTTPMetrics:
+    """HTTP performance metrics."""
+
+    dns_time: AggregateStats
+    connect_time: AggregateStats
+    ssl_time: AggregateStats
+    starttransfer_time: AggregateStats
+    total_time: AggregateStats
+    tcp_time: AggregateStats
+    content_transfer_time: AggregateStats
+    server_processing_time: AggregateStats
+    success_rate: float
 
 
 class RateLimiter:
@@ -84,12 +125,12 @@ class TCPPerfStats:
     def __init__(self, host: str, port: int):
         self.host = host
         self.port = port
-        self.previous_latency = None
-        self.jitter_values = []
-        self.request_history: Deque[ConnectionMetadata] = deque()
         self.__post_init__()
 
     def __post_init__(self):
+        self.previous_latency = None
+        self.jitter_values = []
+        self.request_history: Deque[ConnectionMetadata] = deque()
         self.rate_limiter = RateLimiter(self.max_connections_per_minute)
         self.connection_lock = threading.Lock()
 
@@ -147,42 +188,30 @@ class TCPPerfStats:
         if not latencies:
             return {}
 
-        return self._calculate_stats(latencies, jitters, num_runs)
+        return TCPMetrics(
+            latency_stats=self._calculate_stats(latencies),
+            jitter_stats=self._calculate_stats(jitters),
+            connection_success_rate=len(latencies) / num_runs * 100,
+            requests_per_minute=len(self.request_history),
+            max_requests_per_minute=self.max_connections_per_minute,
+            max_concurrent_connections=self.max_concurrent_connections,
+            requests_in_last_minute=len(self.request_history),
+        )
 
-    def _calculate_stats(self, latencies: list[float], jitters: list[float], num_connections: int) -> dict:
-        """Generate TCP performance stats from collected data."""
-        stats = {
-            "tcp_latency": {},
-            "tcp_jitter": {"current": jitters[-1] if jitters else 0},
-        }
+    def _calculate_stats(self, values: list[float]) -> AggregateStats:
+        if not values:
+            return AggregateStats(0, 0, 0, 0, 0, 0, 0)
 
-        for metric_name, values in [("tcp_latency", latencies), ("tcp_jitter", jitters)]:
-            if not values:
-                continue
-
-            quants = quantiles(values, n=100)
-            stats[metric_name].update(
-                {
-                    "min": min(values),
-                    "max": max(values),
-                    "avg": mean(values),
-                    "median": quants[49],
-                    "stddev": stdev(values) if len(values) > 1 else 0,
-                    "p95": quants[94],
-                    "p99": quants[98],
-                }
-            )
-
-        stats["connection_success_rate"] = len(latencies) / num_connections * 100
-
-        # Add rate limiting stats
-        stats["rate_limiting"] = {
-            "requests_in_last_minute": len(self.request_history),
-            "max_requests_per_minute": self.max_connections_per_minute,
-            "max_concurrent_connections": self.max_concurrent_connections,
-        }
-
-        return stats
+        quants = quantiles(values, n=100)
+        return AggregateStats(
+            min=round(min(values), 2),
+            max=round(max(values), 2),
+            avg=round(mean(values), 2),
+            median=round(quants[49], 2),  # median
+            stddev=round(stdev(values), 2) if len(values) > 1 else 0,
+            p95=round(quants[94], 2),  # 95th percentile
+            p99=round(quants[98], 2),  # 99th percentile
+        )
 
 
 @dataclass
@@ -281,17 +310,17 @@ class HTTPPerfStats:
                 print(f"Error during request: {e}")
                 return None
 
-    def get_stats(self, n_runs: int) -> dict[str, dict[str, float]]:
+    def get_stats(self, n_runs: int) -> HTTPMetrics:
         """Aggregate performance stats from multiple runs"""
         print(f"Measuring HTTP performance for {self.url}")
 
-        stats_list: list[HTTPStats] = []
+        measurements: list[HTTPStats] = []
         for _ in range(n_runs):
             if stats := self._get_stats():
-                stats_list.append(stats)
+                measurements.append(stats)
             time.sleep(0.1)  # Small delay between requests
 
-        if not stats_list:
+        if not measurements:
             return {}
 
         # Metrics to analyze
@@ -307,23 +336,34 @@ class HTTPPerfStats:
         ]
 
         # Calculate aggregated stats
-        agg_stats = defaultdict(dict)
+        agg_stats = {}
         for metric in metrics:
-            values = [getattr(s, metric) for s in stats_list]
-            if not values:
-                continue
+            values = [getattr(m, metric) for m in measurements]
+            agg_stats[metric] = self._calculate_stats(values)
 
-            quants = quantiles(values, n=100)
-            agg_stats[metric].update(
-                {
-                    "min": min(values),
-                    "max": max(values),
-                    "avg": mean(values),
-                    "median": quants[49],
-                    "stddev": stdev(values) if len(values) > 1 else 0,
-                    "p95": quants[94],
-                    "p99": quants[98],
-                }
-            )
+        return HTTPMetrics(
+            dns_time=agg_stats["dns_time"],
+            connect_time=agg_stats["connect_time"],
+            ssl_time=agg_stats["ssl_time"],
+            starttransfer_time=agg_stats["starttransfer_time"],
+            total_time=agg_stats["total_time"],
+            tcp_time=agg_stats["tcp_time"],
+            content_transfer_time=agg_stats["content_transfer_time"],
+            server_processing_time=agg_stats["server_processing_time"],
+            success_rate=len(measurements) / n_runs * 100,
+        )
 
-        return dict(agg_stats)
+    def _calculate_stats(self, values: list[float]) -> AggregateStats:
+        if not values:
+            return AggregateStats(0, 0, 0, 0, 0, 0, 0)
+
+        quants = quantiles(values, n=100)
+        return AggregateStats(
+            min=round(min(values), 2),
+            max=round(max(values), 2),
+            avg=round(mean(values), 2),
+            median=round(quants[49], 2),  # median
+            stddev=round(stdev(values), 2) if len(values) > 1 else 0,
+            p95=round(quants[94], 2),  # 95th percentile
+            p99=round(quants[98], 2),  # 99th percentile
+        )
