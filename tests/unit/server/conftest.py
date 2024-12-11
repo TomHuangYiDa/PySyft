@@ -3,7 +3,7 @@ import json
 import pytest
 from fastapi.testclient import TestClient
 
-from syftbox.client.plugins.sync.sync_client import SyncClient
+from syftbox.client.server_client import SyncClient
 from syftbox.server.server import app
 from syftbox.server.settings import ServerSettings
 
