@@ -254,6 +254,11 @@ class SyftPermission(BaseModel):
         )
 
     @classmethod
+    def mine_with_public_write(cls, email: str, filepath: Path):
+        # for backwards compatibility
+        return cls.mine_with_public_rw(email, filepath)
+
+    @classmethod
     def mine_with_public_rw(cls, email: str, filepath: Path):
         return cls.from_rule_dicts(
             filepath,
