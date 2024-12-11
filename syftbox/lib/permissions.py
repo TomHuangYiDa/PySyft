@@ -351,7 +351,7 @@ class ComputedPermission(BaseModel):
         else:
             return False
 
-    def rule_applies_to_path(self, rule: PermissionRule):
+    def rule_applies_to_path(self, rule: PermissionRule) -> bool:
         if rule.has_email_template:
             # we fill in a/b/{useremail}/*.txt -> a/b/user@email.org/*.txt
             resolved_path_pattern = rule.resolve_path_pattern(self.user)
@@ -361,19 +361,20 @@ class ComputedPermission(BaseModel):
         # target file path (the one that we want to check permissions for relative to the syftperm file
         # we need this because the syftperm file specifies path patterns relative to its own location
 
-        # excecption for permfiles: only admin and read permissions are applied
-        if self.file_path.name == PERM_FILE and {PermissionType.CREATE, PermissionType.WRITE} & set(rule.permissions):
-            return False
-
         if issubpath(rule.dir_path, self.file_path):
             relative_file_path = self.file_path.relative_to(rule.dir_path)
             return globmatch(relative_file_path, resolved_path_pattern, flags=wcmatch.glob.GLOBSTAR)
         else:
             return False
 
+    def is_invalid_permission(self, permtype: PermissionType) -> bool:
+        return self.file_path.name == PERM_FILE and permtype in [PermissionType.CREATE, PermissionType.WRITE]
+
     def apply(self, rule: PermissionRule):
         if self.user_matches(rule) and self.rule_applies_to_path(rule):
             for permtype in rule.permissions:
+                if self.is_invalid_permission(permtype):
+                    continue
                 self.perms[permtype] = rule.allow
 
 
