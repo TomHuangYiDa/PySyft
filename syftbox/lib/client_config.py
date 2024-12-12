@@ -98,6 +98,8 @@ class SyftClientConfig(BaseModel):
             elif legacy_path.exists():
                 data = json.loads(legacy_path.read_text())
                 path = legacy_path
+            else:
+                raise FileNotFoundError(f"Config file not found at '{conf_path}'")
             # todo end
 
             return cls(path=path, **data)

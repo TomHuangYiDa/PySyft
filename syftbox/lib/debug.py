@@ -26,6 +26,8 @@ def debug_report(config_path: Optional[PathLike] = None) -> str:
         app_dir = result.apps_dir
         apps = [app.name for app in result.apps]
         client_config = client_config.as_dict(exclude={"token", "access_token"})
+    except FileNotFoundError:
+        pass
     except Exception as e:
         logger.exception("Error loading client config", e)
         pass
