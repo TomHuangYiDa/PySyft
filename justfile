@@ -35,11 +35,11 @@ alias b := build
 
 # Run a local syftbox server on port 5001
 [group('server')]
-run-server port="5001" uvicorn_args="":
+run-server port="5001" cli_args="":
     #!/bin/bash
     mkdir -p .server/data
     SYFTBOX_DATA_FOLDER=.server/data SYFTBOX_ENV=${SYFTBOX_ENV:-DEV}  SYFTBOX_OTEL_ENABLED=${SYFTBOX_OTEL_ENABLED:-0} \
-    uv run uvicorn syftbox.server.server:app --reload --reload-dir ./syftbox --port {{ port }} {{ uvicorn_args }}
+    uv run syftbox server --reload --reload-dir ./syftbox --port {{ port }} {{ cli_args }}
 
 # ---------------------------------------------------------------------------------------------------------------------
 

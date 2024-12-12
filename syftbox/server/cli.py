@@ -3,6 +3,9 @@ from typing import Annotated, Optional
 
 from typer import Context, Option, Typer
 
+from syftbox.server.migrations import run_migrations
+from syftbox.server.settings import ServerSettings
+
 app = Typer(
     name="SyftBox Server",
     pretty_exceptions_enable=False,
@@ -54,6 +57,17 @@ SSL_CERT_OPTS = Option(
     rich_help_panel=SSL_PANEL,
     help="Path to SSL certificate file",
 )
+
+RELOAD_OPTS = Option(
+    "--reload",
+    is_flag=True,
+    help="Reload the server on file changes",
+)
+
+RELOAD_DIR_OPTS = Option(
+    "--reload-dir",
+    help="Directories to watch for file changes",
+)
 # fmt: on
 
 
@@ -65,6 +79,8 @@ def server(
     verbose: Annotated[bool, VERBOSE_OPTS] = False,
     ssl_key: Annotated[Optional[Path], SSL_KEY_OPTS] = None,
     ssl_cert: Annotated[Optional[Path], SSL_CERT_OPTS] = None,
+    reload: Annotated[bool, RELOAD_OPTS] = False,
+    reload_dir: Annotated[Optional[str], RELOAD_DIR_OPTS] = None,
 ):
     """Run the SyftBox server"""
 
@@ -74,16 +90,20 @@ def server(
     # lazy import to improve CLI startup performance
     import uvicorn
 
-    from syftbox.server.server import app as fastapi_app
+    settings = ServerSettings()
+    run_migrations(settings)
 
     uvicorn.run(
-        app=fastapi_app,
+        app="syftbox.server.server:app",
         host="0.0.0.0",
         port=port,
         log_level="debug" if verbose else "info",
         workers=workers,
         ssl_keyfile=ssl_key,
         ssl_certfile=ssl_cert,
+        timeout_graceful_shutdown=5,
+        reload=reload,
+        reload_dirs=reload_dir,
     )
 
 
