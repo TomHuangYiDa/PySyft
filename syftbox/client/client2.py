@@ -247,7 +247,7 @@ class SyftClientContext(SyftClientInterface):
         return self.config.email
 
     @property
-    def datasite(self) -> Path:
+    def my_datasite(self) -> Path:
         return self.workspace.datasites / self.config.email
 
     @property

@@ -23,7 +23,7 @@ def test_create_without_permission(
             PERM_FILE: SyftPermission.mine_with_public_read(datasite_1.email, Path("folder1") / PERM_FILE),
         },
     }
-    create_dir_tree(Path(datasite_1.datasite), tree)
+    create_dir_tree(Path(datasite_1.my_datasite), tree)
 
     sync_service_1.run_single_thread()
     sync_service_2.run_single_thread()
@@ -67,7 +67,7 @@ def test_delete_without_permission(
             "file.txt": "Hello, World!",
         },
     }
-    create_dir_tree(Path(datasite_1.datasite), tree)
+    create_dir_tree(Path(datasite_1.my_datasite), tree)
 
     sync_service_1.run_single_thread()
     sync_service_2.run_single_thread()
@@ -98,7 +98,7 @@ def test_modify_without_permissions(
             "file.txt": "Hello, World!",
         },
     }
-    create_dir_tree(Path(datasite_1.datasite), tree)
+    create_dir_tree(Path(datasite_1.my_datasite), tree)
 
     sync_service_1.run_single_thread()
     sync_service_2.run_single_thread()

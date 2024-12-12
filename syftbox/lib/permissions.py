@@ -13,9 +13,11 @@ from pydantic import BaseModel, model_validator
 from wcmatch.glob import globmatch
 
 from syftbox.lib.constants import PERM_FILE
+from syftbox.lib.lib import SyftBoxContext
 from syftbox.server.models.sync_models import RelativePath
 
 
+# TODO "Client" naming for SDK is confusing, it is a context for the syftbox lib
 # util
 def issubpath(path1, path2):
     return path1 in path2.parents
@@ -196,19 +198,6 @@ class SyftPermission(BaseModel):
         with open(path, "w") as f:
             yaml.dump([x.as_file_json() for x in self.rules], f)
 
-    @classmethod
-    def datasite_default(cls, email: str):
-        return SyftPermission.from_rule_dicts(
-            Path(email) / PERM_FILE,
-            [
-                {
-                    "path": "**",
-                    "user": email,
-                    "permissions": ["admin", "create", "write", "read"],
-                }
-            ],
-        )
-
     def ensure(self, path=None) -> bool:
         """For backwards compatibility, we ensure that the permission file exists with these permissions"""
         self.save(path)
@@ -221,8 +210,8 @@ class SyftPermission(BaseModel):
     def to_dict(self):
         return [x.as_file_json() for x in self.rules]
 
-    @classmethod
-    def is_permission_file(cls, path: Path):
+    @staticmethod
+    def is_permission_file(path: Path):
         return path.name == PERM_FILE
 
     @classmethod
@@ -236,45 +225,50 @@ class SyftPermission(BaseModel):
             return False
 
     @classmethod
-    def mine_with_public_read(cls, email: str, filepath: Path):
-        return cls.from_rule_dicts(
-            filepath,
-            [
-                {
-                    "path": "**",
-                    "user": email,
-                    "permissions": ["admin"],
-                },
-                {
-                    "path": "**",
-                    "user": "*",
-                    "permissions": ["read"],
-                },
-            ],
-        )
+    def create(cls, context: SyftBoxContext, dir: Path) -> "SyftPermission":
+        if not dir.is_absolute():
+            raise ValueError("dir must be an absolute")
+
+        if dir.exists() and dir.is_file():
+            raise ValueError("dir must be a directory")
+
+        dir.mkdir(parents=True, exist_ok=True)
+        file_path = dir / PERM_FILE
+
+        try:
+            relative_path = file_path.relative_to(context.workspace.datasites)
+        except ValueError:
+            raise ValueError("dir must be inside the datasites folder")
+        return cls(relative_filepath=relative_path, rules=[])
 
     @classmethod
-    def mine_with_public_write(cls, email: str, filepath: Path):
+    def datasite_default(cls, context: SyftBoxContext, dir: Path) -> "SyftPermission":
+        perm = cls.create(context, dir)
+        perm.add_rule(
+            path="**",
+            user=context.email,
+            permission=["admin", "create", "write", "read"],
+        )
+        return perm
+
+    @classmethod
+    def mine_with_public_read(cls, context: SyftBoxContext, dir: Path) -> "SyftPermission":
+        perm = cls.create(context, dir)
+        perm.add_rule(path="**", user=context.email, permission=["admin"])
+        perm.add_rule(path="**", user="*", permission=["read"])
+        return perm
+
+    @classmethod
+    def mine_with_public_write(cls, context: SyftBoxContext, dir: Path) -> "SyftPermission":
         # for backwards compatibility
-        return cls.mine_with_public_rw(email, filepath)
+        return cls.mine_with_public_rw(context, dir)
 
     @classmethod
-    def mine_with_public_rw(cls, email: str, filepath: Path):
-        return cls.from_rule_dicts(
-            filepath,
-            [
-                {
-                    "path": "**",
-                    "user": email,
-                    "permissions": ["admin"],
-                },
-                {
-                    "path": "**",
-                    "user": "*",
-                    "permissions": ["write", "read"],
-                },
-            ],
-        )
+    def mine_with_public_rw(cls, context: SyftBoxContext, dir: Path) -> "SyftPermission":
+        perm = cls.create(context, dir)
+        perm.add_rule(path="**", user=context.email, permission=["admin"])
+        perm.add_rule(path="**", user="*", permission=["write", "read"])
+        return perm
 
     def add_rule(self, path: str, user: str, permission: Union[list[str], list[PermissionType]], allow=True):
         priority = len(self.rules)
