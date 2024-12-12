@@ -15,7 +15,13 @@ concurrency:
 
 jobs:
   build-test:
-    runs-on: ubuntu-latest
+    strategy:
+      max-parallel: 99
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        python-version: ["3.9", "3.12"]
+
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
 
@@ -29,10 +35,10 @@ jobs:
         with:
           just-version: "1.36.0"
 
-      - name: Set up Python
+      - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          python-version: ${{ matrix.python-version }}
 
       - name: Pre-test checks
         run: |
