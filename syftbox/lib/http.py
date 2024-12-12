@@ -1,5 +1,7 @@
 import platform
 
+import distro
+
 from syftbox import __version__
 
 # keep these as bytes
@@ -15,10 +17,23 @@ _PYTHON_VERSION = platform.python_version()
 # OS info
 uname = platform.uname()
 if uname.system == "Darwin":
-    _OS_NAME = "macos"
+    _OS_NAME = "MacOS"
 else:
-    _OS_NAME = uname.system.lower()
-_OS_VERSION = uname.release  # e.g. '6.8.0-49-generic'
+    _OS_NAME = uname.system
+
+
+def get_os_version(os_name: str = None) -> str:
+    if os_name == "Linux":
+        return distro.name(pretty=True)
+    elif os_name == "Windows":
+        return platform.win32_ver()[0]
+    elif os_name == "MacOS":
+        return platform.mac_ver()[0]
+    else:
+        return "Unknown"
+
+
+_OS_VERSION = get_os_version(_OS_NAME)  # e.g. '6.8.0-49-generic'
 _OS_ARCH = uname.machine  # e.g. 'x86_64', 'arm64', 'aarch64', etc.
 
 SYFTBOX_HEADERS = {
