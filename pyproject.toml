@@ -7,6 +7,7 @@ requires-python = ">=3.9"
 dependencies = [
     "fastapi==0.115.6",
     "uvicorn==0.32.1",
+    "gunicorn==23.0.0",
     "jinja2==3.1.4",
     "typing-extensions==4.12.2",
     "pydantic-settings==2.6.1",
@@ -33,12 +34,10 @@ dependencies = [
 # Local dependencies for development
 # Add using `uv add --group <group> <pip package>`
 [dependency-groups]
-ds = ["pandas>=2.2.3"]
 
 # Published optional dependencies, or "extras". Will be referenced in the built wheel
 # add using `uv add --optional <group> <pip package>`
 [project.optional-dependencies]
-server = ["gunicorn>=23.0.0"]
 
 [project.scripts]
 syftbox = "syftbox.main:main"
