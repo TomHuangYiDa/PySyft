@@ -3,8 +3,14 @@ from __future__ import annotations
 import json
 import os
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from typing_extensions import Any, Self, Union
+
+if TYPE_CHECKING:
+    pass
+
+SyftBoxContext = Union["Client", "SyftClientInterface"]
 
 USER_GROUP_GLOBAL = "GLOBAL"
 

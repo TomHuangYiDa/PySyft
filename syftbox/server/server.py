@@ -21,7 +21,14 @@ from opentelemetry.trace import Span
 from typing_extensions import Any, Optional, Union
 
 from syftbox import __version__
-from syftbox.lib.http import HEADER_SYFTBOX_PYTHON, HEADER_SYFTBOX_USER, HEADER_SYFTBOX_VERSION
+from syftbox.lib.http import (
+    HEADER_OS_ARCH,
+    HEADER_OS_NAME,
+    HEADER_OS_VERSION,
+    HEADER_SYFTBOX_PYTHON,
+    HEADER_SYFTBOX_USER,
+    HEADER_SYFTBOX_VERSION,
+)
 from syftbox.lib.lib import (
     get_datasites,
 )
@@ -30,6 +37,9 @@ from syftbox.server.logger import setup_logger
 from syftbox.server.middleware import LoguruMiddleware
 from syftbox.server.settings import ServerSettings, get_server_settings
 from syftbox.server.telemetry import (
+    OTEL_ATTR_CLIENT_OS_ARCH,
+    OTEL_ATTR_CLIENT_OS_NAME,
+    OTEL_ATTR_CLIENT_OS_VER,
     OTEL_ATTR_CLIENT_PYTHON,
     OTEL_ATTR_CLIENT_USER,
     OTEL_ATTR_CLIENT_VERSION,
@@ -59,6 +69,9 @@ def server_request_hook(span: Span, scope: dict[str, Any]):
     span.set_attribute(OTEL_ATTR_CLIENT_VERSION, headers.get(HEADER_SYFTBOX_VERSION, ""))
     span.set_attribute(OTEL_ATTR_CLIENT_PYTHON, headers.get(HEADER_SYFTBOX_PYTHON, ""))
     span.set_attribute(OTEL_ATTR_CLIENT_USER, headers.get(HEADER_SYFTBOX_USER, ""))
+    span.set_attribute(OTEL_ATTR_CLIENT_OS_NAME, headers.get(HEADER_OS_NAME, ""))
+    span.set_attribute(OTEL_ATTR_CLIENT_OS_VER, headers.get(HEADER_OS_VERSION, ""))
+    span.set_attribute(OTEL_ATTR_CLIENT_OS_ARCH, headers.get(HEADER_OS_ARCH, ""))
 
 
 @contextlib.asynccontextmanager
