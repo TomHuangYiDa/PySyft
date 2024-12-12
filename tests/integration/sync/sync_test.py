@@ -72,7 +72,7 @@ def test_enqueue_changes(datasite_1: SyftClientInterface):
     # Create two files in datasite_1
     tree = {
         "folder1": {
-            PERM_FILE: SyftPermission.mine_with_public_read(datasite_1.email, Path("folder1") / PERM_FILE),
+            PERM_FILE: SyftPermission.mine_with_public_read(datasite_1, dir=datasite_1.my_datasite / "folder1"),
             "large.txt": fake.text(max_nb_chars=1000),
             "small.txt": fake.text(max_nb_chars=10),
         },
@@ -148,7 +148,7 @@ def test_modify(server_client: TestClient, datasite_1: SyftClientInterface):
     # Setup initial state
     tree = {
         "folder1": {
-            PERM_FILE: SyftPermission.mine_with_public_rw(datasite_1.email, Path("folder1") / PERM_FILE),
+            PERM_FILE: SyftPermission.mine_with_public_rw(datasite_1, dir=datasite_1.my_datasite / "folder1"),
             "file.txt": "content",
         },
     }
@@ -175,7 +175,7 @@ def test_modify_and_pull(server_client: TestClient, datasite_1: SyftClientInterf
     # Setup initial state
     tree = {
         "folder1": {
-            PERM_FILE: SyftPermission.mine_with_public_rw(datasite_1.email, Path("folder1") / PERM_FILE),
+            PERM_FILE: SyftPermission.mine_with_public_rw(datasite_1, dir=datasite_1.my_datasite / "folder1"),
             "file.txt": "content1",
         },
     }
@@ -210,7 +210,7 @@ def test_modify_with_conflict(
     # Setup initial state
     tree = {
         "folder1": {
-            PERM_FILE: SyftPermission.mine_with_public_rw(datasite_1.email, Path("folder1") / PERM_FILE),
+            PERM_FILE: SyftPermission.mine_with_public_rw(datasite_1, dir=datasite_1.my_datasite / "folder1"),
             "file.txt": "content1",
         },
     }
@@ -263,7 +263,7 @@ def test_delete_file(server_client: TestClient, datasite_1: SyftClientInterface,
     # Setup initial state
     tree = {
         "folder1": {
-            PERM_FILE: SyftPermission.mine_with_public_rw(datasite_1.email, Path("folder1") / PERM_FILE),
+            PERM_FILE: SyftPermission.mine_with_public_rw(datasite_1, dir=datasite_1.my_datasite / "folder1"),
             "file.txt": fake.text(max_nb_chars=1000),
         },
     }
@@ -297,11 +297,11 @@ def test_invalid_sync_to_remote(server_client: TestClient, datasite_1: SyftClien
     too_large_content = os.urandom((MAX_FILE_SIZE_MB * 1024 * 1024) + 1)
     tree = {
         "valid": {
-            PERM_FILE: SyftPermission.mine_with_public_rw(datasite_1.email, Path("valid") / PERM_FILE),
+            PERM_FILE: SyftPermission.mine_with_public_rw(datasite_1, dir=datasite_1.my_datasite / "valid"),
             "file.txt": "valid content",
         },
         "invalid_on_modify": {
-            PERM_FILE: SyftPermission.mine_with_public_rw(datasite_1.email, Path("invalid_on_modify") / PERM_FILE),
+            PERM_FILE: SyftPermission.mine_with_public_rw(datasite_1, dir=datasite_1.my_datasite / "invalid_on_modify"),
             "file.txt": "valid content",
         },
         "invalid_on_create": {
@@ -365,7 +365,7 @@ def test_sync_invalid_local_environment(datasite_1: SyftClientInterface):
     # Create a file in datasite_1
     tree = {
         "folder1": {
-            PERM_FILE: SyftPermission.mine_with_public_read(datasite_1.email, Path("folder1") / PERM_FILE),
+            PERM_FILE: SyftPermission.mine_with_public_read(datasite_1, dir=datasite_1.my_datasite / "folder1"),
             "file.txt": fake.text(max_nb_chars=1000),
         },
     }
