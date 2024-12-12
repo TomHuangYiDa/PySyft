@@ -11,6 +11,7 @@ import psutil
 from syftbox import __version__
 from syftbox.app.manager import list_app
 from syftbox.lib.client_config import SyftClientConfig
+from syftbox.lib.exceptions import ClientConfigException
 from syftbox.lib.types import PathLike
 from syftbox.lib.workspace import SyftWorkspace
 
@@ -26,7 +27,7 @@ def debug_report(config_path: Optional[PathLike] = None) -> str:
         app_dir = result.apps_dir
         apps = [app.name for app in result.apps]
         client_config = client_config.as_dict(exclude={"token", "access_token"})
-    except FileNotFoundError:
+    except ClientConfigException:
         pass
     except Exception as e:
         logger.exception("Error loading client config", e)
