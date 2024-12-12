@@ -25,6 +25,9 @@ dependencies = [
     "pyjwt==2.10.1",
     "wcmatch==10.0",
     "curl-cffi>=0.7.4",
+    "opentelemetry-instrumentation-fastapi==0.50b0",
+    "opentelemetry-instrumentation-sqlite3==0.50b0",
+    "opentelemetry-exporter-otlp-proto-grpc==1.29.0",
 ]
 
 # Local dependencies for development
@@ -74,7 +77,7 @@ asyncio_default_fixture_loop_scope = "function"
 
 [tool.ruff]
 line-length = 120
-exclude = ["data", "users", "build", "dist", ".venv"]
+exclude = [".venv", "dist", ".clients", ".e2e", ".server"]
 
 [tool.ruff.lint]
 extend-select = ["I"]
