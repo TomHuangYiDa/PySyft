@@ -20,10 +20,10 @@ def test_create_without_permission(
     # Create a folder with only read permission for datasite_2
     tree = {
         "folder_1": {
-            PERM_FILE: SyftPermission.mine_with_public_read(datasite_1.email, Path("folder1") / PERM_FILE),
+            PERM_FILE: SyftPermission.mine_with_public_read(datasite_1, dir=datasite_1.my_datasite / "folder_1"),
         },
     }
-    create_dir_tree(Path(datasite_1.datasite), tree)
+    create_dir_tree(Path(datasite_1.my_datasite), tree)
 
     sync_service_1.run_single_thread()
     sync_service_2.run_single_thread()
@@ -63,11 +63,11 @@ def test_delete_without_permission(
     # Create a folder with only read permission for datasite_2
     tree = {
         "folder_1": {
-            PERM_FILE: SyftPermission.mine_with_public_read(datasite_1.email, Path("folder1") / PERM_FILE),
+            PERM_FILE: SyftPermission.mine_with_public_read(datasite_1, dir=datasite_1.my_datasite / "folder_1"),
             "file.txt": "Hello, World!",
         },
     }
-    create_dir_tree(Path(datasite_1.datasite), tree)
+    create_dir_tree(Path(datasite_1.my_datasite), tree)
 
     sync_service_1.run_single_thread()
     sync_service_2.run_single_thread()
@@ -94,11 +94,11 @@ def test_modify_without_permissions(
     # Create a folder with only read permission for datasite_2
     tree = {
         "folder_1": {
-            PERM_FILE: SyftPermission.mine_with_public_read(datasite_1.email, Path("folder1") / PERM_FILE),
+            PERM_FILE: SyftPermission.mine_with_public_read(datasite_1, dir=datasite_1.my_datasite / "folder_1"),
             "file.txt": "Hello, World!",
         },
     }
-    create_dir_tree(Path(datasite_1.datasite), tree)
+    create_dir_tree(Path(datasite_1.my_datasite), tree)
 
     sync_service_1.run_single_thread()
     sync_service_2.run_single_thread()

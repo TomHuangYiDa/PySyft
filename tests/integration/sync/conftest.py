@@ -39,14 +39,16 @@ def setup_datasite(tmp_path: Path, server_client: TestClient, email: str) -> Syf
     config.save()
     ws = SyftWorkspace(config.data_dir)
     ws.mkdirs()
-    create_datasite(ws.datasites, email)
-    authenticate_testclient(server_client, email)
-    return SyftClientContext(
+    context = SyftClientContext(
         config,
         ws,
         server_client,
         MockPluginManager(),
     )
+    create_datasite(context)
+    authenticate_testclient(server_client, email)
+
+    return context
 
 
 @pytest.fixture(scope="function")
