@@ -5,6 +5,7 @@ from typing import Optional
 
 from syftbox.client.base import BenchmarkReporter, MetricCollector
 from syftbox.client.benchmark.network_metric import ServerNetworkMetricCollector
+from syftbox.client.benchmark.sync_metric import SyncPerformanceCollector
 from syftbox.lib.client_config import SyftClientConfig
 
 
@@ -23,6 +24,7 @@ class SyftBenchmarkRunner:
         """Get the metric collectors for the benchmark tests."""
         return {
             "network": ServerNetworkMetricCollector,
+            "sync": SyncPerformanceCollector,
         }
 
     def run(self, num_runs: int, report_path: Optional[Path] = None):
