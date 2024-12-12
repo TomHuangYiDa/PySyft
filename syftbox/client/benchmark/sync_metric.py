@@ -1,10 +1,9 @@
-import json
-import secrets
 import shutil
 import time
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from pathlib import Path
 from statistics import quantiles, stdev
+from uuid import uuid4
 
 from curl_cffi import CurlMime, requests
 
@@ -42,7 +41,7 @@ class SyncPerformanceMetric(BaseMetric):
     size_metrics: list[SizePerformanceData]
 
 
-class BenchmarkData:
+class SampleBenchmarkData:
     """Helper class to create and clean up sample files"""
 
     def __init__(self, base_dir: Path, size_mb: int):
@@ -52,7 +51,8 @@ class BenchmarkData:
 
     def _generate_filepath(self) -> Path:
         """Generate a unique filepath for the test file"""
-        filename = f"{self.size_mb}mb-{secrets.randbelow(10)}.bytes"
+        random_id = uuid4().hex[:8]
+        filename = f"{self.size_mb}mb-{random_id}.bytes"
         return self.base_dir / filename
 
     def create(self):
@@ -69,7 +69,7 @@ class BenchmarkData:
 class SyncPerformanceCollector(MetricCollector):
     """Tests and measures sync performance metrics"""
 
-    DEFAULT_FILE_SIZES = [1, 5, 10]  # MB
+    DEFAULT_FILE_SIZES = [1, 5, 9]  # MB
 
     def __init__(self, config):
         self.config = config
@@ -118,12 +118,11 @@ class SyncPerformanceCollector(MetricCollector):
 
     def delete_file(self, filepath: Path) -> None:
         """Delete a file from the server"""
-        response = requests.post(
+        requests.post(
             f"{self.config.server_url}sync/delete/",
             headers=self.headers,
             json={"path": filepath.name},
         )
-        response.raise_for_status()
 
     def run_size_performance_test(self, file_size_mb: int, num_runs: int) -> dict[str, dict]:
         """Run performance tests for a specific file size"""
@@ -136,11 +135,14 @@ class SyncPerformanceCollector(MetricCollector):
 
         for run in range(num_runs):
             # Create a test file
-            sample_file = BenchmarkData(benchmark_dir, file_size_mb)
+            sample_file = SampleBenchmarkData(benchmark_dir, file_size_mb)
             filepath = sample_file.create()
 
             try:
                 print(f"\rRun {run + 1}/{num_runs}...", end="", flush=True)
+
+                # Clean up any existing files with the same name
+                self.delete_file(filepath)
 
                 # Measure upload
                 _, upload_time = self._measure_operation_time(self.upload_file, filepath)
@@ -219,7 +221,6 @@ class SyncPerformanceCollector(MetricCollector):
         print("-" * 40)
 
         for size_mb in file_sizes_mb:
-            print(f"\nTesting size: {size_mb}MB")
             metrics = self.run_size_performance_test(size_mb, num_runs)
 
             size_metrics.append(
@@ -231,18 +232,3 @@ class SyncPerformanceCollector(MetricCollector):
             )
 
         return SyncPerformanceMetric(size_metrics=size_metrics, num_runs=num_runs)
-
-
-if __name__ == "__main__":
-    from syftbox.lib.client_config import SyftClientConfig
-
-    config = SyftClientConfig.load(conf_path=".clients/a@openmined.org/config.json")
-    # config = SyftClientConfig.load(conf_path="/home/shubham/.syftbox/config.json")
-    tester = SyncPerformanceCollector(config)
-
-    # Test with custom file sizes (in MB)
-    custom_sizes = [1, 5, 9]  # Adjust as needed
-    performance_report = tester.collect_metrics(num_runs=3, file_sizes_mb=custom_sizes)
-
-    print("\nPerformance Report:")
-    print(json.dumps(asdict(performance_report), indent=2))

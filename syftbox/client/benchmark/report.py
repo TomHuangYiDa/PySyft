@@ -6,6 +6,7 @@ from typing_extensions import Optional
 
 from syftbox.client.base import BaseMetric, BenchmarkReporter
 from syftbox.client.benchmark.network_metric import NetworkMetric
+from syftbox.client.benchmark.sync_metric import SyncPerformanceMetric
 
 
 class JsonBenchmarkReport(BenchmarkReporter):
@@ -64,6 +65,32 @@ class HumanReadableBenchmarkReport(BenchmarkReporter):
                         "=" * 16,
                     ]
                 )
+            if isinstance(metric, SyncPerformanceMetric):
+                sync_comb_report = [
+                    "\nSync Performance Metrics: ",
+                    "------------------------------",
+                    f"{'Size(MB)':>8} {'Operation':>10} {'Min(ms)':>10} {'Max(ms)':>10} {'Avg(ms)':>10} {'P95(ms)':>10} {'Success%':>10}",
+                ]
+                for metric in metric.size_metrics:
+                    sync_report = [
+                        f"{metric.file_size_mb:>8} {'Upload':>10} ",
+                        f"{metric.upload_metrics.min_time:>10.1f} ",
+                        f"{metric.upload_metrics.max_time:>10.1f} ",
+                        f"{metric.upload_metrics.avg_time:>10.1f} ",
+                        f"{metric.upload_metrics.p95:>10.1f} ",
+                        f"{metric.upload_metrics.success_rate:>9.0f}%",
+                        f"\n{'':>8} {'Download':>10} "
+                        f"{metric.download_metrics.min_time:>10.1f} "
+                        f"{metric.download_metrics.max_time:>10.1f} "
+                        f"{metric.download_metrics.avg_time:>10.1f} "
+                        f"{metric.download_metrics.p95:>10.1f} "
+                        f"{metric.download_metrics.success_rate:>9.0f}%",
+                    ]
+                    sync_comb_report.append("".join(sync_report))
+
+                sync_comb_report.append("=" * 16)
+
+                sections.extend(sync_comb_report)
 
         report = "\n".join(sections)
         print(report)
