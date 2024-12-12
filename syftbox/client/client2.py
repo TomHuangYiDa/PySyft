@@ -136,7 +136,7 @@ class SyftClient:
     def init_datasite(self):
         if self.datasite.exists():
             return
-        create_datasite(self.workspace.datasites, self.config.email)
+        create_datasite(self.context)
 
     def register_self(self):
         """Register the user's email with the SyftBox cache server"""
