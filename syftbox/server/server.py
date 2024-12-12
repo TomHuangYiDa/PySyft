@@ -4,7 +4,6 @@ import platform
 from datetime import datetime
 from pathlib import Path
 
-import yaml
 from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import (
@@ -22,20 +21,25 @@ from opentelemetry.trace import Span
 from typing_extensions import Any, Optional, Union
 
 from syftbox import __version__
-from syftbox.lib.constants import PERM_FILE
-from syftbox.lib.hash import collect_files, hash_files
-from syftbox.lib.http import HEADER_SYFTBOX_PYTHON, HEADER_SYFTBOX_USER, HEADER_SYFTBOX_VERSION
+from syftbox.lib.http import (
+    HEADER_OS_ARCH,
+    HEADER_OS_NAME,
+    HEADER_OS_VERSION,
+    HEADER_SYFTBOX_PYTHON,
+    HEADER_SYFTBOX_USER,
+    HEADER_SYFTBOX_VERSION,
+)
 from syftbox.lib.lib import (
     get_datasites,
 )
-from syftbox.lib.permissions import SyftPermission, migrate_permissions
 from syftbox.server.analytics import log_analytics_event
-from syftbox.server.db import db
-from syftbox.server.db.schema import get_db
 from syftbox.server.logger import setup_logger
 from syftbox.server.middleware import LoguruMiddleware
 from syftbox.server.settings import ServerSettings, get_server_settings
 from syftbox.server.telemetry import (
+    OTEL_ATTR_CLIENT_OS_ARCH,
+    OTEL_ATTR_CLIENT_OS_NAME,
+    OTEL_ATTR_CLIENT_OS_VER,
     OTEL_ATTR_CLIENT_PYTHON,
     OTEL_ATTR_CLIENT_USER,
     OTEL_ATTR_CLIENT_VERSION,
@@ -56,49 +60,6 @@ def create_folders(folders: list[str]) -> None:
             os.makedirs(folder, exist_ok=True)
 
 
-def init_db(settings: ServerSettings) -> None:
-    # remove this after the upcoming release
-    if __version__ in ["0.2.11", "0.2.12"]:
-        # Delete existing DB to avoid conflicts
-        db_path = settings.file_db_path.absolute()
-        if db_path.exists():
-            db_path.unlink()
-    migrate_permissions(settings.snapshot_folder)
-
-    # might take very long as snapshot folder grows
-    logger.info(f"> Collecting Files from {settings.snapshot_folder.absolute()}")
-    files = collect_files(settings.snapshot_folder.absolute())
-    logger.info("> Hashing files")
-    metadata = hash_files(files, settings.snapshot_folder)
-    logger.info(f"> Updating file hashes at {settings.file_db_path.absolute()}")
-    con = get_db(settings.file_db_path.absolute())
-    cur = con.cursor()
-    for m in metadata:
-        db.save_file_metadata(cur, m)
-
-    # remove files that are not in the snapshot folder
-    all_metadata = db.get_all_metadata(cur)
-    for m in all_metadata:
-        abs_path = settings.snapshot_folder / m.path
-        if not abs_path.exists():
-            logger.info(f"{m.path} not found in {settings.snapshot_folder}, deleting from db")
-            db.delete_file_metadata(cur, m.path.as_posix())
-
-    # fill the permission tables
-    for file in settings.snapshot_folder.rglob(PERM_FILE):
-        content = file.read_text()
-        rule_dicts = yaml.safe_load(content)
-        perm_file = SyftPermission.from_rule_dicts(
-            permfile_file_path=file.relative_to(settings.snapshot_folder), rule_dicts=rule_dicts
-        )
-        db.set_rules_for_permfile(con, perm_file)
-        db.link_existing_rules_to_file(con, file.relative_to(settings.snapshot_folder))
-
-    cur.close()
-    con.commit()
-    con.close()
-
-
 def server_request_hook(span: Span, scope: dict[str, Any]):
     if not span.is_recording():
         return
@@ -108,6 +69,9 @@ def server_request_hook(span: Span, scope: dict[str, Any]):
     span.set_attribute(OTEL_ATTR_CLIENT_VERSION, headers.get(HEADER_SYFTBOX_VERSION, ""))
     span.set_attribute(OTEL_ATTR_CLIENT_PYTHON, headers.get(HEADER_SYFTBOX_PYTHON, ""))
     span.set_attribute(OTEL_ATTR_CLIENT_USER, headers.get(HEADER_SYFTBOX_USER, ""))
+    span.set_attribute(OTEL_ATTR_CLIENT_OS_NAME, headers.get(HEADER_OS_NAME, ""))
+    span.set_attribute(OTEL_ATTR_CLIENT_OS_VER, headers.get(HEADER_OS_VERSION, ""))
+    span.set_attribute(OTEL_ATTR_CLIENT_OS_ARCH, headers.get(HEADER_OS_ARCH, ""))
 
 
 @contextlib.asynccontextmanager
@@ -125,13 +89,6 @@ async def lifespan(app: FastAPI, settings: Optional[ServerSettings] = None):
         setup_otel_exporter(settings.env.value)
     else:
         logger.info("OTel Exporter is DISABLED")
-
-    logger.info("Creating Folders")
-    create_folders(settings.folders)
-
-    logger.info("> Loading Users")
-
-    init_db(settings)
 
     yield {
         "server_settings": settings,

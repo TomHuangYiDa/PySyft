@@ -54,7 +54,7 @@ class ServerSettings(BaseSettings):
     auth_enabled: bool = False
     """Enable/Disable authentication"""
 
-    otel_enabled: bool = True
+    otel_enabled: bool = False
     """Enable/Disable OpenTelemetry tracing"""
 
     @field_validator("data_folder", mode="after")

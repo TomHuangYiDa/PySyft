@@ -1,7 +1,8 @@
 import os
-import platform
 import subprocess
 from typing import Tuple
+
+from syftbox.lib.platform import OS_IS_WSL2, UNAME
 
 
 def open_dir(folder_path: str) -> Tuple[bool, str]:
@@ -31,13 +32,13 @@ def open_dir(folder_path: str) -> Tuple[bool, str]:
         return False, f"Folder does not exist: {folder_path}"
 
     try:
-        system_name = platform.system()
+        system_name = UNAME.system
         if system_name == "Darwin":
             subprocess.run(["open", folder_path])
         elif system_name == "Windows":
             subprocess.run(["explorer", folder_path])
         elif system_name == "Linux":
-            if _is_wsl():
+            if OS_IS_WSL2:
                 # Convert the path to Windows format for explorer.exe
                 windows_path = _convert_to_windows_path(folder_path)
                 if windows_path:
@@ -53,26 +54,6 @@ def open_dir(folder_path: str) -> Tuple[bool, str]:
         return True, "Folder opened successfully"
     except Exception as e:
         return False, str(e)
-
-
-def _is_wsl() -> bool:
-    """
-    Check if the system is running Windows Subsystem for Linux (WSL).
-
-    Returns:
-        bool: `True` if the system is running WSL, otherwise `False`.
-
-    Description:
-        This function reads the `/proc/version` file to determine if the system is
-        running under WSL by checking for keywords such as "microsoft" or "wsl" in the
-        version information. If the file is not found, it returns `False`.
-    """
-    try:
-        with open("/proc/version", "r") as file:
-            version_info = file.read().lower()
-            return "microsoft" in version_info or "wsl" in version_info
-    except FileNotFoundError:
-        return False
 
 
 def _convert_to_windows_path(folder_path: str) -> str:

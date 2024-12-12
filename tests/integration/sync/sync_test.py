@@ -72,12 +72,12 @@ def test_enqueue_changes(datasite_1: SyftClientInterface):
     # Create two files in datasite_1
     tree = {
         "folder1": {
-            PERM_FILE: SyftPermission.mine_with_public_read(datasite_1.email, Path("folder1") / PERM_FILE),
+            PERM_FILE: SyftPermission.mine_with_public_read(datasite_1, dir=datasite_1.my_datasite / "folder1"),
             "large.txt": fake.text(max_nb_chars=1000),
             "small.txt": fake.text(max_nb_chars=10),
         },
     }
-    create_dir_tree(Path(datasite_1.datasite), tree)
+    create_dir_tree(Path(datasite_1.my_datasite), tree)
     datasite_changes = datasites[0].get_datasite_changes()
     num_out_of_sync_files = len(datasite_changes.files) + len(datasite_changes.permissions)
     # 3 new files
@@ -108,11 +108,11 @@ def test_create_file(server_client: TestClient, datasite_1: SyftClientInterface,
     # Create a file in datasite_1
     tree = {
         "folder1": {
-            PERM_FILE: SyftPermission.mine_with_public_read(datasite_1.email, Path("folder1") / PERM_FILE),
+            PERM_FILE: SyftPermission.mine_with_public_read(datasite_1, dir=datasite_1.my_datasite / "folder1"),
             "file.txt": fake.text(max_nb_chars=1000),
         },
     }
-    create_dir_tree(Path(datasite_1.datasite), tree)
+    create_dir_tree(Path(datasite_1.my_datasite), tree)
 
     # changes are pushed to server
     sync_service.run_single_thread()
@@ -148,15 +148,15 @@ def test_modify(server_client: TestClient, datasite_1: SyftClientInterface):
     # Setup initial state
     tree = {
         "folder1": {
-            PERM_FILE: SyftPermission.mine_with_public_rw(datasite_1.email, Path("folder1") / PERM_FILE),
+            PERM_FILE: SyftPermission.mine_with_public_rw(datasite_1, dir=datasite_1.my_datasite / "folder1"),
             "file.txt": "content",
         },
     }
-    create_dir_tree(Path(datasite_1.datasite), tree)
+    create_dir_tree(Path(datasite_1.my_datasite), tree)
     sync_service_1.run_single_thread()
 
     # modify the file
-    file_path = datasite_1.datasite / "folder1" / "file.txt"
+    file_path = datasite_1.my_datasite / "folder1" / "file.txt"
     new_content = "modified"
     file_path.write_text(new_content)
     assert file_path.read_text() == new_content
@@ -175,16 +175,16 @@ def test_modify_and_pull(server_client: TestClient, datasite_1: SyftClientInterf
     # Setup initial state
     tree = {
         "folder1": {
-            PERM_FILE: SyftPermission.mine_with_public_rw(datasite_1.email, Path("folder1") / PERM_FILE),
+            PERM_FILE: SyftPermission.mine_with_public_rw(datasite_1, dir=datasite_1.my_datasite / "folder1"),
             "file.txt": "content1",
         },
     }
-    create_dir_tree(Path(datasite_1.datasite), tree)
+    create_dir_tree(Path(datasite_1.my_datasite), tree)
     sync_service_1.run_single_thread()
     sync_service_2.run_single_thread()
 
     # modify the file
-    file_path = datasite_1.datasite / "folder1" / "file.txt"
+    file_path = datasite_1.my_datasite / "folder1" / "file.txt"
     new_content = fake.text(max_nb_chars=100_000)
     file_path.write_text(new_content)
 
@@ -210,16 +210,16 @@ def test_modify_with_conflict(
     # Setup initial state
     tree = {
         "folder1": {
-            PERM_FILE: SyftPermission.mine_with_public_rw(datasite_1.email, Path("folder1") / PERM_FILE),
+            PERM_FILE: SyftPermission.mine_with_public_rw(datasite_1, dir=datasite_1.my_datasite / "folder1"),
             "file.txt": "content1",
         },
     }
-    create_dir_tree(Path(datasite_1.datasite), tree)
+    create_dir_tree(Path(datasite_1.my_datasite), tree)
     sync_service_1.run_single_thread()
     sync_service_2.run_single_thread()
 
     # modify the file both clients
-    file_path_1 = datasite_1.datasite / "folder1" / "file.txt"
+    file_path_1 = datasite_1.my_datasite / "folder1" / "file.txt"
     new_content_1 = "modified1"
     file_path_1.write_text(new_content_1)
 
@@ -263,16 +263,16 @@ def test_delete_file(server_client: TestClient, datasite_1: SyftClientInterface,
     # Setup initial state
     tree = {
         "folder1": {
-            PERM_FILE: SyftPermission.mine_with_public_rw(datasite_1.email, Path("folder1") / PERM_FILE),
+            PERM_FILE: SyftPermission.mine_with_public_rw(datasite_1, dir=datasite_1.my_datasite / "folder1"),
             "file.txt": fake.text(max_nb_chars=1000),
         },
     }
-    create_dir_tree(Path(datasite_1.datasite), tree)
+    create_dir_tree(Path(datasite_1.my_datasite), tree)
     sync_service_1.run_single_thread()
     sync_service_2.run_single_thread()
 
     # delete the file
-    file_path = datasite_1.datasite / "folder1" / "file.txt"
+    file_path = datasite_1.my_datasite / "folder1" / "file.txt"
     file_path.unlink()
 
     sync_service_1.run_single_thread()
@@ -281,7 +281,7 @@ def test_delete_file(server_client: TestClient, datasite_1: SyftClientInterface,
     assert (server_settings.snapshot_folder / datasite_1.email / "folder1" / "file.txt").exists() is False
 
     sync_service_2.run_single_thread()
-    assert (datasite_2.datasite / datasite_1.email / "folder1" / "file.txt").exists() is False
+    assert (datasite_2.my_datasite / datasite_1.email / "folder1" / "file.txt").exists() is False
 
     # Check if the metadata is gone
     remote_state_1 = sync_service_1.producer.get_datasite_states()[0].get_remote_state()
@@ -297,11 +297,11 @@ def test_invalid_sync_to_remote(server_client: TestClient, datasite_1: SyftClien
     too_large_content = os.urandom((MAX_FILE_SIZE_MB * 1024 * 1024) + 1)
     tree = {
         "valid": {
-            PERM_FILE: SyftPermission.mine_with_public_rw(datasite_1.email, Path("valid") / PERM_FILE),
+            PERM_FILE: SyftPermission.mine_with_public_rw(datasite_1, dir=datasite_1.my_datasite / "valid"),
             "file.txt": "valid content",
         },
         "invalid_on_modify": {
-            PERM_FILE: SyftPermission.mine_with_public_rw(datasite_1.email, Path("invalid_on_modify") / PERM_FILE),
+            PERM_FILE: SyftPermission.mine_with_public_rw(datasite_1, dir=datasite_1.my_datasite / "invalid_on_modify"),
             "file.txt": "valid content",
         },
         "invalid_on_create": {
@@ -310,7 +310,7 @@ def test_invalid_sync_to_remote(server_client: TestClient, datasite_1: SyftClien
         },
     }
 
-    create_dir_tree(Path(datasite_1.datasite), tree)
+    create_dir_tree(Path(datasite_1.my_datasite), tree)
     sync_service_1.producer.enqueue_datasite_changes(
         datasite=DatasiteState(sync_service_1.sync_client, email=datasite_1.email),
     )
@@ -336,9 +336,9 @@ def test_invalid_sync_to_remote(server_client: TestClient, datasite_1: SyftClien
     sync_service_1.run_single_thread()
 
     # Modify invalid_on_modify to be invalid
-    file_path = datasite_1.datasite / "invalid_on_modify" / "file.txt"
+    file_path = datasite_1.my_datasite / "invalid_on_modify" / "file.txt"
     file_path.write_bytes(too_large_content)
-    permission_path = datasite_1.datasite / "invalid_on_modify" / PERM_FILE
+    permission_path = datasite_1.my_datasite / "invalid_on_modify" / PERM_FILE
     permission_path.write_text("invalid permission")
 
     sync_service_1.producer.enqueue_datasite_changes(
@@ -365,11 +365,11 @@ def test_sync_invalid_local_environment(datasite_1: SyftClientInterface):
     # Create a file in datasite_1
     tree = {
         "folder1": {
-            PERM_FILE: SyftPermission.mine_with_public_read(datasite_1.email, Path("folder1") / PERM_FILE),
+            PERM_FILE: SyftPermission.mine_with_public_read(datasite_1, dir=datasite_1.my_datasite / "folder1"),
             "file.txt": fake.text(max_nb_chars=1000),
         },
     }
-    create_dir_tree(Path(datasite_1.datasite), tree)
+    create_dir_tree(Path(datasite_1.my_datasite), tree)
 
     # Start syncing in separate thread
     sync_service.start()
@@ -398,7 +398,7 @@ def test_skip_symlink(server_client: TestClient, datasite_1: SyftClientInterface
     sync_service.run_single_thread()
 
     apps_dir = datasite_1.workspace.apps
-    datasite_dir = datasite_1.datasite
+    datasite_dir = datasite_1.my_datasite
 
     folder_to_symlink = apps_dir / "folder_to_symlink"
     file_to_symlink = apps_dir / "file_to_symlink.txt"
@@ -433,9 +433,9 @@ def test_skip_hidden_paths(server_client: TestClient, datasite_1: SyftClientInte
     sync_service = SyncManager(datasite_1)
     sync_service.run_single_thread()
 
-    hidden_folder = datasite_1.datasite / ".hidden_folder"
+    hidden_folder = datasite_1.my_datasite / ".hidden_folder"
     hidden_nested_file = hidden_folder / "subfolder" / "file.txt"
-    hidden_file = datasite_1.datasite / ".hidden_file.txt"
+    hidden_file = datasite_1.my_datasite / ".hidden_file.txt"
 
     hidden_folder.mkdir()
     hidden_nested_file.parent.mkdir(parents=True)

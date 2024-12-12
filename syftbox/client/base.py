@@ -64,7 +64,7 @@ class SyftClientInterface(Protocol):
         ...
 
     @property
-    def datasite(self) -> Path:
+    def my_datasite(self) -> Path:
         """Path to the datasite directory for the current user."""
         ...  # pragma: no cover
 
