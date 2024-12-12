@@ -195,6 +195,8 @@ class SyftPermission(BaseModel):
     rules: List[PermissionRule]
 
     def save(self, path: Path):
+        if path.is_dir():
+            path = path / PERM_FILE
         with open(path, "w") as f:
             yaml.dump([x.as_file_json() for x in self.rules], f)
 
