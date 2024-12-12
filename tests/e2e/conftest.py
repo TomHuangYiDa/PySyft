@@ -126,10 +126,10 @@ class E2EContext:
         env.update(server.env)
 
         process = await asyncio.create_subprocess_exec(
-            "syftbox",
-            "server",
-            "--port",
-            f"{server.port}",
+            "gunicorn",
+            "syftbox.server.server:app",
+            "-k=uvicorn.workers.UvicornWorker",
+            f"--bind=127.0.0.1:{server.port}",
             stdout=open(logs_dir / "server.log", "w"),
             stderr=asyncio.subprocess.STDOUT,
             env=env,
