@@ -87,6 +87,7 @@ class SyftClientConfig(BaseModel):
             # args or env or default
             path = conf_path or os.getenv(CONFIG_PATH_ENV, DEFAULT_CONFIG_PATH)
             path = to_path(path)
+            data = {}
 
             # todo migration stuff we can remove later
             legacy_path = Path(path.parent, LEGACY_CONFIG_NAME)
