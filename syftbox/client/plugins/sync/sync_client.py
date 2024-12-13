@@ -3,12 +3,28 @@ from pathlib import Path
 from typing import Union
 
 import httpx
+from pydantic import BaseModel
+from tqdm import tqdm
 
 from syftbox.client.base import SyftClientInterface
 from syftbox.client.exceptions import SyftServerError
 from syftbox.client.plugins.sync.exceptions import SyftPermissionError
 from syftbox.lib.workspace import SyftWorkspace
-from syftbox.server.models.sync_models import ApplyDiffResponse, DiffResponse, FileMetadata
+from syftbox.server.models.sync_models import ApplyDiffResponse, DiffResponse, FileMetadata, RelativePath
+
+
+class StreamedFile(BaseModel):
+    path: RelativePath
+    content: str
+
+    @property
+    def raw_bytes(self) -> bytes:
+        return base64.b64decode(self.content)
+
+    def write_bytes(self, output_dir: Path):
+        file_path = output_dir / self.path
+        file_path.parent.mkdir(parents=True, exist_ok=True)
+        file_path.write_bytes(self.raw_bytes)
 
 
 class SyncClient:
@@ -142,11 +158,25 @@ class SyncClient:
         self.raise_for_status(response)
         return response.content
 
-    def download_bulk(self, relative_paths: list[Path]) -> bytes:
+    def download_files_streaming(self, relative_paths: list[str], output_dir: Path) -> None:
         relative_paths = [path.as_posix() for path in relative_paths]
-        response = self.server_client.post(
+
+        with self.server_client.stream(
+            "POST",
             "/sync/download_bulk",
             json={"paths": relative_paths},
-        )
-        self.raise_for_status(response)
-        return response.content
+        ) as response:
+            response.raise_for_status()
+
+            extracted_files = []
+            for line in tqdm(
+                response.iter_lines(),
+                total=len(relative_paths),
+                unit="files",
+                desc="Downloading files",
+            ):
+                file = StreamedFile.model_validate_json(line)
+                file.write_bytes(output_dir)
+                extracted_files.append(file.path)
+
+            return extracted_files

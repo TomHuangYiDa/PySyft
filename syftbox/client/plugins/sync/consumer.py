@@ -1,5 +1,3 @@
-import zipfile
-from io import BytesIO
 from pathlib import Path
 from typing import Optional
 
@@ -26,13 +24,11 @@ from syftbox.server.models.sync_models import FileMetadata
 
 def create_local_batch(sync_client: SyncClient, paths_to_download: list[Path]) -> list[str]:
     try:
-        content_bytes = sync_client.download_bulk(paths_to_download)
+        file_list = sync_client.download_files_streaming(paths_to_download, sync_client.workspace.datasites)
     except SyftServerError as e:
         logger.error(e)
         return []
-    zip_file = zipfile.ZipFile(BytesIO(content_bytes))
-    zip_file.extractall(sync_client.workspace.datasites)
-    return zip_file.namelist()
+    return file_list
 
 
 class SyncConsumer:
