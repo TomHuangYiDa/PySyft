@@ -27,12 +27,12 @@ class SyncManager:
         self.thread: Optional[Thread] = None
         self.is_stop_requested = False
         self.sync_run_once = False
-        self.last_health_check = 0
-        self.health_check_interval = health_check_interval
+        self.last_health_check = 0.0
+        self.health_check_interval = float(health_check_interval)
 
         self.setup()
 
-    def setup(self):
+    def setup(self) -> None:
         try:
             self.local_state.load()
         except Exception as e:
@@ -72,7 +72,7 @@ class SyncManager:
     def _should_perform_health_check(self) -> bool:
         return time.time() - self.last_health_check > self.health_check_interval
 
-    def check_server_status(self):
+    def check_server_status(self) -> None:
         """
         check if the server is still available for syncing,
         if the user cannot authenticate, the sync will stop.
@@ -90,7 +90,7 @@ class SyncManager:
         except Exception as e:
             logger.error(f"Health check failed: {e}. Retrying in {self.health_check_interval} seconds.")
 
-    def run_single_thread(self):
+    def run_single_thread(self) -> None:
         datasite_states = self.producer.get_datasite_states()
         logger.debug(f"Syncing {len(datasite_states)} datasites")
 

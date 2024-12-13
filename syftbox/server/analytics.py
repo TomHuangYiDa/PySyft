@@ -15,7 +15,7 @@ def to_jsonable_dict(obj: dict) -> dict:
     """
     Convert log record to a JSON serializable dictionary.
     """
-    result = {}
+    result: dict = {}
     for key, value in obj.items():
         if isinstance(value, dict):
             result[key] = to_jsonable_dict(value)

@@ -63,6 +63,8 @@ class SyncConsumer:
         try:
             missing_files: list[Path] = []
             for datasite_state in datasite_states:
+                if not datasite_state.remote_state:
+                    continue
                 for file in datasite_state.remote_state:
                     path = file.path
                     if not self.local_state.states.get(path):
@@ -71,11 +73,10 @@ class SyncConsumer:
 
             logger.info(f"Downloading {len(missing_files)} files in batch")
             received_files = create_local_batch(self.client, missing_files)
-            for path in received_files:
-                path = Path(path)
-                state = self.get_current_local_metadata(path)
+            for file_path in received_files:
+                state = self.get_current_local_metadata(Path(file_path))
                 self.local_state.insert_synced_file(
-                    path=path,
+                    path=Path(file_path),
                     state=state,
                     action=SyncActionType.CREATE_LOCAL,
                 )

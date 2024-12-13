@@ -14,14 +14,14 @@ class PluginManager(Plugins):
         client: SyftClientInterface,
         sync_manager: Optional[SyncManager] = None,
         app_runner: Optional[AppRunner] = None,
-        **kwargs,
-    ):
+        **kwargs: dict,
+    ) -> None:
         self.__client = client
         self.__sync_manager = sync_manager
         self.__app_runner = app_runner
 
     @property
-    def sync_manager(self):
+    def sync_manager(self) -> SyncManager:
         """the sync manager. lazily initialized"""
         if self.__sync_manager is None:
             try:
@@ -31,7 +31,7 @@ class PluginManager(Plugins):
         return self.__sync_manager
 
     @property
-    def app_runner(self):
+    def app_runner(self) -> AppRunner:
         """the app runner. lazily initialized"""
         if self.__app_runner is None:
             try:
@@ -40,11 +40,11 @@ class PluginManager(Plugins):
                 raise SyftPluginException(f"Failed to initialize app runner - {e}") from e
         return self.__app_runner
 
-    def start(self):
+    def start(self) -> None:
         self.sync_manager.start()
         self.app_runner.start()
 
-    def stop(self):
+    def stop(self) -> None:
         if self.__sync_manager is not None:
             self.__sync_manager.stop()
 

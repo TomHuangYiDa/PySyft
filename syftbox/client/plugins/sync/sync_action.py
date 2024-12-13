@@ -47,6 +47,8 @@ def determine_sync_action(
     remote_exists = current_remote_metadata is not None
     both_exist = local_exists and remote_exists
 
+    action: SyncAction
+
     if in_sync:
         action = NoopAction(local_metadata=current_local_metadata, remote_metadata=current_remote_metadata)
 
@@ -91,7 +93,7 @@ class SyncAction(ABC):
     status: SyncStatus
     message: Optional[str]
 
-    def __init_subclass__(cls):
+    def __init_subclass__(cls) -> None:
         if not hasattr(cls, "action_type"):
             raise TypeError("SyncAction subclasses must define an action_type")
         return super().__init_subclass__()
@@ -101,7 +103,7 @@ class SyncAction(ABC):
             raise ValueError("At least one of local_metadata or remote_metadata must be provided")
         self.local_metadata = local_metadata
         self.remote_metadata = remote_metadata
-        self.path = local_metadata.path if local_metadata else remote_metadata.path
+        self.path = local_metadata.path if local_metadata else remote_metadata.path  # type: ignore
         self.status = SyncStatus.PROCESSING
         self.message = None
 
@@ -140,7 +142,7 @@ class SyncAction(ABC):
         return self.action_type == SyncActionType.NOOP
 
     @property
-    def result_local_state(self) -> FileMetadata:
+    def result_local_state(self) -> Optional[FileMetadata]:
         """Metadata of the local file after the action is executed successfully."""
         if self.side_to_update == SyncSide.LOCAL:
             return self.remote_metadata
@@ -150,7 +152,7 @@ class SyncAction(ABC):
 class NoopAction(SyncAction):
     action_type = SyncActionType.NOOP
 
-    def __init__(self, local_metadata, remote_metadata):
+    def __init__(self, local_metadata: FileMetadata, remote_metadata: FileMetadata) -> None:
         super().__init__(local_metadata, remote_metadata)
         # noop actions are already synced
         self.status = SyncStatus.SYNCED
@@ -181,7 +183,9 @@ class CreateLocalAction(SyncAction):
 class ModifyLocalAction(SyncAction):
     action_type = SyncActionType.MODIFY_LOCAL
 
-    def execute(self, client: SyncClient):
+    def execute(self, client: SyncClient) -> None:
+        if self.local_metadata is None:
+            raise ValueError("Local metadata is missing for a modify sync action")
         # Use rsync to update the local file with the remote changes
         diff = client.get_diff(self.path, self.local_metadata.signature)
 
@@ -209,7 +213,7 @@ class ModifyLocalAction(SyncAction):
 class DeleteLocalAction(SyncAction):
     action_type = SyncActionType.DELETE_LOCAL
 
-    def execute(self, client: SyncClient):
+    def execute(self, client: SyncClient) -> None:
         abs_path = client.workspace.datasites / self.path
         abs_path.unlink()
         self.status = SyncStatus.SYNCED
@@ -222,7 +226,7 @@ class DeleteLocalAction(SyncAction):
 class CreateRemoteAction(SyncAction):
     action_type = SyncActionType.CREATE_REMOTE
 
-    def execute(self, client: SyncClient):
+    def execute(self, client: SyncClient) -> None:
         abs_path = client.workspace.datasites / self.path
         data = abs_path.read_bytes()
         client.create(self.path, data)
@@ -240,7 +244,11 @@ class CreateRemoteAction(SyncAction):
 class ModifyRemoteAction(SyncAction):
     action_type = SyncActionType.MODIFY_REMOTE
 
-    def execute(self, client: SyncClient):
+    def execute(self, client: SyncClient) -> None:
+        if self.remote_metadata is None:
+            raise ValueError("Remote metadata is missing for a modify sync action")
+        if self.local_metadata is None:
+            raise ValueError("Local metadata is missing for a modify sync action")
         abs_path = client.workspace.datasites / self.path
         local_data = abs_path.read_bytes()
         diff = py_fast_rsync.diff(self.remote_metadata.signature_bytes, local_data)
@@ -271,7 +279,7 @@ class ModifyRemoteAction(SyncAction):
 class DeleteRemoteAction(SyncAction):
     action_type = SyncActionType.DELETE_REMOTE
 
-    def execute(self, client: SyncClient):
+    def execute(self, client: SyncClient) -> None:
         client.delete(self.path)
         self.status = SyncStatus.SYNCED
 
@@ -304,6 +312,7 @@ def _validate_local_action(client: SyncClient, action: SyncAction) -> None:
     max_size_bytes = MAX_FILE_SIZE_MB * 1024 * 1024
     if (
         action.action_type in {SyncActionType.CREATE_LOCAL, SyncActionType.MODIFY_LOCAL}
+        and action.remote_metadata is not None
         and action.remote_metadata.file_size > max_size_bytes
     ):
         raise SyncValidationError(f"File {abs_path} is larger than {MAX_FILE_SIZE_MB}MB.")
@@ -327,6 +336,7 @@ def _validate_remote_action(client: SyncClient, action: SyncAction) -> None:
     max_size_bytes = MAX_FILE_SIZE_MB * 1024 * 1024
     if (
         action.action_type in {SyncActionType.CREATE_REMOTE, SyncActionType.MODIFY_REMOTE}
+        and action.local_metadata is not None
         and action.local_metadata.file_size > max_size_bytes
     ):
         raise SyncValidationError(f"File {abs_path} is larger than {MAX_FILE_SIZE_MB}MB.")

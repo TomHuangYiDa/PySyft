@@ -57,7 +57,7 @@ class LocalState(BaseModel):
                 action=action.action_type,
             )
 
-    def insert_synced_file(self, path: Path, state: FileMetadata, action: "SyncActionType") -> None:
+    def insert_synced_file(self, path: Path, state: Optional[FileMetadata], action: "SyncActionType") -> None:
         if not isinstance(path, Path):
             raise ValueError(f"path must be a Path object, got {path}")
         if not self.path.is_file():
@@ -88,21 +88,21 @@ class LocalState(BaseModel):
         message: Optional[str] = None,
         action: Optional["SyncActionType"] = None,
         save: bool = True,
-    ):
+    ) -> None:
         if not isinstance(path, Path):
             raise ValueError(f"path must be a Path object, got {path}")
         self.status_info[path] = SyncStatusInfo(path=path, status=status, message=message, action=action)
         if save:
             self.save()
 
-    def save(self):
+    def save(self) -> None:
         try:
             with threading.Lock():
                 self.path.write_text(self.model_dump_json())
         except Exception as e:
             logger.exception(f"Failed to save {self.path}: {e}")
 
-    def load(self):
+    def load(self) -> None:
         with threading.Lock():
             if self.path.exists():
                 data = self.path.read_text()
