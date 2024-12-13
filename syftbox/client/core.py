@@ -30,7 +30,7 @@ ICON_FOLDER = ASSETS_FOLDER / "icon"
 METADATA_FILENAME = ".metadata.json"
 
 
-class LocalSyftBox:
+class SyftBoxRunner:
     """The local SyftBox instance.
 
     This is the main SyftBox instance that handles workspace data, server
@@ -199,7 +199,7 @@ class LocalSyftBox:
 class SyftBoxContext(SyftBoxContextInterface):
     """
     Provides a light-weight context object for sub-systems to interact with.
-    It will be instantiated by SyftClient, but sub-systems can freely pass it around.
+    It will be instantiated by LocalSyftBox, but sub-systems can freely pass it around.
     """
 
     def __init__(
@@ -302,7 +302,7 @@ def run_syftbox(
         logger.debug("Directory icons are disabled")
 
     try:
-        syftbox_instance = LocalSyftBox(client_config, log_level=log_level)
+        syftbox_instance = SyftBoxRunner(client_config, log_level=log_level)
         # we don't want to run migration if another instance of client is already running
         bool(syftbox_instance.check_pidfile()) and run_migration(client_config, migrate_datasite=migrate_datasite)
         (not syftbox_env.DISABLE_ICONS) and syftbox_instance.copy_icons()

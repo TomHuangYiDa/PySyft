@@ -9,7 +9,7 @@ from typing_extensions import Annotated
 from syftbox import __version__
 from syftbox.app.manager import install_app, list_app, uninstall_app
 from syftbox.client.base import SyftBoxContextInterface
-from syftbox.client.core import LocalSyftBox
+from syftbox.client.core import SyftBoxRunner
 from syftbox.client.plugins.apps import find_and_run_script
 from syftbox.lib.client_config import SyftClientConfig
 from syftbox.lib.constants import DEFAULT_CONFIG_PATH
@@ -136,7 +136,7 @@ def env(with_syftbox: bool = False):
 def get_syftbox_context(config_path: Path) -> SyftBoxContextInterface:
     try:
         conf = SyftClientConfig.load(config_path)
-        client = LocalSyftBox(conf)
+        client = SyftBoxRunner(conf)
         return client.context
     except ClientConfigException:
         msg = (
