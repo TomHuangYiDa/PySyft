@@ -11,7 +11,7 @@ from syftbox.server.server import create_folders
 from syftbox.server.settings import ServerSettings
 
 
-def run_migrations(settings: ServerSettings):
+def run_migrations(settings: ServerSettings) -> None:
     logger.info("Creating folders")
     create_folders(settings.folders)
     logger.info("Initializing DB")

@@ -60,7 +60,7 @@ def create_folders(folders: list[str]) -> None:
             os.makedirs(folder, exist_ok=True)
 
 
-def server_request_hook(span: Span, scope: dict[str, Any]):
+def server_request_hook(span: Span, scope: dict[str, Any]) -> None:
     if not span.is_recording():
         return
 
@@ -126,7 +126,7 @@ syftbox client
 
 
 @app.get("/", response_class=PlainTextResponse)
-async def get_ascii_art(request: Request):
+async def get_ascii_art(request: Request) -> str:
     return ascii_art.replace("[[SERVER_URL]]", str(request.url).rstrip("/"))
 
 

@@ -14,7 +14,7 @@ from syftbox.client.routers.common import APIContext
 router = APIRouter()
 
 
-def parse_frontmatter(file_path) -> dict:
+def parse_frontmatter(file_path: Path) -> dict:
     """
     Parses frontmatter YAML from a README.md file and returns it as a Python dictionary.
 

@@ -3,11 +3,13 @@ import json
 import platform
 import shutil
 from pathlib import Path
+from types import TracebackType
 
 import httpx
 import uvicorn
 from loguru import logger
 from pid import PidFile, PidFileAlreadyLockedError, PidFileAlreadyRunningError
+from typing_extensions import Optional, Type
 
 from syftbox import __version__
 from syftbox.client.api import create_api
@@ -194,7 +196,7 @@ class SyftClient:
         if platform.system() == "Darwin":
             macos.copy_icon_file(ICON_FOLDER, self.workspace.data_dir)
 
-    def log_system_info(self):
+    def log_system_info(self) -> None:
         self.server_client.post(
             "/log_event",
             json={
@@ -209,7 +211,9 @@ class SyftClient:
     def __enter__(self) -> "SyftClient":
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
+    def __exit__(
+        self, exc_type: Optional[Type[BaseException]], exc_val: Optional[BaseException], exc_tb: Optional[TracebackType]
+    ) -> None:
         self.shutdown()
 
 
