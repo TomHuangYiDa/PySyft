@@ -83,7 +83,7 @@ def get_access_token(
         raise typer.Exit(1)
 
 
-def authenticate_user(conf: SyftClientConfig, login_client: httpx.Client) -> str:
+def authenticate_user(conf: SyftClientConfig, login_client: httpx.Client) -> Optional[str]:
     if has_valid_access_token(conf, login_client):
         return conf.access_token
 

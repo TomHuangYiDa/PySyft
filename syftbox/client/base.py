@@ -72,7 +72,7 @@ class SyftClientInterface(Protocol):
         """Path to the datasite directory for the current user."""
         ...  # pragma: no cover
 
-    def log_analytics_event(self, event_name: str, **kwargs) -> None:
+    def log_analytics_event(self, event_name: str, **kwargs: dict) -> None:
         """Log an analytics event to the server."""
         ...  # pragma: no cover
 

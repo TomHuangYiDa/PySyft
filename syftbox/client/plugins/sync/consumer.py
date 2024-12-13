@@ -1,7 +1,7 @@
 import zipfile
 from io import BytesIO
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Union
 
 import httpx
 from loguru import logger
@@ -132,7 +132,7 @@ class SyncConsumer:
         action = self.process_action(action)
         self.local_state.insert_completed_action(action)
 
-    def get_current_local_metadata(self, path: Path) -> Optional[FileMetadata]:
+    def get_current_local_metadata(self, path: Path) -> Union[FileMetadata, tuple[str, None], None]:
         abs_path = self.client.workspace.datasites / path
         if not abs_path.is_file():
             return None

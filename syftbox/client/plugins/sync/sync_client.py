@@ -143,10 +143,10 @@ class SyncClient:
         return response.content
 
     def download_bulk(self, relative_paths: list[Path]) -> bytes:
-        relative_paths = [path.as_posix() for path in relative_paths]
+        paths: list[str] = [path.as_posix() for path in relative_paths]
         response = self.server_client.post(
             "/sync/download_bulk",
-            json={"paths": relative_paths},
+            json={"paths": paths},
         )
         self.raise_for_status(response)
         return response.content

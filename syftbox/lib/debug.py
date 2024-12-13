@@ -17,7 +17,7 @@ from syftbox.lib.types import PathLike
 from syftbox.lib.workspace import SyftWorkspace
 
 
-def debug_report(config_path: Optional[PathLike] = None) -> str:
+def debug_report(config_path: Optional[PathLike] = None) -> dict:
     client_config = None
     apps = []
     app_dir = None

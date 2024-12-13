@@ -31,7 +31,7 @@ class SyftFile(BaseModel):
     absolute_path: AbsolutePath
 
 
-def computed_permission_for_user_and_path(connection: sqlite3.Connection, user: str, path: Path):
+def computed_permission_for_user_and_path(connection: sqlite3.Connection, user: str, path: Path) -> ComputedPermission:
     rules: List[PermissionRule] = get_rules_for_path(connection, path)
     return ComputedPermission.from_user_rules_and_path(rules=rules, user=user, path=path)
 
