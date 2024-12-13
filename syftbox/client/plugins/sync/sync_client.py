@@ -3,6 +3,7 @@ from pathlib import Path
 from typing import Union
 
 import httpx
+import msgpack
 from pydantic import BaseModel
 from tqdm import tqdm
 
@@ -15,16 +16,12 @@ from syftbox.server.models.sync_models import ApplyDiffResponse, DiffResponse, F
 
 class StreamedFile(BaseModel):
     path: RelativePath
-    content: str
-
-    @property
-    def raw_bytes(self) -> bytes:
-        return base64.b64decode(self.content)
+    content: bytes
 
     def write_bytes(self, output_dir: Path):
         file_path = output_dir / self.path
         file_path.parent.mkdir(parents=True, exist_ok=True)
-        file_path.write_bytes(self.raw_bytes)
+        file_path.write_bytes(self.content)
 
 
 class SyncClient:
@@ -159,7 +156,14 @@ class SyncClient:
         return response.content
 
     def download_files_streaming(self, relative_paths: list[str], output_dir: Path) -> None:
+        if not relative_paths:
+            return []
         relative_paths = [path.as_posix() for path in relative_paths]
+
+        pbar = tqdm(
+            total=len(relative_paths), desc="Downloading files", unit="file", mininterval=1.0, dynamic_ncols=True
+        )
+        extracted_files = []
 
         with self.server_client.stream(
             "POST",
@@ -168,15 +172,17 @@ class SyncClient:
         ) as response:
             response.raise_for_status()
 
-            extracted_files = []
-            for line in tqdm(
-                response.iter_lines(),
-                total=len(relative_paths),
-                unit="files",
-                desc="Downloading files",
-            ):
-                file = StreamedFile.model_validate_json(line)
-                file.write_bytes(output_dir)
-                extracted_files.append(file.path)
+            unpacker = msgpack.Unpacker(
+                raw=False,
+            )
 
-            return extracted_files
+            for chunk in response.iter_bytes(chunk_size=1024 * 1024):
+                unpacker.feed(chunk)
+                for file_json in unpacker:
+                    file = StreamedFile.model_validate(file_json)
+                    file.write_bytes(output_dir)
+                    extracted_files.append(file.path)
+                    pbar.update(1)
+
+        pbar.close()
+        return extracted_files

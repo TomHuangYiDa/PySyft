@@ -1,10 +1,10 @@
 import base64
 import hashlib
-import json
 import sqlite3
 import traceback
 from typing import Iterator, List
 
+import msgpack
 import py_fast_rsync
 from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
@@ -212,11 +212,10 @@ def file_streamer(files: List[RelativePath], file_store: FileStore, email) -> It
         try:
             file = file_store.get(path, email)
             metadata = {
-                "size": file.metadata.file_size,
                 "path": file.metadata.path.as_posix(),
-                "content": base64.b64encode(file.data).decode(),
+                "content": file.data,
             }
-            yield json.dumps(metadata).encode() + b"\n"
+            yield msgpack.packb(metadata)
         except ValueError:
             logger.warning(f"File not found: {path}")
             continue
