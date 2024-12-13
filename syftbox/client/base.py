@@ -4,10 +4,12 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 import httpx
+from loguru import logger
 from typing_extensions import Protocol
 
 from syftbox.client.exceptions import SyftAuthenticationError, SyftPermissionError, SyftServerError
 from syftbox.lib.client_config import SyftClientConfig
+from syftbox.lib.http import HEADER_SYFTBOX_USER, SYFTBOX_HEADERS
 from syftbox.lib.workspace import SyftWorkspace
 
 
@@ -67,7 +69,7 @@ class SyftBoxContextInterface(Protocol):
         ...
 
     @property
-    def datasite(self) -> Path:
+    def my_datasite(self) -> Path:
         """Path to the datasite directory for the current user."""
         ...  # pragma: no cover
 
@@ -92,10 +94,15 @@ class ClientBase:
 
     @staticmethod
     def _make_headers(config: SyftClientConfig) -> dict[str, str]:
-        headers = {"email": config.email}
+        headers = {
+            **SYFTBOX_HEADERS,
+            HEADER_SYFTBOX_USER: config.email,
+            "email": config.email,  # legacy
+        }
         if config.access_token is not None:
             headers["Authorization"] = f"Bearer {config.access_token}"
 
+        logger.debug(f"Server headers: {headers}")
         return headers
 
     @classmethod

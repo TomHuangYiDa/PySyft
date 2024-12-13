@@ -4,7 +4,6 @@ import platform
 from datetime import datetime
 from pathlib import Path
 
-import yaml
 from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import (
@@ -16,21 +15,36 @@ from fastapi.responses import (
 )
 from jinja2 import Template
 from loguru import logger
+from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
+from opentelemetry.instrumentation.sqlite3 import SQLite3Instrumentor
+from opentelemetry.trace import Span
 from typing_extensions import Any, Optional, Union
 
 from syftbox import __version__
-from syftbox.lib.constants import PERM_FILE
-from syftbox.lib.hash import collect_files, hash_files
+from syftbox.lib.http import (
+    HEADER_OS_ARCH,
+    HEADER_OS_NAME,
+    HEADER_OS_VERSION,
+    HEADER_SYFTBOX_PYTHON,
+    HEADER_SYFTBOX_USER,
+    HEADER_SYFTBOX_VERSION,
+)
 from syftbox.lib.lib import (
     get_datasites,
 )
-from syftbox.lib.permissions import SyftPermission, migrate_permissions
 from syftbox.server.analytics import log_analytics_event
-from syftbox.server.db import db
-from syftbox.server.db.schema import get_db
 from syftbox.server.logger import setup_logger
 from syftbox.server.middleware import LoguruMiddleware
 from syftbox.server.settings import ServerSettings, get_server_settings
+from syftbox.server.telemetry import (
+    OTEL_ATTR_CLIENT_OS_ARCH,
+    OTEL_ATTR_CLIENT_OS_NAME,
+    OTEL_ATTR_CLIENT_OS_VER,
+    OTEL_ATTR_CLIENT_PYTHON,
+    OTEL_ATTR_CLIENT_USER,
+    OTEL_ATTR_CLIENT_VERSION,
+    setup_otel_exporter,
+)
 from syftbox.server.users.auth import get_current_user
 
 from .api.v1.sync_router import router as sync_router
@@ -46,68 +60,41 @@ def create_folders(folders: list[str]) -> None:
             os.makedirs(folder, exist_ok=True)
 
 
-def init_db(settings: ServerSettings) -> None:
-    # remove this after the upcoming release
-    migrate_permissions(settings.snapshot_folder)
+def server_request_hook(span: Span, scope: dict[str, Any]):
+    if not span.is_recording():
+        return
 
-    # might take very long as snapshot folder grows
-    logger.info(f"> Collecting Files from {settings.snapshot_folder.absolute()}")
-    files = collect_files(settings.snapshot_folder.absolute())
-    logger.info("> Hashing files")
-    metadata = hash_files(files, settings.snapshot_folder)
-    logger.info(f"> Updating file hashes at {settings.file_db_path.absolute()}")
-    con = get_db(settings.file_db_path.absolute())
-    cur = con.cursor()
-    for m in metadata:
-        db.save_file_metadata(cur, m)
-
-    # remove files that are not in the snapshot folder
-    all_metadata = db.get_all_metadata(cur)
-    for m in all_metadata:
-        abs_path = settings.snapshot_folder / m.path
-        if not abs_path.exists():
-            logger.info(f"{m.path} not found in {settings.snapshot_folder}, deleting from db")
-            db.delete_file_metadata(cur, m.path.as_posix())
-
-    # fill the permission tables
-    for file in settings.snapshot_folder.rglob(PERM_FILE):
-        content = file.read_text()
-        rule_dicts = yaml.safe_load(content)
-        perm_file = SyftPermission.from_rule_dicts(
-            permfile_file_path=file.relative_to(settings.snapshot_folder), rule_dicts=rule_dicts
-        )
-        db.set_rules_for_permfile(con, perm_file)
-        db.link_existing_rules_to_file(con, file.relative_to(settings.snapshot_folder))
-
-    cur.close()
-    con.commit()
-    con.close()
+    # headers k/v pairs are bytes
+    headers: dict[bytes, bytes] = dict(scope.get("headers", {}))
+    span.set_attribute(OTEL_ATTR_CLIENT_VERSION, headers.get(HEADER_SYFTBOX_VERSION, ""))
+    span.set_attribute(OTEL_ATTR_CLIENT_PYTHON, headers.get(HEADER_SYFTBOX_PYTHON, ""))
+    span.set_attribute(OTEL_ATTR_CLIENT_USER, headers.get(HEADER_SYFTBOX_USER, ""))
+    span.set_attribute(OTEL_ATTR_CLIENT_OS_NAME, headers.get(HEADER_OS_NAME, ""))
+    span.set_attribute(OTEL_ATTR_CLIENT_OS_VER, headers.get(HEADER_OS_VERSION, ""))
+    span.set_attribute(OTEL_ATTR_CLIENT_OS_ARCH, headers.get(HEADER_OS_ARCH, ""))
 
 
 @contextlib.asynccontextmanager
 async def lifespan(app: FastAPI, settings: Optional[ServerSettings] = None):
     # Startup
-    if settings is None:
-        settings = ServerSettings()
+    settings = settings or ServerSettings()
 
     setup_logger(logs_folder=settings.logs_folder)
 
-    logger.info(f"> Starting SyftBox Server {__version__}. Python {platform.python_version()}")
+    logger.info(f"Starting SyftBox Server {__version__}. Python {platform.python_version()}")
     logger.info(settings)
 
-    logger.info("> Creating Folders")
-
-    create_folders(settings.folders)
-
-    logger.info("> Loading Users")
-
-    init_db(settings)
+    if settings.otel_enabled:
+        logger.info("OTel Exporter is ENABLED")
+        setup_otel_exporter(settings.env.value)
+    else:
+        logger.info("OTel Exporter is DISABLED")
 
     yield {
         "server_settings": settings,
     }
 
-    logger.info("> Shutting down server")
+    logger.info("Shutting down server")
 
 
 app = FastAPI(lifespan=lifespan)
@@ -116,6 +103,9 @@ app.include_router(sync_router)
 app.include_router(users_router)
 app.add_middleware(GZipMiddleware, minimum_size=1000, compresslevel=5)
 app.add_middleware(LoguruMiddleware)
+
+FastAPIInstrumentor.instrument_app(app, server_request_hook=server_request_hook)
+SQLite3Instrumentor().instrument()
 
 # Define the ASCII art
 ascii_art = rf"""
@@ -128,7 +118,7 @@ ascii_art = rf"""
 
 
 # Install Syftbox (MacOS and Linux)
-curl -LsSf https://syftbox.openmined.org/install.sh | sh
+curl -LsSf [[SERVER_URL]]/install.sh | sh
 
 # Run the client
 syftbox client
@@ -137,22 +127,7 @@ syftbox client
 
 @app.get("/", response_class=PlainTextResponse)
 async def get_ascii_art(request: Request):
-    req_host = request.headers.get("host", "")
-    if "syftboxstage" in req_host:
-        return ascii_art.replace("syftbox.openmined.org", "syftboxstage.openmined.org")
-    return ascii_art
-
-
-@app.get("/wheel/{path:path}", response_class=HTMLResponse)
-async def get_wheel(path: str):
-    if path == "":  # Check if path is empty (meaning "/datasites/")
-        return RedirectResponse(url="/")
-
-    filename = path.split("/")[0]
-    if filename.endswith(".whl"):
-        wheel_path = os.path.expanduser("~/syftbox-0.1.0-py3-none-any.whl")
-        return FileResponse(wheel_path, media_type="application/octet-stream")
-    return filename
+    return ascii_art.replace("[[SERVER_URL]]", str(request.url).rstrip("/"))
 
 
 def get_file_list(directory: Union[str, Path] = ".") -> list[dict[str, Any]]:

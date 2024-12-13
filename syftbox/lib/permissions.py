@@ -4,7 +4,7 @@ import traceback
 from collections import defaultdict
 from enum import Enum
 from pathlib import Path
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, Union
 
 import wcmatch
 import yaml
@@ -13,9 +13,11 @@ from pydantic import BaseModel, model_validator
 from wcmatch.glob import globmatch
 
 from syftbox.lib.constants import PERM_FILE
+from syftbox.lib.lib import SyftBoxContext
 from syftbox.server.models.sync_models import RelativePath
 
 
+# TODO "Client" naming for SDK is confusing, it is a context for the syftbox lib
 # util
 def issubpath(path1, path2):
     return path1 in path2.parents
@@ -193,21 +195,10 @@ class SyftPermission(BaseModel):
     rules: List[PermissionRule]
 
     def save(self, path: Path):
+        if path.is_dir():
+            path = path / PERM_FILE
         with open(path, "w") as f:
             yaml.dump([x.as_file_json() for x in self.rules], f)
-
-    @classmethod
-    def datasite_default(cls, email: str):
-        return SyftPermission.from_rule_dicts(
-            Path(email) / PERM_FILE,
-            [
-                {
-                    "path": "**",
-                    "user": email,
-                    "permissions": ["admin", "create", "write", "read"],
-                }
-            ],
-        )
 
     def ensure(self, path=None) -> bool:
         """For backwards compatibility, we ensure that the permission file exists with these permissions"""
@@ -221,8 +212,8 @@ class SyftPermission(BaseModel):
     def to_dict(self):
         return [x.as_file_json() for x in self.rules]
 
-    @classmethod
-    def is_permission_file(cls, path: Path):
+    @staticmethod
+    def is_permission_file(path: Path):
         return path.name == PERM_FILE
 
     @classmethod
@@ -236,40 +227,59 @@ class SyftPermission(BaseModel):
             return False
 
     @classmethod
-    def mine_with_public_read(cls, email: str, filepath: Path):
-        return cls.from_rule_dicts(
-            filepath,
-            [
-                {
-                    "path": "**",
-                    "user": email,
-                    "permissions": ["admin"],
-                },
-                {
-                    "path": "**",
-                    "user": "*",
-                    "permissions": ["read"],
-                },
-            ],
-        )
+    def create(cls, context: SyftBoxContext, dir: Path) -> "SyftPermission":
+        if not dir.is_absolute():
+            raise ValueError("dir must be an absolute")
+
+        if dir.exists() and dir.is_file():
+            raise ValueError("dir must be a directory")
+
+        dir.mkdir(parents=True, exist_ok=True)
+        file_path = dir / PERM_FILE
+
+        try:
+            relative_path = file_path.relative_to(context.workspace.datasites)
+        except ValueError:
+            raise ValueError("dir must be inside the datasites folder")
+        return cls(relative_filepath=relative_path, rules=[])
 
     @classmethod
-    def mine_with_public_rw(cls, email: str, filepath: Path):
-        return cls.from_rule_dicts(
-            filepath,
-            [
-                {
-                    "path": "**",
-                    "user": email,
-                    "permissions": ["admin"],
-                },
-                {
-                    "path": "**",
-                    "user": "*",
-                    "permissions": ["write", "read"],
-                },
-            ],
+    def datasite_default(cls, context: SyftBoxContext, dir: Path) -> "SyftPermission":
+        perm = cls.create(context, dir)
+        perm.add_rule(
+            path="**",
+            user=context.email,
+            permission=["admin", "create", "write", "read"],
         )
+        return perm
+
+    @classmethod
+    def mine_with_public_read(cls, context: SyftBoxContext, dir: Path) -> "SyftPermission":
+        perm = cls.create(context, dir)
+        perm.add_rule(path="**", user=context.email, permission=["admin"])
+        perm.add_rule(path="**", user="*", permission=["read"])
+        return perm
+
+    @classmethod
+    def mine_with_public_write(cls, context: SyftBoxContext, dir: Path) -> "SyftPermission":
+        # for backwards compatibility
+        return cls.mine_with_public_rw(context, dir)
+
+    @classmethod
+    def mine_with_public_rw(cls, context: SyftBoxContext, dir: Path) -> "SyftPermission":
+        perm = cls.create(context, dir)
+        perm.add_rule(path="**", user=context.email, permission=["admin"])
+        perm.add_rule(path="**", user="*", permission=["write", "read"])
+        return perm
+
+    def add_rule(self, path: str, user: str, permission: Union[list[str], list[PermissionType]], allow=True):
+        priority = len(self.rules)
+        if isinstance(permission, list) and isinstance(permission[0], PermissionType):
+            permission = [PermissionType[p.upper()] for p in permission]
+        rule = PermissionRule(
+            dir_path=self.dir_path, path=path, user=user, allow=allow, permissions=permission, priority=priority
+        )
+        self.rules.append(rule)
 
     @property
     def dir_path(self):
@@ -351,7 +361,7 @@ class ComputedPermission(BaseModel):
         else:
             return False
 
-    def rule_applies_to_path(self, rule: PermissionRule):
+    def rule_applies_to_path(self, rule: PermissionRule) -> bool:
         if rule.has_email_template:
             # we fill in a/b/{useremail}/*.txt -> a/b/user@email.org/*.txt
             resolved_path_pattern = rule.resolve_path_pattern(self.user)
@@ -361,19 +371,20 @@ class ComputedPermission(BaseModel):
         # target file path (the one that we want to check permissions for relative to the syftperm file
         # we need this because the syftperm file specifies path patterns relative to its own location
 
-        # excecption for permfiles: only admin and read permissions are applied
-        if self.file_path.name == PERM_FILE and {PermissionType.CREATE, PermissionType.WRITE} & set(rule.permissions):
-            return False
-
         if issubpath(rule.dir_path, self.file_path):
             relative_file_path = self.file_path.relative_to(rule.dir_path)
             return globmatch(relative_file_path, resolved_path_pattern, flags=wcmatch.glob.GLOBSTAR)
         else:
             return False
 
+    def is_invalid_permission(self, permtype: PermissionType) -> bool:
+        return self.file_path.name == PERM_FILE and permtype in [PermissionType.CREATE, PermissionType.WRITE]
+
     def apply(self, rule: PermissionRule):
         if self.user_matches(rule) and self.rule_applies_to_path(rule):
             for permtype in rule.permissions:
+                if self.is_invalid_permission(permtype):
+                    continue
                 self.perms[permtype] = rule.allow
 
 
@@ -383,6 +394,8 @@ class ComputedPermission(BaseModel):
 def map_email_to_permissions(json_data: dict) -> dict:
     email_permissions = defaultdict(list)
     for permission, emails in json_data.items():
+        if permission not in ["read", "write", "create", "admin"]:
+            continue
         for email in emails:
             if email is None:
                 continue

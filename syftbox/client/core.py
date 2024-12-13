@@ -17,11 +17,11 @@ from syftbox.client.logger import setup_logger
 from syftbox.client.plugin_manager import PluginManager
 from syftbox.client.server_client import SyftBoxClient
 from syftbox.client.utils import error_reporting, file_manager, macos
-from syftbox.client.utils.file_manager import _is_wsl
 from syftbox.lib.client_config import SyftClientConfig
 from syftbox.lib.datasite import create_datasite
 from syftbox.lib.exceptions import SyftBoxException
 from syftbox.lib.ignore import IGNORE_FILENAME
+from syftbox.lib.platform import OS_NAME, OS_VERSION, PYTHON_VERSION
 from syftbox.lib.workspace import SyftWorkspace
 
 SCRIPT_DIR = Path(__file__).parent
@@ -135,7 +135,7 @@ class SyftBoxRunner:
     def init_datasite(self):
         if self.datasite.exists():
             return
-        create_datasite(self.workspace.datasites, self.config.email)
+        create_datasite(self.context)
 
     def register_self(self):
         """Register the user's email with the SyftBox cache server"""
@@ -175,18 +175,12 @@ class SyftBoxRunner:
             macos.copy_icon_file(ICON_FOLDER, self.workspace.data_dir)
 
     def log_system_info(self):
-        if _is_wsl():
-            os_name = "WSL"
-        else:
-            os_name = platform.system()
-            os_name = "macOS" if os_name == "Darwin" else os_name
-
         self.client.log_analytics_event(
             event_name="system_info",
-            os_name=os_name,
-            os_version=platform.release(),
+            os_name=OS_NAME,
+            os_version=OS_VERSION,
             syftbox_version=__version__,
-            python_version=platform.python_version(),
+            python_version=PYTHON_VERSION,
         )
 
     def __enter__(self):
@@ -219,7 +213,7 @@ class SyftBoxContext(SyftBoxContextInterface):
         return self.config.email
 
     @property
-    def datasite(self) -> Path:
+    def my_datasite(self) -> Path:
         return self.workspace.datasites / self.config.email
 
     @property

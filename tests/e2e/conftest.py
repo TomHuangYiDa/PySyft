@@ -120,14 +120,16 @@ class E2EContext:
         logs_dir.mkdir(parents=True, exist_ok=True)
 
         env = os.environ.copy()
+        env["SYFTBOX_ENV"] = "DEV"
         env["SYFTBOX_DATA_FOLDER"] = str(server_dir)
+        env["SYFTBOX_OTEL_ENABLED"] = "0"
         env.update(server.env)
 
         process = await asyncio.create_subprocess_exec(
-            "syftbox",
-            "server",
-            "--port",
-            f"{server.port}",
+            "gunicorn",
+            "syftbox.server.server:app",
+            "-k=uvicorn.workers.UvicornWorker",
+            f"--bind=127.0.0.1:{server.port}",
             stdout=open(logs_dir / "server.log", "w"),
             stderr=asyncio.subprocess.STDOUT,
             env=env,

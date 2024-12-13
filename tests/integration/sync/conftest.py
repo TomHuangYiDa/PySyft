@@ -12,6 +12,7 @@ from syftbox.client.server_client import SyftBoxClient
 from syftbox.lib.client_config import SyftClientConfig
 from syftbox.lib.datasite import create_datasite
 from syftbox.lib.workspace import SyftWorkspace
+from syftbox.server.migrations import run_migrations
 from syftbox.server.server import app as server_app
 from syftbox.server.server import lifespan as server_lifespan
 from syftbox.server.settings import ServerSettings
@@ -40,14 +41,16 @@ def setup_datasite(tmp_path: Path, server_client: TestClient, email: str) -> Syf
     config.save()
     ws = SyftWorkspace(config.data_dir)
     ws.mkdirs()
-    create_datasite(ws.datasites, email)
-    authenticate_testclient(server_client, email)
-    return SyftBoxContext(
+    context = SyftBoxContext(
         config,
         ws,
         SyftBoxClient(conn=server_client),
         MockPluginManager(),
     )
+    create_datasite(context)
+    authenticate_testclient(server_client, email)
+
+    return context
 
 
 @pytest.fixture(scope="function")
@@ -60,9 +63,10 @@ def server_app_with_lifespan(tmp_path: Path) -> FastAPI:
     path.mkdir()
     settings = ServerSettings.from_data_folder(path)
     settings.auth_enabled = False
+    settings.otel_enabled = False
     lifespan_with_settings = partial(server_lifespan, settings=settings)
     server_app.router.lifespan_context = lifespan_with_settings
-
+    run_migrations(settings)
     return server_app
 
 
