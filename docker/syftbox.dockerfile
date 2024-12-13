@@ -14,4 +14,4 @@ RUN uv pip install --no-cache syftbox==${SYFT_VERSION}
 
 EXPOSE 8000
 
-CMD ["uv", "run", "uvicorn", "syftbox.server.server:app", "--host=0.0.0.0", "--port=8000"]
+CMD ["uv", "run", "gunicorn", "syftbox.server.server:app", "--bind=0.0.0.0:8000"]

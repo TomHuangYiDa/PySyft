@@ -17,11 +17,12 @@ from syftbox.client.exceptions import SyftAuthenticationError, SyftBoxAlreadyRun
 from syftbox.client.logger import setup_logger
 from syftbox.client.plugin_manager import PluginManager
 from syftbox.client.utils import error_reporting, file_manager, macos
-from syftbox.client.utils.file_manager import _is_wsl
 from syftbox.lib.client_config import SyftClientConfig
 from syftbox.lib.datasite import create_datasite
 from syftbox.lib.exceptions import SyftBoxException
+from syftbox.lib.http import HEADER_SYFTBOX_USER, SYFTBOX_HEADERS
 from syftbox.lib.ignore import IGNORE_FILENAME
+from syftbox.lib.platform import OS_NAME, OS_VERSION, PYTHON_VERSION
 from syftbox.lib.workspace import SyftWorkspace
 
 SCRIPT_DIR = Path(__file__).parent
@@ -135,7 +136,7 @@ class SyftClient:
     def init_datasite(self) -> None:
         if self.datasite.exists():
             return
-        create_datasite(self.workspace.datasites, self.config.email)
+        create_datasite(self.context)
 
     def register_self(self) -> None:
         """Register the user's email with the SyftBox cache server"""
@@ -173,9 +174,15 @@ class SyftClient:
 
     def __get_server_headers(self) -> dict:
         # TODO make access token required for initializing the client
-        headers = {"email": self.config.email}
+        headers = {
+            **SYFTBOX_HEADERS,
+            HEADER_SYFTBOX_USER: self.config.email,
+            "email": self.config.email,  # legacy
+        }
         if self.config.access_token is not None:
             headers["Authorization"] = f"Bearer {self.config.access_token}"
+
+        logger.info(f"Server headers: {headers}")
         return headers
 
     # utils
@@ -187,21 +194,15 @@ class SyftClient:
         if platform.system() == "Darwin":
             macos.copy_icon_file(ICON_FOLDER, self.workspace.data_dir)
 
-    def log_system_info(self) -> None:
-        if _is_wsl():
-            os_name = "WSL"
-        else:
-            os_name = platform.system()
-            os_name = "macOS" if os_name == "Darwin" else os_name
-
+    def log_system_info(self):
         self.server_client.post(
             "/log_event",
             json={
                 "event_name": "system_info",
-                "os_name": os_name,
-                "os_version": platform.release(),
+                "os_name": OS_NAME,
+                "os_version": OS_VERSION,
                 "syftbox_version": __version__,
-                "python_version": platform.python_version(),
+                "python_version": PYTHON_VERSION,
             },
         )
 
@@ -240,7 +241,7 @@ class SyftClientContext(SyftClientInterface):
         return self.config.email
 
     @property
-    def datasite(self) -> Path:
+    def my_datasite(self) -> Path:
         return self.workspace.datasites / self.config.email
 
     @property
