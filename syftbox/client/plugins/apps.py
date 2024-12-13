@@ -1,12 +1,15 @@
 import hashlib
 import json
+import logging
 import os
 import shutil
 import subprocess
 import threading
 import time
 from datetime import datetime
+from logging.handlers import RotatingFileHandler
 from pathlib import Path
+from subprocess import CompletedProcess
 from types import SimpleNamespace
 
 from croniter import croniter
@@ -18,7 +21,7 @@ from syftbox.lib.client_config import CONFIG_PATH_ENV
 
 APP_LOG_FILE_NAME_FORMAT = "{app_name}.log"
 DEFAULT_INTERVAL = 10
-RUNNING_APPS = {}
+RUNNING_APPS: dict = {}
 DEFAULT_APPS_PATH = Path(os.path.join(os.path.dirname(__file__), "..", "..", "..", "default_apps")).absolute().resolve()
 EVENT = threading.Event()
 
@@ -49,8 +52,8 @@ def path_without_virtualenvs() -> str:
     return os.pathsep.join(cleaned_path)
 
 
-def get_clean_env():
-    clean_env = {}
+def get_clean_env() -> dict:
+    clean_env: dict = {}
 
     essential_vars = {
         "PATH",
@@ -75,7 +78,9 @@ def get_clean_env():
     return clean_env
 
 
-def find_and_run_script(app_path: Path, extra_args: list, config_path: Path, app_log_dir: Optional[Path] = None):
+def find_and_run_script(
+    app_path: Path, extra_args: list, config_path: Path, app_log_dir: Optional[Path] = None
+) -> CompletedProcess[str]:
     script_path = os.path.join(app_path, "run.sh")
 
     clean_env = get_clean_env()
@@ -105,11 +110,8 @@ def find_and_run_script(app_path: Path, extra_args: list, config_path: Path, app
         raise FileNotFoundError(f"run.sh not found in {app_path}")
 
 
-def create_app_logger(log_file: Path):
+def create_app_logger(log_file: Path) -> tuple[logging.Logger, RotatingFileHandler]:
     """Create an isolated logger for app runs"""
-    import logging
-    from logging.handlers import RotatingFileHandler
-
     # Create a new logger instance
     logger = logging.getLogger(f"app_logger_{log_file.name}")
     logger.setLevel(logging.INFO)
@@ -136,11 +138,15 @@ def create_app_logger(log_file: Path):
     return logger, file_handler
 
 
-def run_with_logging(command: str, app_path: Path, clean_env: dict, log_path: Optional[Path] = None):
+def run_with_logging(
+    command: str, app_path: Path, clean_env: dict, log_path: Optional[Path] = None
+) -> tuple[CompletedProcess[str], Path]:
     """
     Run a subprocess command and capture output to both a log file and return results.
     """
     # Create logs directory if it doesn't exist
+    if log_path is None:
+        log_path = app_path / "logs"
     log_path.mkdir(parents=True, exist_ok=True)
 
     # Create a unique log filename with timestamp and app name
@@ -195,7 +201,7 @@ def run_with_logging(command: str, app_path: Path, clean_env: dict, log_path: Op
         file_handler.close()
 
 
-def copy_default_apps(apps_path: Path):
+def copy_default_apps(apps_path: Path) -> None:
     if not DEFAULT_APPS_PATH.exists():
         logger.info(f"Default apps directory not found: {DEFAULT_APPS_PATH}")
         return
@@ -213,7 +219,7 @@ def copy_default_apps(apps_path: Path):
                 logger.info(f"Copied default app:: {app}")
 
 
-def dict_to_namespace(data) -> Union[SimpleNamespace, list, Any]:
+def dict_to_namespace(data: Union[dict, list, Any]) -> Union[SimpleNamespace, list, Any]:
     if isinstance(data, dict):
         return SimpleNamespace(**{key: dict_to_namespace(value) for key, value in data.items()})
     elif isinstance(data, list):
@@ -222,7 +228,7 @@ def dict_to_namespace(data) -> Union[SimpleNamespace, list, Any]:
         return data
 
 
-def load_config(path: str) -> Optional[SimpleNamespace]:
+def load_config(path: str) -> Optional[Union[SimpleNamespace, list, Any]]:
     try:
         with open(path, "r") as f:
             data = json.load(f)
@@ -231,7 +237,7 @@ def load_config(path: str) -> Optional[SimpleNamespace]:
         return None
 
 
-def bootstrap(client: SyftClientInterface):
+def bootstrap(client: SyftClientInterface) -> None:
     # create the directory
     apps_path = client.workspace.apps
 
@@ -241,7 +247,7 @@ def bootstrap(client: SyftClientInterface):
     copy_default_apps(apps_path)
 
 
-def run_apps(apps_path: Path, client_config: Path):
+def run_apps(apps_path: Path, client_config: Path) -> None:
     # create the directory
 
     for app in apps_path.iterdir():
@@ -264,12 +270,12 @@ def run_apps(apps_path: Path, client_config: Path):
                 RUNNING_APPS[os.path.basename(app)] = thread
 
 
-def get_file_hash(file_path, digest="md5") -> str:
+def get_file_hash(file_path: Union[str, Path], digest: str = "md5") -> str:
     with open(file_path, "rb") as f:
-        return hashlib.file_digest(f, digest)
+        return hashlib.file_digest(f, digest).hexdigest()
 
 
-def output_published(app_output, published_output) -> bool:
+def output_published(app_output: Union[str, Path], published_output: Union[str, Path]) -> bool:
     return (
         os.path.exists(app_output)
         and os.path.exists(published_output)
@@ -277,7 +283,7 @@ def output_published(app_output, published_output) -> bool:
     )
 
 
-def run_custom_app_config(app_config: SimpleNamespace, app_path: Path, client_config: Path):
+def run_custom_app_config(app_config: SimpleNamespace, app_path: Path, client_config: Path) -> None:
     app_name = os.path.basename(app_path)
     clean_env = {
         "PATH": path_without_virtualenvs(),
@@ -334,12 +340,12 @@ def run_custom_app_config(app_config: SimpleNamespace, app_path: Path, client_co
         time.sleep(time_to_wait)
 
 
-def run_app(app_path: Path, config_path: Path):
+def run_app(app_path: Path, config_path: Path) -> None:
     app_name = os.path.basename(app_path)
     app_log_dir = app_path / "logs"
     log_file = app_log_dir / APP_LOG_FILE_NAME_FORMAT.format(app_name=app_name)
 
-    extra_args = []
+    extra_args: list = []
     try:
         logger.info(f"Running '{app_name}' app")
         find_and_run_script(app_path, extra_args, config_path, app_log_dir)
@@ -360,10 +366,10 @@ class AppRunner:
         self.client = client
         self.__event = threading.Event()
         self.interval = interval
-        self.__run_thread: threading.Thread = None
+        self.__run_thread: Optional[threading.Thread] = None
 
-    def start(self):
-        def run():
+    def start(self) -> None:
+        def run() -> None:
             bootstrap(self.client)
             while not self.__event.is_set():
                 try:
@@ -378,10 +384,11 @@ class AppRunner:
         self.__run_thread = threading.Thread(target=run)
         self.__run_thread.start()
 
-    def stop(self, blocking: bool = False):
+    def stop(self, blocking: bool = False) -> None:
         if not self.__run_thread:
             return
 
         EVENT.set()
         self.__event.set()
-        blocking and self.__run_thread.join()
+        if blocking:
+            self.__run_thread.join()
