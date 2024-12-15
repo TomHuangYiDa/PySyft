@@ -4,8 +4,8 @@ from urllib.parse import urlparse
 import pytest
 import requests
 
+from syftbox.client.benchmark.metrics import AggregateStats, HTTPMetrics, TCPMetrics
 from syftbox.client.benchmark.network_metric import NetworkMetric, ServerNetworkMetricCollector
-from syftbox.lib.metrics import AggregateStats, HTTPMetrics, TCPMetrics
 
 
 @pytest.fixture

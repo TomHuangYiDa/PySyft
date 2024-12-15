@@ -3,6 +3,7 @@ from pathlib import Path
 
 import pytest
 
+from syftbox.client.benchmark.metrics import AggregateStats, HTTPMetrics, TCPMetrics
 from syftbox.client.benchmark.report import (
     HumanReadableBenchmarkReport,
     JsonBenchmarkReport,
@@ -10,7 +11,6 @@ from syftbox.client.benchmark.report import (
     SyncPerformanceMetric,
 )
 from syftbox.client.benchmark.sync_metric import PerformanceMetrics, SizePerformanceData
-from syftbox.lib.metrics import AggregateStats, HTTPMetrics, TCPMetrics
 
 
 @pytest.fixture

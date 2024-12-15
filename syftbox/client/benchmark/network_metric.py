@@ -5,8 +5,8 @@ from urllib.parse import urlparse
 import requests
 
 from syftbox.client.base import BaseMetric, MetricCollector
+from syftbox.client.benchmark.metrics import HTTPMetrics, HTTPPerfStats, TCPMetrics, TCPPerfStats
 from syftbox.lib.client_config import SyftClientConfig
-from syftbox.lib.metrics import HTTPMetrics, HTTPPerfStats, TCPMetrics, TCPPerfStats
 
 
 @dataclass
