@@ -3,11 +3,11 @@ from pathlib import Path
 
 import pytest
 
-from syftbox.client.benchmark.metrics import AggregateStats, HTTPMetrics, TCPMetrics
+from syftbox.client.benchmark.netstats_tcp import HTTPMetrics, Stats, TCPTimingStats
 from syftbox.client.benchmark.report import (
-    HumanReadableBenchmarkReport,
-    JsonBenchmarkReport,
-    NetworkMetric,
+    ConsoleReport,
+    JSONReport,
+    NetworkBenchmarkResult,
     SyncPerformanceMetric,
 )
 from syftbox.client.benchmark.sync_metric import PerformanceMetrics, SizePerformanceData
@@ -16,13 +16,13 @@ from syftbox.client.benchmark.sync_metric import PerformanceMetrics, SizePerform
 @pytest.fixture
 def aggregate_stats():
     """Fixture for aggregate statistics."""
-    return AggregateStats(min=10.0, max=20.0, avg=15.0, median=15.0, stddev=2.0, p95=19.0, p99=19.5)
+    return Stats(min=10.0, max=20.0, mean=15.0, p50=15.0, stddev=2.0, p95=19.0, p99=19.5)
 
 
 @pytest.fixture
 def network_metric(aggregate_stats):
     """Fixture for network metric data."""
-    return NetworkMetric(
+    return NetworkBenchmarkResult(
         timestamp="2024-01-01T00:00:00+00:00",
         num_runs=5,
         url="https://test.example.com",
@@ -37,7 +37,7 @@ def network_metric(aggregate_stats):
             content_transfer_time=aggregate_stats,
             success_rate=99.9,
         ),
-        tcp_stats=TCPMetrics(
+        tcp_stats=TCPTimingStats(
             latency_stats=aggregate_stats,
             jitter_stats=aggregate_stats,
             connection_success_rate=98.5,
@@ -75,7 +75,7 @@ def sync_metric(performance_metrics):
 
 def test_json_report_generate(network_metric, sync_metric, tmp_path):
     """Test JSON report generation."""
-    reporter = JsonBenchmarkReport()
+    reporter = JSONReport()
     metrics = {"network": network_metric, "sync": sync_metric}
 
     report = reporter.generate(metrics)
@@ -98,7 +98,7 @@ def test_json_report_generate(network_metric, sync_metric, tmp_path):
 
 def test_json_report_save(network_metric, sync_metric, tmp_path):
     """Test JSON report saving to file."""
-    reporter = JsonBenchmarkReport()
+    reporter = JSONReport()
     metrics = {"network": network_metric, "sync": sync_metric}
 
     reporter.generate(metrics, tmp_path)
@@ -115,7 +115,7 @@ def test_json_report_save(network_metric, sync_metric, tmp_path):
 
 def test_human_readable_report_generate(network_metric, sync_metric):
     """Test human readable report generation."""
-    reporter = HumanReadableBenchmarkReport()
+    reporter = ConsoleReport()
     metrics = {"network": network_metric, "sync": sync_metric}
 
     report = reporter.generate(metrics)
@@ -138,7 +138,7 @@ def test_human_readable_report_generate(network_metric, sync_metric):
 
 def test_human_readable_report_save(network_metric, sync_metric, tmp_path):
     """Test human readable report saving to file."""
-    reporter = HumanReadableBenchmarkReport()
+    reporter = ConsoleReport()
     metrics = {"network": network_metric, "sync": sync_metric}
 
     reporter.generate(metrics, tmp_path)
@@ -155,7 +155,7 @@ def test_human_readable_report_save(network_metric, sync_metric, tmp_path):
 
 def test_dict_to_str_conversion():
     """Test dictionary to string conversion."""
-    reporter = HumanReadableBenchmarkReport()
+    reporter = ConsoleReport()
     test_dict = {"key1": 100, "key2": 200}
     result = reporter.dict_to_str(test_dict)
 
@@ -166,14 +166,14 @@ def test_dict_to_str_conversion():
 
 def test_empty_metrics():
     """Test report generation with empty metrics."""
-    reporter = JsonBenchmarkReport()
+    reporter = JSONReport()
     metrics = {}
 
     report = reporter.generate(metrics)
     assert report["metrics"] == {}
 
 
-@pytest.mark.parametrize("reporter_class", [JsonBenchmarkReport, HumanReadableBenchmarkReport])
+@pytest.mark.parametrize("reporter_class", [JSONReport, ConsoleReport])
 def test_invalid_save_path(reporter_class, network_metric, sync_metric):
     """Test saving report to invalid path."""
     reporter = reporter_class()
@@ -195,7 +195,7 @@ def test_sync_metric_multiple_sizes(performance_metrics):
 
     sync_metric = SyncPerformanceMetric(size_metrics=[size_data_1, size_data_2], num_runs=5)
 
-    reporter = HumanReadableBenchmarkReport()
+    reporter = ConsoleReport()
     report = reporter.generate({"sync": sync_metric})
 
     assert "1" in report  # Check for 1MB size

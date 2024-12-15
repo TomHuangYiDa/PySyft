@@ -1,11 +1,7 @@
 """Benchmark class for Syft client."""
 
-from pathlib import Path
-from typing import Optional
-
 from syftbox.client.benchmark import Benchmark, BenchmarkReporter
-from syftbox.client.benchmark.network_metric import ServerNetworkMetricCollector
-from syftbox.client.benchmark.sync_metric import SyncPerformanceCollector
+from syftbox.client.benchmark.network import NetworkBenchmark
 from syftbox.lib.client_config import SyftClientConfig
 
 
@@ -23,11 +19,11 @@ class SyftBenchmarkRunner:
     def get_collectors(self) -> dict[str, type[Benchmark]]:
         """Get the metric collectors for the benchmark tests."""
         return {
-            "network": ServerNetworkMetricCollector,
-            "sync": SyncPerformanceCollector,
+            "network": NetworkBenchmark,
+            # "sync": SyncPerformanceCollector,
         }
 
-    def run(self, num_runs: int, report_path: Optional[Path] = None):
+    def run(self, num_runs: int):
         """Run the benchmark tests."""
 
         # Get the metric collectors
@@ -37,9 +33,7 @@ class SyftBenchmarkRunner:
         metrics = {}
         for name, collector in collectors.items():
             collector_instance = collector(self.config)
-            # TODO: run the tests in parallel
             metrics[name] = collector_instance.collect_metrics(num_runs)
 
         # Generate the benchmark report
-
-        self.reporter.generate(metrics, report_path)
+        self.reporter.generate(metrics)

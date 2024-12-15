@@ -4,8 +4,8 @@ from urllib.parse import urlparse
 import pytest
 import requests
 
-from syftbox.client.benchmark.metrics import AggregateStats, HTTPMetrics, TCPMetrics
-from syftbox.client.benchmark.network_metric import NetworkMetric, ServerNetworkMetricCollector
+from syftbox.client.benchmark.netstats_tcp import HTTPMetrics, Stats, TCPTimingStats
+from syftbox.client.benchmark.network import NetworkBenchmark, NetworkBenchmarkResult
 
 
 @pytest.fixture
@@ -25,7 +25,7 @@ def mock_datetime(monkeypatch):
 @pytest.fixture
 def mock_aggregate_stats():
     """Fixture to create mock aggregate stats."""
-    return AggregateStats(min=10.0, max=20.0, avg=15.0, median=15.0, stddev=2.0, p95=19.0, p99=19.5)
+    return Stats(min=10.0, max=20.0, mean=15.0, p50=15.0, stddev=2.0, p95=19.0, p99=19.5)
 
 
 @pytest.fixture
@@ -38,7 +38,7 @@ def config():
 
 @pytest.fixture
 def collector(config):
-    return ServerNetworkMetricCollector(config)
+    return NetworkBenchmark(config)
 
 
 def test_initialization(collector):
@@ -61,7 +61,7 @@ def test_default_port_http(monkeypatch):
     class MockConfig:
         server_url = "http://test.example.com"
 
-    collector = ServerNetworkMetricCollector(MockConfig())
+    collector = NetworkBenchmark(MockConfig())
     assert collector.tcp_perf.port == 80
 
 
@@ -71,7 +71,7 @@ def test_default_port_https(monkeypatch):
     class MockConfig:
         server_url = "https://test.example.com"
 
-    collector = ServerNetworkMetricCollector(MockConfig())
+    collector = NetworkBenchmark(MockConfig())
     assert collector.tcp_perf.port == 443
 
 
@@ -108,7 +108,7 @@ def test_collect_metrics_success(collector, monkeypatch, mock_datetime, mock_agg
     # Mock TCP stats
     class MockTCPStats:
         def get_stats(self, num_runs):
-            return TCPMetrics(
+            return TCPTimingStats(
                 latency_stats=mock_aggregate_stats,
                 jitter_stats=mock_aggregate_stats,
                 connection_success_rate=98.5,
@@ -138,21 +138,21 @@ def test_collect_metrics_success(collector, monkeypatch, mock_datetime, mock_agg
 
     result = collector.collect_metrics(num_runs=5)
 
-    assert isinstance(result, NetworkMetric)
+    assert isinstance(result, NetworkBenchmarkResult)
     assert result.timestamp == mock_datetime
     assert result.url == "https://test.example.com:8080"
     assert result.num_runs == 5
 
     # Verify TCP metrics structure
-    assert isinstance(result.tcp_stats.latency_stats, AggregateStats)
-    assert result.tcp_stats.latency_stats.avg == 15.0
+    assert isinstance(result.tcp_stats.latency_stats, Stats)
+    assert result.tcp_stats.latency_stats.mean == 15.0
     assert result.tcp_stats.latency_stats.p95 == 19.0
     assert result.tcp_stats.connection_success_rate == 98.5
     assert result.tcp_stats.requests_per_minute == 1000
 
     # Verify HTTP metrics structure
-    assert isinstance(result.http_stats.total_time, AggregateStats)
-    assert result.http_stats.total_time.avg == 15.0
+    assert isinstance(result.http_stats.total_time, Stats)
+    assert result.http_stats.total_time.mean == 15.0
     assert result.http_stats.total_time.p95 == 19.0
     assert result.http_stats.success_rate == 99.9
 
@@ -191,7 +191,7 @@ def test_collect_metrics_different_runs(collector, monkeypatch, mock_aggregate_s
     class MockTCPStats:
         def get_stats(self, num_runs):
             runs_count.append(num_runs)
-            return TCPMetrics(
+            return TCPTimingStats(
                 latency_stats=mock_aggregate_stats,
                 jitter_stats=mock_aggregate_stats,
                 connection_success_rate=98.5,
@@ -223,5 +223,5 @@ def test_collect_metrics_different_runs(collector, monkeypatch, mock_aggregate_s
 
     assert result.num_runs == num_runs
     assert all(count == num_runs for count in runs_count)
-    assert isinstance(result.tcp_stats, TCPMetrics)
+    assert isinstance(result.tcp_stats, TCPTimingStats)
     assert isinstance(result.http_stats, HTTPMetrics)

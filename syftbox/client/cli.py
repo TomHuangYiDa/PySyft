@@ -82,7 +82,7 @@ REPORT_PATH_OPTS = Option(
 # benchmark command opts
 JSON_BENCHMARK_REPORT_OPTS = Option(
     "--json", "-j",
-    help="Generate the benchmark report in JSON format",
+    help="Path where benchmark report will be stored in JSON format",
 )
 
 # fmt: on
@@ -157,25 +157,25 @@ def report(
 @app.command()
 def benchmark(
     config_path: Annotated[Path, CONFIG_OPTS] = DEFAULT_CONFIG_PATH,
-    json: Annotated[Optional[bool], JSON_BENCHMARK_REPORT_OPTS] = False,
-    output_path: Annotated[Optional[Path], REPORT_PATH_OPTS] = Path(".").resolve(),
+    json: Annotated[Optional[Path], JSON_BENCHMARK_REPORT_OPTS] = None,
+    num_runs: int = DEFAULT_BENCHMARK_RUNS,
 ):
     """Run the SyftBox benchmark"""
 
     # Lazy import to improve cli startup speed
-    from syftbox.client.benchmark.report import HumanReadableBenchmarkReport, JsonBenchmarkReport
+    from syftbox.client.benchmark.report import ConsoleReport, JSONReport
     from syftbox.client.benchmark.runner import SyftBenchmarkRunner
     from syftbox.lib.client_config import SyftClientConfig
 
     try:
+        print("Running benchmarks")
         config = SyftClientConfig.load(config_path)
-        benchmark_reporter = JsonBenchmarkReport() if json else HumanReadableBenchmarkReport()
+        benchmark_reporter = JSONReport(json) if json else ConsoleReport()
         benchmark_runner = SyftBenchmarkRunner(config, benchmark_reporter)
-        print(f"Running benchmark for {config_path} ...")
-        benchmark_runner.run(DEFAULT_BENCHMARK_RUNS, output_path)
+        benchmark_runner.run(num_runs)
     except Exception as e:
         rprint(f"[red]Error[/red]: {e}")
-        raise Exit(1)
+        raise e
 
 
 def main():

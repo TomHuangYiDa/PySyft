@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from syftbox.client.benchmark.network_metric import ServerNetworkMetricCollector
+from syftbox.client.benchmark.network import NetworkBenchmark
 from syftbox.client.benchmark.runner import SyftBenchmarkRunner
 from syftbox.client.benchmark.sync_metric import SyncPerformanceCollector
 
@@ -52,7 +52,7 @@ def test_get_collectors(benchmark_runner):
 
     assert isinstance(collectors, dict)
     assert len(collectors) == 2
-    assert collectors["network"] == ServerNetworkMetricCollector
+    assert collectors["network"] == NetworkBenchmark
     assert collectors["sync"] == SyncPerformanceCollector
 
 
