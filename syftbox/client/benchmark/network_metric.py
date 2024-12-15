@@ -4,13 +4,13 @@ from urllib.parse import urlparse
 
 import requests
 
-from syftbox.client.base import BaseMetric, MetricCollector
+from syftbox.client.benchmark import Benchmark, BenchmarkResult
 from syftbox.client.benchmark.metrics import HTTPMetrics, HTTPPerfStats, TCPMetrics, TCPPerfStats
 from syftbox.lib.client_config import SyftClientConfig
 
 
 @dataclass
-class NetworkMetric(BaseMetric):
+class NetworkMetric(BenchmarkResult):
     """Dataclass for network performance metrics."""
 
     timestamp: str
@@ -19,7 +19,7 @@ class NetworkMetric(BaseMetric):
     tcp_stats: TCPMetrics
 
 
-class ServerNetworkMetricCollector(MetricCollector):
+class ServerNetworkMetricCollector(Benchmark):
     """Class for collecting network performance metrics for a server."""
 
     tcp_perf: TCPPerfStats

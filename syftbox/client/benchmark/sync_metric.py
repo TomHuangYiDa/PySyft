@@ -7,7 +7,7 @@ from uuid import uuid4
 
 from curl_cffi import CurlMime, requests
 
-from syftbox.client.base import BaseMetric, MetricCollector
+from syftbox.client.benchmark import Benchmark, BenchmarkResult
 from syftbox.lib.workspace import SyftWorkspace
 
 
@@ -35,7 +35,7 @@ class SizePerformanceData:
 
 
 @dataclass
-class SyncPerformanceMetric(BaseMetric):
+class SyncPerformanceMetric(BenchmarkResult):
     """Complete report of sync performance metrics across different file sizes"""
 
     size_metrics: list[SizePerformanceData]
@@ -66,7 +66,7 @@ class SampleBenchmarkData:
         shutil.rmtree(self.base_dir, ignore_errors=True)
 
 
-class SyncPerformanceCollector(MetricCollector):
+class SyncPerformanceCollector(Benchmark):
     """Tests and measures sync performance metrics"""
 
     DEFAULT_FILE_SIZES = [1, 5, 9]  # MB

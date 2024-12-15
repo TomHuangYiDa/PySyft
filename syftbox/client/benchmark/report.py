@@ -4,7 +4,7 @@ from pathlib import Path
 
 from typing_extensions import Optional
 
-from syftbox.client.base import BaseMetric, BenchmarkReporter
+from syftbox.client.benchmark import BenchmarkReporter, BenchmarkResult
 from syftbox.client.benchmark.network_metric import NetworkMetric
 from syftbox.client.benchmark.sync_metric import SyncPerformanceMetric
 
@@ -12,7 +12,7 @@ from syftbox.client.benchmark.sync_metric import SyncPerformanceMetric
 class JsonBenchmarkReport(BenchmarkReporter):
     """JSON format benchmark report."""
 
-    def generate(self, metrics: dict[str, BaseMetric], report_path: Optional[Path] = None) -> dict:
+    def generate(self, metrics: dict[str, BenchmarkResult], report_path: Optional[Path] = None) -> dict:
         """Generate the benchmark report in JSON format."""
         report = {
             "metrics": {name: asdict(metric) for name, metric in metrics.items()},
@@ -35,7 +35,7 @@ class JsonBenchmarkReport(BenchmarkReporter):
 class HumanReadableBenchmarkReport(BenchmarkReporter):
     """Human readable format benchmark report."""
 
-    def generate(self, metrics: dict[str, BaseMetric], report_path: Optional[Path] = None) -> str:
+    def generate(self, metrics: dict[str, BenchmarkResult], report_path: Optional[Path] = None) -> str:
         """Generate the benchmark report in human readable format."""
 
         sections = ["\nBenchmark Report", "=" * 16, ""]

@@ -3,7 +3,7 @@
 from pathlib import Path
 from typing import Optional
 
-from syftbox.client.base import BenchmarkReporter, MetricCollector
+from syftbox.client.benchmark import Benchmark, BenchmarkReporter
 from syftbox.client.benchmark.network_metric import ServerNetworkMetricCollector
 from syftbox.client.benchmark.sync_metric import SyncPerformanceCollector
 from syftbox.lib.client_config import SyftClientConfig
@@ -20,7 +20,7 @@ class SyftBenchmarkRunner:
         self.config = config
         self.reporter = reporter
 
-    def get_collectors(self) -> dict[str, type[MetricCollector]]:
+    def get_collectors(self) -> dict[str, type[Benchmark]]:
         """Get the metric collectors for the benchmark tests."""
         return {
             "network": ServerNetworkMetricCollector,
