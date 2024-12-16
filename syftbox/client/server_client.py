@@ -180,7 +180,7 @@ class SyncClient(ClientBase):
                 raw=False,
             )
 
-            for chunk in response.iter_bytes(chunk_size=1024 * 1024):
+            for chunk in response.iter_bytes():
                 unpacker.feed(chunk)
                 for file_json in unpacker:
                     file = StreamedFile.model_validate(file_json)

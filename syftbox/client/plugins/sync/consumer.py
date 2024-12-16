@@ -23,7 +23,7 @@ from syftbox.server.models.sync_models import FileMetadata
 
 def create_local_batch(context: SyftBoxContextInterface, paths_to_download: list[Path]) -> list[str]:
     try:
-        file_list = context.client.sync.download_files_streaming(paths_to_download)
+        file_list = context.client.sync.download_files_streaming(paths_to_download, context.workspace.datasites)
     except SyftServerError as e:
         logger.error(e)
         return []
