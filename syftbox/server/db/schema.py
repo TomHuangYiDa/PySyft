@@ -2,7 +2,7 @@ import sqlite3
 
 
 # @contextlib.contextmanager
-def get_db(path: str):
+def get_db(path: str) -> sqlite3.Connection:
     conn = sqlite3.connect(path, check_same_thread=False)
 
     with conn:
