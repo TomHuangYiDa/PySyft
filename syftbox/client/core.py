@@ -4,23 +4,22 @@ import platform
 import shutil
 from pathlib import Path
 
-import httpx
 import uvicorn
 from loguru import logger
 from pid import PidFile, PidFileAlreadyLockedError, PidFileAlreadyRunningError
 
 from syftbox import __version__
 from syftbox.client.api import create_api
-from syftbox.client.base import Plugins, SyftClientInterface
+from syftbox.client.base import PluginManagerInterface, SyftBoxContextInterface
 from syftbox.client.env import syftbox_env
-from syftbox.client.exceptions import SyftAuthenticationError, SyftBoxAlreadyRunning, SyftServerError
+from syftbox.client.exceptions import SyftBoxAlreadyRunning
 from syftbox.client.logger import setup_logger
 from syftbox.client.plugin_manager import PluginManager
+from syftbox.client.server_client import SyftBoxClient
 from syftbox.client.utils import error_reporting, file_manager, macos
 from syftbox.lib.client_config import SyftClientConfig
 from syftbox.lib.datasite import create_datasite
 from syftbox.lib.exceptions import SyftBoxException
-from syftbox.lib.http import HEADER_SYFTBOX_USER, SYFTBOX_HEADERS
 from syftbox.lib.ignore import IGNORE_FILENAME
 from syftbox.lib.platform import OS_NAME, OS_VERSION, PYTHON_VERSION
 from syftbox.lib.workspace import SyftWorkspace
@@ -31,11 +30,11 @@ ICON_FOLDER = ASSETS_FOLDER / "icon"
 METADATA_FILENAME = ".metadata.json"
 
 
-class SyftClient:
-    """The SyftBox Client
+class SyftBoxRunner:
+    """The local SyftBox instance.
 
-    This is the main SyftBox client that handles workspace data, server
-    communication, and local API services. Only one client instance can run
+    This is the main SyftBox instance that handles workspace data, server
+    communication, and local API services. Only one instance can run
     for a given workspace directory.
 
     Warning:
@@ -53,15 +52,15 @@ class SyftClient:
 
         self.workspace = SyftWorkspace(self.config.data_dir)
         self.pid = PidFile(pidname="syftbox.pid", piddir=self.workspace.data_dir)
-
-        self.server_client = httpx.Client(
-            base_url=str(self.config.server_url),
-            follow_redirects=True,
-            headers=self.__get_server_headers(),
-        )
+        self.client = SyftBoxClient.from_config(self.config)
 
         # create a single client context shared across components
-        self.__ctx = SyftClientContext(self.config, self.workspace, self.server_client, plugins=None)
+        self.__ctx = SyftBoxContext(
+            self.config,
+            self.workspace,
+            client=self.client,
+            plugins=None,
+        )
         self.plugins = PluginManager(self.__ctx, **kwargs)
         # make plugins available to the context
         self.__ctx.plugins = self.plugins
@@ -86,7 +85,7 @@ class SyftClient:
         return self.datasite / "public"
 
     @property
-    def context(self) -> "SyftClientContext":
+    def context(self) -> "SyftBoxContext":
         return self.__ctx
 
     def start(self):
@@ -96,7 +95,7 @@ class SyftClient:
             raise SyftBoxAlreadyRunning(f"Another instance of SyftBox is running on {self.config.data_dir}")
         self.create_metadata_file()
 
-        logger.info("Started SyftBox client")
+        logger.info("Started SyftBox")
 
         self.config.save()  # commit config changes (like migration) to disk after PID is created
         self.workspace.mkdirs()  # create the workspace directories
@@ -123,7 +122,7 @@ class SyftClient:
         self.plugins.stop()
 
         self.pid.close()
-        logger.info("SyftBox client shutdown complete")
+        logger.info("SyftBox shutdown complete")
 
     def check_pidfile(self) -> str:
         """Check if another instance of SyftBox is running"""
@@ -143,7 +142,7 @@ class SyftClient:
         if self.is_registered:
             return
         try:
-            token = self.__register_email()
+            token = self.client.register(self.config.email)
             # TODO + FIXME - once we have JWT, we should not store token in config!
             # ideally in OS keychain (using keyring) or
             # in a separate location under self.workspace.plugins
@@ -166,25 +165,6 @@ class SyftClient:
         )
         return self.__local_server.run()
 
-    def __register_email(self) -> str:
-        # TODO - this should probably be wrapped in a SyftCacheServer API?
-        response = self.server_client.post("/register", json={"email": self.config.email})
-        response.raise_for_status()
-        return response.json().get("token")
-
-    def __get_server_headers(self):
-        # TODO make access token required for initializing the client
-        headers = {
-            **SYFTBOX_HEADERS,
-            HEADER_SYFTBOX_USER: self.config.email,
-            "email": self.config.email,  # legacy
-        }
-        if self.config.access_token is not None:
-            headers["Authorization"] = f"Bearer {self.config.access_token}"
-
-        logger.info(f"Server headers: {headers}")
-        return headers
-
     # utils
     def open_datasites_dir(self):
         file_manager.open_dir(self.workspace.datasites)
@@ -195,15 +175,12 @@ class SyftClient:
             macos.copy_icon_file(ICON_FOLDER, self.workspace.data_dir)
 
     def log_system_info(self):
-        self.server_client.post(
-            "/log_event",
-            json={
-                "event_name": "system_info",
-                "os_name": OS_NAME,
-                "os_version": OS_VERSION,
-                "syftbox_version": __version__,
-                "python_version": PYTHON_VERSION,
-            },
+        self.client.log_analytics_event(
+            event_name="system_info",
+            os_name=OS_NAME,
+            os_version=OS_VERSION,
+            syftbox_version=__version__,
+            python_version=PYTHON_VERSION,
         )
 
     def __enter__(self):
@@ -213,27 +190,22 @@ class SyftClient:
         self.shutdown()
 
 
-class SyftClientContext(SyftClientInterface):
+class SyftBoxContext(SyftBoxContextInterface):
     """
-    Concrete implementation of SyftClientInterface that provides a lightweight
-    client context for components.
-
-    This class encapsulates the minimal set of attributes needed by components
-    without exposing the full SyftClient implementation.
-
-    It will be instantiated by SyftClient, but sub-systems can freely pass it around.
+    Provides a light-weight context object for sub-systems to interact with.
+    It will be instantiated by LocalSyftBox, but sub-systems can freely pass it around.
     """
 
     def __init__(
         self,
         config: SyftClientConfig,
         workspace: SyftWorkspace,
-        server_client: httpx.Client,
-        plugins: Plugins,
+        client: SyftBoxClient,
+        plugins: PluginManagerInterface,
     ):
         self.config = config
         self.workspace = workspace
-        self.server_client = server_client
+        self.client = client
         self.plugins = plugins
 
     @property
@@ -250,35 +222,7 @@ class SyftClientContext(SyftClientInterface):
         return [d.name for d in self.workspace.datasites.iterdir() if (d.is_dir() and "@" in d.name)]
 
     def __repr__(self) -> str:
-        return f"SyftClientContext<{self.config.email}, {self.config.data_dir}>"
-
-    def log_analytics_event(self, event_name: str, **kwargs) -> None:
-        """Log an event to the server"""
-        event_data = {
-            "event_name": event_name,
-            **kwargs,
-        }
-
-        response = self.server_client.post("/log_event", json=event_data)
-        if response.status_code != 200:
-            raise SyftServerError(f"Failed to log event: {response.text}")
-
-    def whoami(self) -> str:
-        try:
-            response = self.server_client.post("/auth/whoami")
-            if response.status_code == 401:
-                raise SyftAuthenticationError()
-            if response.status_code != 200:
-                raise SyftServerError(f"[/whoami] Server error: {response.status_code}, {response.text}")
-
-            data = response.json()
-            if "email" not in data:
-                raise SyftServerError("[/whoami] Missing email in response")
-
-            return data["email"]
-
-        except httpx.RequestError as e:
-            raise SyftServerError(f"[/whoami] Request failed: {e}") from e
+        return f"SyftBoxContext<{self.config.email}, {self.config.data_dir.as_posix()}>"
 
 
 def run_apps_to_api_migration(new_ws: SyftWorkspace):
@@ -333,11 +277,11 @@ def run_migration(config: SyftClientConfig, migrate_datasite=True):
             shutil.rmtree(str(old_sync_state.parent))
 
 
-def run_client(
+def run_syftbox(
     client_config: SyftClientConfig, open_dir: bool = False, log_level: str = "INFO", migrate_datasite=True
 ) -> int:
     """Run the SyftBox client"""
-    client = None
+    syftbox_instance = None
 
     setup_logger(log_level, log_dir=client_config.data_dir / "logs")
 
@@ -352,13 +296,13 @@ def run_client(
         logger.debug("Directory icons are disabled")
 
     try:
-        client = SyftClient(client_config, log_level=log_level)
+        syftbox_instance = SyftBoxRunner(client_config, log_level=log_level)
         # we don't want to run migration if another instance of client is already running
-        bool(client.check_pidfile()) and run_migration(client_config, migrate_datasite=migrate_datasite)
-        (not syftbox_env.DISABLE_ICONS) and client.copy_icons()
-        open_dir and client.open_datasites_dir()
-        client.log_system_info()
-        client.start()
+        bool(syftbox_instance.check_pidfile()) and run_migration(client_config, migrate_datasite=migrate_datasite)
+        (not syftbox_env.DISABLE_ICONS) and syftbox_instance.copy_icons()
+        open_dir and syftbox_instance.open_datasites_dir()
+        syftbox_instance.log_system_info()
+        syftbox_instance.start()
     except SyftBoxAlreadyRunning as e:
         logger.error(e)
         return -1
@@ -368,5 +312,5 @@ def run_client(
         logger.exception("Unhandled exception when starting the client", e)
         return -2
     finally:
-        client and client.shutdown()
+        syftbox_instance and syftbox_instance.shutdown()
     return 0
