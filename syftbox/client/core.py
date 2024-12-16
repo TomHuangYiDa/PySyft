@@ -302,9 +302,12 @@ def run_syftbox(
     try:
         syftbox_instance = SyftBoxRunner(client_config, log_level=log_level)
         # we don't want to run migration if another instance of client is already running
-        bool(syftbox_instance.check_pidfile()) and run_migration(client_config, migrate_datasite=migrate_datasite)
-        (not syftbox_env.DISABLE_ICONS) and syftbox_instance.copy_icons()
-        open_dir and syftbox_instance.open_datasites_dir()
+        if syftbox_instance.check_pidfile():
+            run_migration(client_config, migrate_datasite=migrate_datasite)
+        if not syftbox_env.DISABLE_ICONS:
+            syftbox_instance.copy_icons()
+        if open_dir:
+            syftbox_instance.open_datasites_dir()
         syftbox_instance.log_system_info()
         syftbox_instance.start()
     except SyftBoxAlreadyRunning as e:
@@ -316,5 +319,6 @@ def run_syftbox(
         logger.exception("Unhandled exception when starting the client", e)
         return -2
     finally:
-        syftbox_instance and syftbox_instance.shutdown()
+        if syftbox_instance is not None:
+            syftbox_instance.shutdown()
     return 0
