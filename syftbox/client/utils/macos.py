@@ -39,6 +39,8 @@ def find_icon_file(src_path: Path) -> Path:
         icon_file = search_icon_file(src_path)
         if icon_file:
             return icon_file
+
+        raise FileNotFoundError(f"Icon file not found for {src_path}")
     except subprocess.CalledProcessError:
         raise RuntimeError("Failed to unzip icon.zip using macOS CLI tool.")
 
