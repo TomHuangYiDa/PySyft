@@ -16,7 +16,7 @@ OTEL_ATTR_CLIENT_OS_ARCH = "syftbox.client.os.arch"
 OTEL_ATTR_SERVER_VERSION = "syftbox.server.version"
 
 
-def setup_otel_exporter(env: str):
+def setup_otel_exporter(env: str) -> None:
     exporter = OTLPSpanExporter()
     span_processor = BatchSpanProcessor(exporter)
 
