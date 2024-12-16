@@ -184,7 +184,9 @@ class CreateLocalAction(SyncAction):
 class ModifyLocalAction(SyncAction):
     action_type = SyncActionType.MODIFY_LOCAL
 
-    def execute(self, context: SyftBoxContextInterface):
+    def execute(self, context: SyftBoxContextInterface) -> None:
+        if self.local_metadata is None:
+            raise ValueError("Local metadata is required for modify local action")
         # Use rsync to update the local file with the remote changes
         diff = context.client.sync.get_diff(self.path, self.local_metadata.signature)
 
@@ -212,7 +214,7 @@ class ModifyLocalAction(SyncAction):
 class DeleteLocalAction(SyncAction):
     action_type = SyncActionType.DELETE_LOCAL
 
-    def execute(self, context: SyftBoxContextInterface):
+    def execute(self, context: SyftBoxContextInterface) -> None:
         abs_path = context.workspace.datasites / self.path
         abs_path.unlink()
         self.status = SyncStatus.SYNCED
@@ -225,7 +227,7 @@ class DeleteLocalAction(SyncAction):
 class CreateRemoteAction(SyncAction):
     action_type = SyncActionType.CREATE_REMOTE
 
-    def execute(self, context: SyftBoxContextInterface):
+    def execute(self, context: SyftBoxContextInterface) -> None:
         abs_path = context.workspace.datasites / self.path
         data = abs_path.read_bytes()
         context.client.sync.create(self.path, data)
@@ -243,10 +245,14 @@ class CreateRemoteAction(SyncAction):
 class ModifyRemoteAction(SyncAction):
     action_type = SyncActionType.MODIFY_REMOTE
 
-    def execute(self, context: SyftBoxContextInterface):
+    def execute(self, context: SyftBoxContextInterface) -> None:
         abs_path = context.workspace.datasites / self.path
         local_data = abs_path.read_bytes()
+        if self.remote_metadata is None:
+            raise ValueError("Remote metadata is required for modify remote action")
         diff = py_fast_rsync.diff(self.remote_metadata.signature_bytes, local_data)
+        if self.local_metadata is None:
+            raise ValueError("Local metadata is required for modify remote action")
         context.client.sync.apply_diff(
             relative_path=self.path,
             diff=diff,
@@ -274,7 +280,7 @@ class ModifyRemoteAction(SyncAction):
 class DeleteRemoteAction(SyncAction):
     action_type = SyncActionType.DELETE_REMOTE
 
-    def execute(self, context: SyftBoxContextInterface):
+    def execute(self, context: SyftBoxContextInterface) -> None:
         context.client.sync.delete(self.path)
         self.status = SyncStatus.SYNCED
 

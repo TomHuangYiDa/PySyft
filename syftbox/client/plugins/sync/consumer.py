@@ -72,10 +72,10 @@ class SyncConsumer:
 
             logger.info(f"Downloading {len(missing_files)} files in batch")
             received_files = create_local_batch(self.context, missing_files)
-            for path in received_files:
-                state = self.get_current_local_metadata(Path(path))
+            for file_path in received_files:
+                state = self.get_current_local_metadata(Path(file_path))
                 self.local_state.insert_synced_file(
-                    path=Path(path),
+                    path=Path(file_path),
                     state=state,
                     action=SyncActionType.CREATE_LOCAL,
                 )

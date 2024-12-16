@@ -1,6 +1,6 @@
 import base64
 from pathlib import Path
-from typing import Union
+from typing import Any, Union
 
 import httpx
 
@@ -27,7 +27,7 @@ class SyftBoxClient(ClientBase):
         self.raise_for_status(response)
         return response.json()
 
-    def log_analytics_event(self, event_name: str, **kwargs) -> None:
+    def log_analytics_event(self, event_name: str, **kwargs: dict) -> None:
         """Log an event to the server"""
         event_data = {
             "event_name": event_name,
@@ -39,7 +39,7 @@ class SyftBoxClient(ClientBase):
 
 
 class AuthClient(ClientBase):
-    def whoami(self):
+    def whoami(self) -> Any:
         response = self.conn.post("/auth/whoami")
         self.raise_for_status(response)
         return response.json()

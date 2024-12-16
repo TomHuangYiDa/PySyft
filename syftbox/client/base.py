@@ -83,7 +83,7 @@ class ClientBase:
     def __init__(self, conn: httpx.Client):
         self.conn = conn
 
-    def raise_for_status(self, response: httpx.Response):
+    def raise_for_status(self, response: httpx.Response) -> None:
         endpoint = response.request.url.path
         if response.status_code == 401:
             raise SyftAuthenticationError()
@@ -93,7 +93,7 @@ class ClientBase:
             raise SyftServerError(f"[{endpoint}] Server returned {response.status_code}: {response.text}")
 
     @staticmethod
-    def _make_headers(config: SyftClientConfig) -> dict[str, str]:
+    def _make_headers(config: SyftClientConfig) -> dict:
         headers = {
             **SYFTBOX_HEADERS,
             HEADER_SYFTBOX_USER: config.email,
@@ -106,7 +106,7 @@ class ClientBase:
         return headers
 
     @classmethod
-    def from_config(cls, config: SyftClientConfig):
+    def from_config(cls, config: SyftClientConfig) -> "ClientBase":
         conn = httpx.Client(
             base_url=str(config.server_url),
             follow_redirects=True,
