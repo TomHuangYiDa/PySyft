@@ -14,7 +14,7 @@ from typing_extensions import Optional
 
 from syftbox import __version__
 from syftbox.client.auth import authenticate_user
-from syftbox.client.client2 import METADATA_FILENAME
+from syftbox.client.core import METADATA_FILENAME
 from syftbox.lib.client_config import SyftClientConfig
 from syftbox.lib.constants import DEFAULT_DATA_DIR
 from syftbox.lib.exceptions import ClientConfigException
