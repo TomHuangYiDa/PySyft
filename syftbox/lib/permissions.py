@@ -14,6 +14,7 @@ from wcmatch.glob import globmatch
 
 from syftbox.lib.constants import PERM_FILE
 from syftbox.lib.lib import SyftBoxContext
+from syftbox.lib.types import PathLike
 from syftbox.server.models.sync_models import RelativePath
 
 
@@ -293,7 +294,7 @@ class SyftPermission(BaseModel):
             return cls.from_rule_dicts(relative_path, rule_dicts)
 
     @classmethod
-    def from_rule_dicts(cls, permfile_file_path, rule_dicts):
+    def from_rule_dicts(cls, permfile_file_path: PathLike, rule_dicts):
         if not isinstance(rule_dicts, list):
             raise ValueError(f"rules should be passed as a list of dicts, received {type(rule_dicts)}")
         rules = []
@@ -304,12 +305,12 @@ class SyftPermission(BaseModel):
         return cls(relative_filepath=permfile_file_path, rules=rules)
 
     @classmethod
-    def from_string(cls, s, path):
+    def from_string(cls, s: str, path: PathLike) -> "SyftPermission":
         dicts = yaml.safe_load(s)
         return cls.from_rule_dicts(Path(path), dicts)
 
     @classmethod
-    def from_bytes(cls, b, path):
+    def from_bytes(cls, b: bytes, path: PathLike) -> "SyftPermission":
         return cls.from_string(b.decode("utf-8"), path)
 
 
@@ -325,18 +326,18 @@ class ComputedPermission(BaseModel):
     }
 
     @classmethod
-    def from_user_rules_and_path(cls, rules: List[PermissionRule], user: str, path: Path):
+    def from_user_rules_and_path(cls, rules: List[PermissionRule], user: str, path: Path) -> "ComputedPermission":
         permission = cls(user=user, file_path=path)
         for rule in rules:
             permission.apply(rule)
         return permission
 
     @property
-    def path_owner(self):
+    def path_owner(self) -> str:
         """owner of the datasite for this path"""
         return str(self.file_path).split("/", 1)[0]
 
-    def has_permission(self, permtype: PermissionType):
+    def has_permission(self, permtype: PermissionType) -> bool:
         # exception for owners: they can always read and write to their own datasite
         if self.path_owner == self.user:
             return True
@@ -352,7 +353,7 @@ class ComputedPermission(BaseModel):
         # default case
         return self.perms[permtype]
 
-    def user_matches(self, rule: PermissionRule):
+    def user_matches(self, rule: PermissionRule) -> bool:
         """Computes if the user in the rule"""
         if rule.user == "*":
             return True
@@ -380,7 +381,7 @@ class ComputedPermission(BaseModel):
     def is_invalid_permission(self, permtype: PermissionType) -> bool:
         return self.file_path.name == PERM_FILE and permtype in [PermissionType.CREATE, PermissionType.WRITE]
 
-    def apply(self, rule: PermissionRule):
+    def apply(self, rule: PermissionRule) -> None:
         if self.user_matches(rule) and self.rule_applies_to_path(rule):
             for permtype in rule.permissions:
                 if self.is_invalid_permission(permtype):
@@ -403,7 +404,7 @@ def map_email_to_permissions(json_data: dict) -> dict:
     return email_permissions
 
 
-def convert_permission(old_perm_dict: dict) -> dict:
+def convert_permission(old_perm_dict: dict) -> list:
     old_perm_dict.pop("filepath", None)  # not needed, we use the actual path of the perm file
 
     user_permissions = map_email_to_permissions(old_perm_dict)
@@ -420,7 +421,7 @@ def convert_permission(old_perm_dict: dict) -> dict:
     return output
 
 
-def migrate_permissions(snapshot_folder: Path):
+def migrate_permissions(snapshot_folder: Path) -> None:
     """
     Migrate all `_.syftperm` files from old format to new format within a given snapshot folder.
     This function:
