@@ -1,5 +1,6 @@
 import json
 import re
+import sqlite3
 import traceback
 from collections import defaultdict
 from enum import Enum
@@ -20,7 +21,7 @@ from syftbox.server.models.sync_models import RelativePath
 
 # TODO "Client" naming for SDK is confusing, it is a context for the syftbox lib
 # util
-def issubpath(path1, path2):
+def issubpath(path1: RelativePath, path2: RelativePath) -> bool:
     return path1 in path2.parents
 
 
@@ -43,22 +44,24 @@ class PermissionRule(BaseModel):
     permissions: List[PermissionType]  # read/write/create/admin
     priority: int
 
-    def __eq__(self, other):
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, PermissionRule):
+            return NotImplemented
         return self.model_dump() == other.model_dump()
 
     @property
-    def permfile_path(self):
+    def permfile_path(self) -> Path:
         return self.dir_path / PERM_FILE
 
     @property
-    def depth(self):
+    def depth(self) -> int:
         return len(self.permfile_path.parts)
 
         # write model validator that accepts either a single string or a list of strings as permissions when initializing
 
     @model_validator(mode="before")
     @classmethod
-    def validate_permissions(cls, values):
+    def validate_permissions(cls, values: dict) -> dict:
         # check if values only contains keys that are in the model
         invalid_keys = set(values.keys()) - (set(cls.model_fields.keys()) | set(["type"]))
         if len(invalid_keys) > 0:
@@ -71,9 +74,10 @@ class PermissionRule(BaseModel):
             values["allow"] = False
 
         # if path refers to a location higher in the directory tree than the current file, raise an error
-        if values.get("path").startswith("../"):
+        path = values.get("path")
+        if path and path.startswith("../"):
             raise PermissionParsingError(
-                f"path {values.get('path')} refers to a location higher in the directory tree than the current file"
+                f"path {path} refers to a location higher in the directory tree than the current file"
             )
 
         # if user is not a valid email, or *, raise an error
@@ -92,19 +96,19 @@ class PermissionRule(BaseModel):
             raise ValueError(f"permissions should be a list of strings or a single string, received {type(perms)}")
 
         path = values.get("path")
-        if "**" in path and "{useremail}" in path and path.index("**") < path.rindex("{useremail}"):
+        if path and "**" in path and "{useremail}" in path and path.index("**") < path.rindex("{useremail}"):
             # this would make creating the path2rule mapping more challenging to compute beforehand
             raise PermissionParsingError("** can never be after {useremail}")
 
         return values
 
     @classmethod
-    def from_rule_dict(cls, dir_path, rule_dict, priority):
+    def from_rule_dict(cls, dir_path: RelativePath, rule_dict: dict, priority: int) -> "PermissionRule":
         # initialize from dict
         return cls(dir_path=dir_path, **rule_dict, priority=priority)
 
     @classmethod
-    def from_db_row(cls, row):
+    def from_db_row(cls, row: sqlite3.Row) -> "PermissionRule":
         """Create a PermissionRule from a database row"""
         permissions = []
         if row["can_read"]:
@@ -125,7 +129,7 @@ class PermissionRule(BaseModel):
             permissions=permissions,
         )
 
-    def to_db_row(self):
+    def to_db_row(self) -> dict:
         """Convert PermissionRule to a database row dictionary"""
         return {
             "permfile_path": str(self.permfile_path),  # Reconstruct full path
@@ -142,7 +146,7 @@ class PermissionRule(BaseModel):
         }
 
     @property
-    def permission_dict(self):
+    def permission_dict(self) -> dict:
         return {
             "read": PermissionType.READ in self.permissions,
             "create": PermissionType.CREATE in self.permissions,
@@ -150,7 +154,7 @@ class PermissionRule(BaseModel):
             "admin": PermissionType.ADMIN in self.permissions,
         }
 
-    def as_file_json(self):
+    def as_file_json(self) -> dict:
         res = {
             "path": self.path,
             "user": self.user,
@@ -184,10 +188,10 @@ class PermissionRule(BaseModel):
         return match, match_for_email
 
     @property
-    def has_email_template(self):
+    def has_email_template(self) -> bool:
         return "{useremail}" in self.path
 
-    def resolve_path_pattern(self, email):
+    def resolve_path_pattern(self, email: str) -> str:
         return self.path.replace("{useremail}", email)
 
 
@@ -195,30 +199,30 @@ class SyftPermission(BaseModel):
     relative_filepath: RelativePath
     rules: List[PermissionRule]
 
-    def save(self, path: Path):
+    def save(self, path: Path) -> None:
         if path.is_dir():
             path = path / PERM_FILE
         with open(path, "w") as f:
             yaml.dump([x.as_file_json() for x in self.rules], f)
 
-    def ensure(self, path=None) -> bool:
+    def ensure(self, path: Optional[Path] = None) -> bool:
         """For backwards compatibility, we ensure that the permission file exists with these permissions"""
         self.save(path)
         return True
 
     @property
-    def depth(self):
+    def depth(self) -> int:
         return len(self.relative_filepath.parts)
 
-    def to_dict(self):
+    def to_dict(self) -> list[dict]:
         return [x.as_file_json() for x in self.rules]
 
     @staticmethod
-    def is_permission_file(path: Path):
+    def is_permission_file(path: Path) -> bool:
         return path.name == PERM_FILE
 
     @classmethod
-    def is_valid(cls, path: Path, datasite_path: Path, _print=True):
+    def is_valid(cls, path: Path, datasite_path: Path, _print: bool = True) -> bool:
         try:
             cls.from_file(path, datasite_path)
             return True
@@ -273,28 +277,30 @@ class SyftPermission(BaseModel):
         perm.add_rule(path="**", user="*", permission=["write", "read"])
         return perm
 
-    def add_rule(self, path: str, user: str, permission: Union[list[str], list[PermissionType]], allow=True):
+    def add_rule(
+        self, path: str, user: str, permission: Union[list[str], list[PermissionType]], allow: bool = True
+    ) -> None:
         priority = len(self.rules)
         if isinstance(permission, list) and isinstance(permission[0], PermissionType):
-            permission = [PermissionType[p.upper()] for p in permission]
+            permission = [PermissionType[p.upper()] for p in permission if isinstance(p, str)]
         rule = PermissionRule(
             dir_path=self.dir_path, path=path, user=user, allow=allow, permissions=permission, priority=priority
         )
         self.rules.append(rule)
 
     @property
-    def dir_path(self):
+    def dir_path(self) -> Path:
         return self.relative_filepath.parent
 
     @classmethod
-    def from_file(cls, path: Path, datasite_path: Path):
+    def from_file(cls, path: Path, datasite_path: Path) -> "SyftPermission":
         with open(path, "r") as f:
             rule_dicts = yaml.safe_load(f)
             relative_path = path.relative_to(datasite_path)
             return cls.from_rule_dicts(relative_path, rule_dicts)
 
     @classmethod
-    def from_rule_dicts(cls, permfile_file_path: PathLike, rule_dicts):
+    def from_rule_dicts(cls, permfile_file_path: PathLike, rule_dicts: list[dict]) -> "SyftPermission":
         if not isinstance(rule_dicts, list):
             raise ValueError(f"rules should be passed as a list of dicts, received {type(rule_dicts)}")
         rules = []
