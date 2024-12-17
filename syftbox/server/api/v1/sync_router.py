@@ -2,11 +2,11 @@ import base64
 import hashlib
 import sqlite3
 import traceback
-import zipfile
-from io import BytesIO
+from typing import Iterator, List
 
+import msgpack
 import py_fast_rsync
-from fastapi import APIRouter, Depends, HTTPException, Request, Response, UploadFile
+from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from loguru import logger
 from typing_extensions import Generator
@@ -14,7 +14,7 @@ from typing_extensions import Generator
 from syftbox.lib.permissions import PermissionType
 from syftbox.server.analytics import log_file_change_event
 from syftbox.server.db.db import get_all_datasites
-from syftbox.server.db.file_store import FileStore, SyftFile
+from syftbox.server.db.file_store import FileStore
 from syftbox.server.db.schema import get_db
 from syftbox.server.settings import ServerSettings, get_server_settings
 from syftbox.server.users.auth import get_current_user
@@ -208,28 +208,24 @@ def get_datasites(
     return get_all_datasites(conn)
 
 
-def create_zip_from_files(files: list[SyftFile]) -> BytesIO:
-    memory_file = BytesIO()
-    with zipfile.ZipFile(memory_file, "w") as zf:
-        for file in files:
-            zf.writestr(file.metadata.path.as_posix(), file.data)
-    memory_file.seek(0)
-    return memory_file
+def file_streamer(files: List[RelativePath], file_store: FileStore, email: str) -> Iterator[bytes]:
+    for path in files:
+        try:
+            file = file_store.get(path, email)
+            metadata = {
+                "path": file.metadata.path.as_posix(),
+                "content": file.data,
+            }
+            yield msgpack.packb(metadata)
+        except ValueError:
+            logger.warning(f"File not found: {path}")
+            continue
 
 
 @router.post("/download_bulk")
-async def get_files(
+def get_files(
     req: BatchFileRequest,
     file_store: FileStore = Depends(get_file_store),
     email: str = Depends(get_current_user),
 ) -> StreamingResponse:
-    all_files = []
-    for path in req.paths:
-        try:
-            file = file_store.get(path, email)
-        except ValueError:
-            logger.warning(f"File not found: {path}")
-            continue
-        all_files.append(file)
-    zip_file = create_zip_from_files(all_files)
-    return Response(content=zip_file.read(), media_type="application/zip")
+    return StreamingResponse(file_streamer(req.paths, file_store, email), media_type="application/x-ndjson")

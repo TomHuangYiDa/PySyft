@@ -1,5 +1,3 @@
-import zipfile
-from io import BytesIO
 from pathlib import Path
 from typing import Optional
 
@@ -20,18 +18,16 @@ from syftbox.client.plugins.sync.sync_action import SyncAction, determine_sync_a
 from syftbox.client.plugins.sync.types import SyncActionType
 from syftbox.lib.hash import hash_file
 from syftbox.lib.ignore import filter_ignored_paths
-from syftbox.server.models.sync_models import FileMetadata
+from syftbox.server.models.sync_models import FileMetadata, RelativePath
 
 
-def create_local_batch(context: SyftBoxContextInterface, paths_to_download: list[Path]) -> list[str]:
+def create_local_batch(context: SyftBoxContextInterface, paths_to_download: list[Path]) -> list[RelativePath]:
     try:
-        content_bytes = context.client.sync.download_bulk(paths_to_download)
+        file_list = context.client.sync.download_files_streaming(paths_to_download, context.workspace.datasites)
     except SyftServerError as e:
         logger.error(e)
         return []
-    zip_file = zipfile.ZipFile(BytesIO(content_bytes))
-    zip_file.extractall(context.workspace.datasites)
-    return zip_file.namelist()
+    return file_list
 
 
 class SyncConsumer:
