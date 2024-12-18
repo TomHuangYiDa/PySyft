@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 import httpx
 from loguru import logger
@@ -57,7 +57,7 @@ class SyftBoxContextInterface(Protocol):
     workspace: SyftWorkspace
     """Paths to different dirs in Syft"""
 
-    plugins: PluginManagerInterface
+    plugins: Optional[PluginManagerInterface]
     """All initialized plugins."""
 
     client: "SyftBoxClient"

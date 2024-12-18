@@ -1,9 +1,12 @@
 import sqlite3
+from pathlib import Path
+
+from syftbox.lib.types import PathLike
 
 
 # @contextlib.contextmanager
-def get_db(path: str) -> sqlite3.Connection:
-    conn = sqlite3.connect(path, check_same_thread=False)
+def get_db(path: PathLike) -> sqlite3.Connection:
+    conn = sqlite3.connect(Path(path), check_same_thread=False)
 
     with conn:
         conn.execute("PRAGMA cache_size=10000;")

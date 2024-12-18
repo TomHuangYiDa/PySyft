@@ -40,7 +40,7 @@ class SyftBoxClient(ClientBase):
         self.raise_for_status(response)
         return response.json()
 
-    def log_analytics_event(self, event_name: str, **kwargs: dict) -> None:
+    def log_analytics_event(self, event_name: str, **kwargs: Any) -> None:
         """Log an event to the server"""
         event_data = {
             "event_name": event_name,

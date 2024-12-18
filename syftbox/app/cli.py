@@ -69,7 +69,7 @@ def install(
 
     try:
         context.client.log_analytics_event(
-            "app_install",
+            event_name="app_install",
             app_name=result.app_name,
             called_by=called_by,
         )
@@ -105,7 +105,7 @@ def run(
     extra_args: List[str] = []
     try:
         rprint(f"Running [bold]'{app_name}'[/bold]\nLocation: '{workspace.apps}'\n")
-        result = find_and_run_script(str(workspace.apps / app_name), extra_args, str(config_path))
+        result = find_and_run_script(workspace.apps / app_name, extra_args, config_path)
         rprint("[bold yellow]stdout:[/bold yellow]")
         print(result.stdout)
         rprint("[bold yellow]stderr:[/bold yellow]")

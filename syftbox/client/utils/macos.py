@@ -3,6 +3,8 @@ from pathlib import Path
 
 from typing_extensions import Optional
 
+from syftbox.lib.types import PathLike
+
 ASSETS_FOLDER = Path(__file__).parents[2] / "assets"
 ICONS_PKG = ASSETS_FOLDER / "icon.zip"
 
@@ -45,7 +47,7 @@ def find_icon_file(src_path: Path) -> Path:
         raise RuntimeError("Failed to unzip icon.zip using macOS CLI tool.")
 
 
-def copy_icon_file(icon_folder: str, dest_folder: str) -> None:
+def copy_icon_file(icon_folder: PathLike, dest_folder: PathLike) -> None:
     dest_path = Path(dest_folder)
     icon_path = Path(icon_folder)
     src_icon_path = find_icon_file(icon_path)

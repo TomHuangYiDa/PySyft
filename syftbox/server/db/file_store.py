@@ -65,7 +65,7 @@ class FileStore:
             cursor = conn.cursor()
             cursor.execute("BEGIN IMMEDIATE;")
             try:
-                db.delete_file_metadata(cursor, str(path))
+                db.delete_file_metadata(conn, str(path))
             except ValueError:
                 pass
 

@@ -64,7 +64,7 @@ class SyftBoxRunner:
             client=self.client,
             plugins=None,
         )
-        self.plugins = PluginManager(self.__ctx, **kwargs)
+        self.plugins = PluginManager(self.__ctx, sync_manager=None, app_runner=None, **kwargs)
         # make plugins available to the context
         self.__ctx.plugins = self.plugins
 
@@ -170,7 +170,7 @@ class SyftBoxRunner:
 
     # utils
     def open_datasites_dir(self) -> None:
-        file_manager.open_dir(self.workspace.datasites)
+        file_manager.open_dir(str(self.workspace.datasites))
 
     def copy_icons(self) -> None:
         self.workspace.mkdirs()
@@ -206,7 +206,7 @@ class SyftBoxContext(SyftBoxContextInterface):
         config: SyftClientConfig,
         workspace: SyftWorkspace,
         client: SyftBoxClient,
-        plugins: PluginManagerInterface,
+        plugins: Optional[PluginManagerInterface],
     ):
         self.config = config
         self.workspace = workspace
