@@ -173,7 +173,9 @@ class PermissionRule(BaseModel):
         match_for_email = None
         if self.has_email_template:
             match = False
-            emails_in_file_path = [part for part in relative_file_path.split("/") if "@" in part]  # todo: improve this
+            emails_in_file_path = [
+                part for part in str(relative_file_path).split("/") if "@" in part
+            ]  # todo: improve this
             for email in emails_in_file_path:
                 if globmatch(
                     str(relative_file_path),
