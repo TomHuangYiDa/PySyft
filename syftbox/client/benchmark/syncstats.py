@@ -116,7 +116,7 @@ class SyncDataTransferStats:
             raise e
         finally:
             # Delete the file after the test
-            self.delete_file(filepath)
+            self.delete_file(str(filepath))
 
     def get_stats(self, file_size_mb: int, num_runs: int) -> DataTransferStats:
         """Get data transfer statistics for a specific file size"""
