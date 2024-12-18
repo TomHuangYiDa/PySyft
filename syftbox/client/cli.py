@@ -2,9 +2,15 @@ from pathlib import Path
 
 from rich import print as rprint
 from typer import Context, Exit, Option, Typer
-from typing_extensions import Annotated
+from typing_extensions import Annotated, Optional
 
-from syftbox.lib.constants import DEFAULT_CONFIG_PATH, DEFAULT_DATA_DIR, DEFAULT_PORT, DEFAULT_SERVER_URL
+from syftbox.lib.constants import (
+    DEFAULT_BENCHMARK_RUNS,
+    DEFAULT_CONFIG_PATH,
+    DEFAULT_DATA_DIR,
+    DEFAULT_PORT,
+    DEFAULT_SERVER_URL,
+)
 
 app = Typer(
     name="SyftBox Client",
@@ -70,7 +76,13 @@ TOKEN_OPTS = Option(
 # report command opts
 REPORT_PATH_OPTS = Option(
     "-o", "--output-dir",
-    help="Directory to save the log file",
+    help="Directory to save the report file",
+)
+
+# benchmark command opts
+JSON_BENCHMARK_REPORT_OPTS = Option(
+    "--json", "-j",
+    help="Path where benchmark report will be stored in JSON format",
 )
 
 # fmt: on
@@ -140,6 +152,30 @@ def report(
     except Exception as e:
         rprint(f"[red]Error[/red]: {e}")
         raise Exit(1)
+
+
+@app.command()
+def benchmark(
+    config_path: Annotated[Path, CONFIG_OPTS] = DEFAULT_CONFIG_PATH,
+    json: Annotated[Optional[Path], JSON_BENCHMARK_REPORT_OPTS] = None,
+    num_runs: int = DEFAULT_BENCHMARK_RUNS,
+) -> None:
+    """Run the SyftBox benchmark"""
+
+    # Lazy import to improve cli startup speed
+    from syftbox.client.benchmark.report import ConsoleReport, JSONReport
+    from syftbox.client.benchmark.runner import SyftBenchmarkRunner
+    from syftbox.lib.client_config import SyftClientConfig
+
+    try:
+        print("Running benchmarks")
+        config = SyftClientConfig.load(config_path)
+        benchmark_reporter = JSONReport(json) if json else ConsoleReport()
+        benchmark_runner = SyftBenchmarkRunner(config, benchmark_reporter)
+        benchmark_runner.run(num_runs)
+    except Exception as e:
+        rprint(f"[red]Error[/red]: {e}")
+        raise e
 
 
 def main() -> None:
