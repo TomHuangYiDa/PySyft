@@ -151,8 +151,6 @@ class FileStore:
                 ]:
                     raise ValueError(f"check_permission must be either WRITE or CREATE, got {check_permission}")
 
-                print("Checking for permission for path", path.resolve())
-                print("Check permission", check_permission.name, check_permission.value)
                 if not computed_perm.has_permission(check_permission):
                     raise HTTPException(
                         status_code=403,
