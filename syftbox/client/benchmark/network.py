@@ -19,7 +19,7 @@ class NetworkBenchmark(Benchmark):
     def __init__(self, config: SyftClientConfig):
         self.url = str(config.server_url)
         parsed = urlparse(self.url)
-        host = parsed.hostname
+        host = str(parsed.hostname)
         port = parsed.port or (443 if parsed.scheme == "https" else 80)
         self.tcp_perf = TCPPerfStats(host, port)
         self.http_perf = HTTPPerfStats(self.url)
@@ -60,7 +60,7 @@ class NetworkBenchmarkResult(BenchmarkResult):
     http_stats: HTTPTimingStats
     tcp_stats: TCPTimingStats
 
-    def readable_report(self):
+    def readable_report(self) -> str:
         return (
             f"===== Network Benchmark =====\n"
             f"Server URL : {self.url}\n"

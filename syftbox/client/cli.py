@@ -159,7 +159,7 @@ def benchmark(
     config_path: Annotated[Path, CONFIG_OPTS] = DEFAULT_CONFIG_PATH,
     json: Annotated[Optional[Path], JSON_BENCHMARK_REPORT_OPTS] = None,
     num_runs: int = DEFAULT_BENCHMARK_RUNS,
-):
+) -> None:
     """Run the SyftBox benchmark"""
 
     # Lazy import to improve cli startup speed

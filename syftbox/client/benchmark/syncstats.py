@@ -59,13 +59,17 @@ class SyncDataTransferStats:
         self,
         path: str,
         ignore_errors: bool = False,
-        **kwargs: dict[str, Any],
+        **kwargs: Any,
     ) -> float:
         """Make a request to the server and measure the time taken"""
         headers = {"Authorization": f"Bearer {self.token}", "email": self.email}
         start_time = time.time()
         url = str(urljoin(self.url, path))
-        response = requests.post(url=url, headers=headers, **kwargs)
+        response = requests.post(
+            url=url,
+            headers=headers,
+            **kwargs,
+        )
         if not ignore_errors:
             response.raise_for_status()
         return (time.time() - start_time) * 1000

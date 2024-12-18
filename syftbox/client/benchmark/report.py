@@ -10,10 +10,10 @@ class JSONReport(BenchmarkReporter):
     def __init__(self, path: Path):
         self.output_path = path / "benchmark_report.json"
 
-    def generate(self, metrics: dict[str, BenchmarkResult]):
+    def generate(self, metrics: dict[str, BenchmarkResult]) -> None:
         """Generate the benchmark report in JSON format."""
 
-        report = {"result": {}}
+        report: dict = {"result": {}}
 
         for name, metric in metrics.items():
             report["result"][name] = metric.dict_report()
@@ -27,7 +27,7 @@ class JSONReport(BenchmarkReporter):
 class ConsoleReport(BenchmarkReporter):
     """Human readable format benchmark report"""
 
-    def generate(self, metrics: dict[str, BenchmarkResult]):
+    def generate(self, metrics: dict[str, BenchmarkResult]) -> None:
         """Generate the benchmark report in human readable format."""
 
         report = []

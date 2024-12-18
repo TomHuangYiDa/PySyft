@@ -15,7 +15,7 @@ class SyncBenchmarkResult(BenchmarkResult):
     file_size_stats: list[DataTransferStats]
     """Data transfer statistics for different file sizes"""
 
-    def readable_report(self):
+    def readable_report(self) -> str:
         """Generate a human-readable report of the sync benchmark results"""
 
         report = f"\n===== Sync Benchmark =====\nServer URL : {self.url}\nRuns: {self.num_runs}\n"
@@ -42,7 +42,7 @@ class SyncBenchmark(Benchmark):
         self.url = str(config.server_url)
         self.sync_perf = SyncDataTransferStats(
             url=self.url,
-            token=config.access_token,
+            token=str(config.access_token),
             email=config.email,
         )
 

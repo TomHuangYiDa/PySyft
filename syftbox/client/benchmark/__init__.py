@@ -4,7 +4,7 @@ from pathlib import Path
 from statistics import mean, quantiles, stdev
 from typing import TYPE_CHECKING, Any, Optional
 
-from typing_extensions import Protocol
+from typing_extensions import Protocol, TypeVar
 
 from syftbox.lib.client_config import SyftClientConfig
 
@@ -28,6 +28,9 @@ class Benchmark(Protocol):
     """
 
     client_config: SyftClientConfig
+
+    def __init__(self, config: SyftClientConfig):
+        self.client_config = config
 
     def collect_metrics(self, num_runs: int) -> BenchmarkResult:
         """Calculate performance metrics."""

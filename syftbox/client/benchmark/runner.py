@@ -1,5 +1,7 @@
 """Benchmark class for Syft client."""
 
+from typing import Type
+
 from rich.progress import Progress, SpinnerColumn
 
 from syftbox.client.benchmark import Benchmark, BenchmarkReporter
@@ -19,14 +21,14 @@ class SyftBenchmarkRunner:
         self.config = config
         self.reporter = reporter
 
-    def get_collectors(self) -> dict[str, type[Benchmark]]:
+    def get_collectors(self) -> dict[str, Type[Benchmark]]:
         """Get the metric collectors for the benchmark tests."""
         return {
             "network": NetworkBenchmark,
             "sync": SyncBenchmark,
         }
 
-    def run(self, num_runs: int):
+    def run(self, num_runs: int) -> None:
         """Run the benchmark tests."""
 
         # Get the metric collectors

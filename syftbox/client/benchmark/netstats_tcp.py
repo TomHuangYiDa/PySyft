@@ -75,7 +75,7 @@ class TCPConnection:
                 latency = (time.time() - start_time) * 1000
 
                 # Calculate jitter
-                jitter = 0
+                jitter = 0.0
                 if self.previous_latency is not None:
                     jitter = abs(latency - self.previous_latency)
 
@@ -98,9 +98,9 @@ class TCPPerfStats:
         self.port = port
         self.__post_init__()
 
-    def __post_init__(self):
-        self.previous_latency = None
-        self.jitter_values = []
+    def __post_init__(self) -> None:
+        self.previous_latency: Optional[float] = None
+        self.jitter_values: list[float] = []
         self.request_history: Deque[ConnectionMetadata] = deque()
         self.rate_limiter = RateLimiter(self.max_connections_per_minute)
         self.connection_lock = threading.Lock()
