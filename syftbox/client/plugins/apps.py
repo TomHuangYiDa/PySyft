@@ -79,7 +79,7 @@ def get_clean_env() -> dict:
 
 
 def find_and_run_script(
-    app_path: Path, extra_args: list, config_path: Path, app_log_dir: Optional[Path] = None
+    app_path: Path, extra_args: list[str], config_path: Path, app_log_dir: Optional[Path] = None
 ) -> CompletedProcess[str]:
     script_path = os.path.join(app_path, "run.sh")
 

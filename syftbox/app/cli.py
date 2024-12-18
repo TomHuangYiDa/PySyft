@@ -1,5 +1,6 @@
 import sys
 from pathlib import Path
+from typing import List
 
 from loguru import logger
 from rich import print as rprint
@@ -101,7 +102,7 @@ def run(
     """Run a Syftbox app"""
     workspace = get_workspace(config_path)
 
-    extra_args: list = []
+    extra_args: List[str] = []
     try:
         rprint(f"Running [bold]'{app_name}'[/bold]\nLocation: '{workspace.apps}'\n")
         result = find_and_run_script(str(workspace.apps / app_name), extra_args, str(config_path))
