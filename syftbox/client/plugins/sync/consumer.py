@@ -18,10 +18,10 @@ from syftbox.client.plugins.sync.sync_action import SyncAction, determine_sync_a
 from syftbox.client.plugins.sync.types import SyncActionType
 from syftbox.lib.hash import hash_file
 from syftbox.lib.ignore import filter_ignored_paths
-from syftbox.server.models.sync_models import FileMetadata
+from syftbox.server.models.sync_models import FileMetadata, RelativePath
 
 
-def create_local_batch(context: SyftBoxContextInterface, paths_to_download: list[Path]) -> list[str]:
+def create_local_batch(context: SyftBoxContextInterface, paths_to_download: list[Path]) -> list[RelativePath]:
     try:
         file_list = context.client.sync.download_files_streaming(paths_to_download, context.workspace.datasites)
     except SyftServerError as e:
@@ -36,13 +36,13 @@ class SyncConsumer:
         self.queue = queue
         self.local_state = local_state
 
-    def validate_sync_environment(self):
+    def validate_sync_environment(self) -> None:
         if not Path(self.context.workspace.datasites).is_dir():
             raise SyncEnvironmentError("Your sync folder has been deleted by a different process.")
         if not self.local_state.path.is_file():
             raise SyncEnvironmentError("Your previous sync state has been deleted by a different process.")
 
-    def consume_all(self):
+    def consume_all(self) -> None:
         while not self.queue.empty():
             self.validate_sync_environment()
             item = self.queue.get(timeout=0.1)
@@ -54,10 +54,12 @@ class SyncConsumer:
             except Exception as e:
                 logger.error(f"Failed to sync file {item.data.path}, it will be retried in the next sync. Reason: {e}")
 
-    def download_all_missing(self, datasite_states: list[DatasiteState]):
+    def download_all_missing(self, datasite_states: list[DatasiteState]) -> None:
         try:
             missing_files: list[Path] = []
             for datasite_state in datasite_states:
+                if not datasite_state.remote_state:
+                    continue
                 for file in datasite_state.remote_state:
                     path = file.path
                     if not self.local_state.states.get(path):
@@ -66,11 +68,10 @@ class SyncConsumer:
 
             logger.info(f"Downloading {len(missing_files)} files in batch")
             received_files = create_local_batch(self.context, missing_files)
-            for path in received_files:
-                path = Path(path)
-                state = self.get_current_local_metadata(path)
+            for file_path in received_files:
+                state = self.get_current_local_metadata(Path(file_path))
                 self.local_state.insert_synced_file(
-                    path=path,
+                    path=Path(file_path),
                     state=state,
                     action=SyncActionType.CREATE_LOCAL,
                 )

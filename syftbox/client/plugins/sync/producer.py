@@ -45,7 +45,7 @@ class SyncProducer:
             if not is_ignored_previously:
                 self.local_state.insert_status_info(path, SyncStatus.IGNORED)
 
-    def enqueue_datasite_changes(self, datasite: DatasiteState):
+    def enqueue_datasite_changes(self, datasite: DatasiteState) -> None:
         """
         Enqueue all out of sync files for the datasite,
         and track the ignored files in the local state.
