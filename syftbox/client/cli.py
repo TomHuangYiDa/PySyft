@@ -92,13 +92,13 @@ JSON_BENCHMARK_REPORT_OPTS = Option(
 def client(
     ctx: Context,
     data_dir: Annotated[Path, DATA_DIR_OPTS] = DEFAULT_DATA_DIR,
-    email: Annotated[str, EMAIL_OPTS] = None,
+    email: Annotated[str, EMAIL_OPTS] = "",
     server: Annotated[str, SERVER_OPTS] = DEFAULT_SERVER_URL,
     config_path: Annotated[Path, CONFIG_OPTS] = DEFAULT_CONFIG_PATH,
     port: Annotated[int, PORT_OPTS] = DEFAULT_PORT,
     open_dir: Annotated[bool, OPEN_OPTS] = True,
     verbose: Annotated[bool, VERBOSE_OPTS] = False,
-):
+) -> None:
     """Run the SyftBox client"""
 
     if ctx.invoked_subcommand is not None:
@@ -136,7 +136,7 @@ def client(
 def report(
     output_path: Annotated[Path, REPORT_PATH_OPTS] = Path(".").resolve(),
     config_path: Annotated[Path, CONFIG_OPTS] = DEFAULT_CONFIG_PATH,
-):
+) -> None:
     """Generate a report of the SyftBox client"""
     from datetime import datetime
 
@@ -178,7 +178,7 @@ def benchmark(
         raise e
 
 
-def main():
+def main() -> None:
     app()
 
 

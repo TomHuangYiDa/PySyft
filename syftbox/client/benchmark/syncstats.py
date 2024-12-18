@@ -1,7 +1,7 @@
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 from urllib.parse import urljoin
 from uuid import uuid4
 
@@ -59,7 +59,7 @@ class SyncDataTransferStats:
         self,
         path: str,
         ignore_errors: bool = False,
-        **kwargs: dict[str, any],
+        **kwargs: dict[str, Any],
     ) -> float:
         """Make a request to the server and measure the time taken"""
         headers = {"Authorization": f"Bearer {self.token}", "email": self.email}

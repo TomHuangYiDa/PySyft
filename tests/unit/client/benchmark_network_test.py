@@ -229,8 +229,8 @@ def test_failed_connection(mock_failing_socket, setup_time_mocks):
     conn = TCPConnection("example.com", 80, timeout=1.0)
     latency, jitter = conn.connect()
 
-    assert latency == -1
-    assert jitter == -1
+    assert latency == -1.0
+    assert jitter == -1.0
 
 
 def test_jitter_calculation(mock_successful_socket, setup_time_mocks):
@@ -366,7 +366,7 @@ def test_get_stats_with_mixed_success(monkeypatch, setup_time_mocks):
         def connect(self):
             self.call_count += 1
             if self.call_count % 2 == 0:
-                return (-1, -1)  # Simulate failure
+                return (-1.0, -1.0)  # Simulate failure
             return (100.0, 0.0)  # Successful measurement
 
     mock_conn = MockConnection()

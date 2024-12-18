@@ -3,10 +3,13 @@ import json
 import platform
 import shutil
 from pathlib import Path
+from types import TracebackType
+from typing import cast
 
 import uvicorn
 from loguru import logger
 from pid import PidFile, PidFileAlreadyLockedError, PidFileAlreadyRunningError
+from typing_extensions import Optional, Type
 
 from syftbox import __version__
 from syftbox.client.api import create_api
@@ -46,13 +49,13 @@ class SyftBoxRunner:
         Exception: If the client fails to start due to any reason
     """
 
-    def __init__(self, config: SyftClientConfig, log_level: str = "INFO", **kwargs):
+    def __init__(self, config: SyftClientConfig, log_level: str = "INFO", **kwargs: dict) -> None:
         self.config = config
         self.log_level = log_level
 
         self.workspace = SyftWorkspace(self.config.data_dir)
         self.pid = PidFile(pidname="syftbox.pid", piddir=self.workspace.data_dir)
-        self.client = SyftBoxClient.from_config(self.config)
+        self.client: SyftBoxClient = cast(SyftBoxClient, SyftBoxClient.from_config(self.config))
 
         # create a single client context shared across components
         self.__ctx = SyftBoxContext(
@@ -61,7 +64,7 @@ class SyftBoxRunner:
             client=self.client,
             plugins=None,
         )
-        self.plugins = PluginManager(self.__ctx, **kwargs)
+        self.plugins = PluginManager(self.__ctx, sync_manager=None, app_runner=None, **kwargs)
         # make plugins available to the context
         self.__ctx.plugins = self.plugins
 
@@ -88,7 +91,7 @@ class SyftBoxRunner:
     def context(self) -> "SyftBoxContext":
         return self.__ctx
 
-    def start(self):
+    def start(self) -> None:
         try:
             self.pid.create()
         except PidFileAlreadyLockedError:
@@ -115,7 +118,7 @@ class SyftBoxRunner:
         metadata_json["version"] = __version__
         self.metadata_path.write_text(json.dumps(metadata_json, indent=2))
 
-    def shutdown(self):
+    def shutdown(self) -> None:
         if self.__local_server:
             _result = asyncio.run(self.__local_server.shutdown())
 
@@ -132,12 +135,12 @@ class SyftBoxRunner:
         except PidFileAlreadyRunningError:
             raise SyftBoxAlreadyRunning(f"Another instance of SyftBox is running on {self.config.data_dir}")
 
-    def init_datasite(self):
+    def init_datasite(self) -> None:
         if self.datasite.exists():
             return
         create_datasite(self.context)
 
-    def register_self(self):
+    def register_self(self) -> None:
         """Register the user's email with the SyftBox cache server"""
         if self.is_registered:
             return
@@ -152,7 +155,7 @@ class SyftBoxRunner:
         except Exception as e:
             raise SyftBoxException(f"Failed to register with the server - {e}") from e
 
-    def __run_local_server(self):
+    def __run_local_server(self) -> None:
         logger.info(f"Starting local server on {self.config.client_url}")
         app = create_api(self.__ctx)
         self.__local_server = uvicorn.Server(
@@ -166,15 +169,15 @@ class SyftBoxRunner:
         return self.__local_server.run()
 
     # utils
-    def open_datasites_dir(self):
-        file_manager.open_dir(self.workspace.datasites)
+    def open_datasites_dir(self) -> None:
+        file_manager.open_dir(str(self.workspace.datasites))
 
-    def copy_icons(self):
+    def copy_icons(self) -> None:
         self.workspace.mkdirs()
         if platform.system() == "Darwin":
             macos.copy_icon_file(ICON_FOLDER, self.workspace.data_dir)
 
-    def log_system_info(self):
+    def log_system_info(self) -> None:
         self.client.log_analytics_event(
             event_name="system_info",
             os_name=OS_NAME,
@@ -183,10 +186,12 @@ class SyftBoxRunner:
             python_version=PYTHON_VERSION,
         )
 
-    def __enter__(self):
+    def __enter__(self) -> "SyftBoxRunner":
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def __exit__(
+        self, exc_type: Optional[Type[BaseException]], exc_val: Optional[BaseException], exc_tb: Optional[TracebackType]
+    ) -> None:
         self.shutdown()
 
 
@@ -201,7 +206,7 @@ class SyftBoxContext(SyftBoxContextInterface):
         config: SyftClientConfig,
         workspace: SyftWorkspace,
         client: SyftBoxClient,
-        plugins: PluginManagerInterface,
+        plugins: Optional[PluginManagerInterface],
     ):
         self.config = config
         self.workspace = workspace
@@ -225,7 +230,7 @@ class SyftBoxContext(SyftBoxContextInterface):
         return f"SyftBoxContext<{self.config.email}, {self.config.data_dir.as_posix()}>"
 
 
-def run_apps_to_api_migration(new_ws: SyftWorkspace):
+def run_apps_to_api_migration(new_ws: SyftWorkspace) -> None:
     old_sync_folder = new_ws.data_dir
     old_apps_dir = old_sync_folder / "apps"
     new_apps_dir = new_ws.apps
@@ -237,7 +242,7 @@ def run_apps_to_api_migration(new_ws: SyftWorkspace):
         shutil.move(str(old_apps_dir), str(new_apps_dir))
 
 
-def run_migration(config: SyftClientConfig, migrate_datasite=True):
+def run_migration(config: SyftClientConfig, migrate_datasite: bool = True) -> None:
     # first run config migration
     config.migrate()
 
@@ -278,7 +283,7 @@ def run_migration(config: SyftClientConfig, migrate_datasite=True):
 
 
 def run_syftbox(
-    client_config: SyftClientConfig, open_dir: bool = False, log_level: str = "INFO", migrate_datasite=True
+    client_config: SyftClientConfig, open_dir: bool = False, log_level: str = "INFO", migrate_datasite: bool = True
 ) -> int:
     """Run the SyftBox client"""
     syftbox_instance = None
@@ -298,9 +303,12 @@ def run_syftbox(
     try:
         syftbox_instance = SyftBoxRunner(client_config, log_level=log_level)
         # we don't want to run migration if another instance of client is already running
-        bool(syftbox_instance.check_pidfile()) and run_migration(client_config, migrate_datasite=migrate_datasite)
-        (not syftbox_env.DISABLE_ICONS) and syftbox_instance.copy_icons()
-        open_dir and syftbox_instance.open_datasites_dir()
+        if syftbox_instance.check_pidfile():
+            run_migration(client_config, migrate_datasite=migrate_datasite)
+        if not syftbox_env.DISABLE_ICONS:
+            syftbox_instance.copy_icons()
+        if open_dir:
+            syftbox_instance.open_datasites_dir()
         syftbox_instance.log_system_info()
         syftbox_instance.start()
     except SyftBoxAlreadyRunning as e:
@@ -312,5 +320,6 @@ def run_syftbox(
         logger.exception("Unhandled exception when starting the client", e)
         return -2
     finally:
-        syftbox_instance and syftbox_instance.shutdown()
+        if syftbox_instance is not None:
+            syftbox_instance.shutdown()
     return 0

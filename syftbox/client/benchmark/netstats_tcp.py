@@ -82,7 +82,7 @@ class TCPConnection:
                 return latency, jitter
 
         except socket.error:
-            return -1, -1
+            return -1.0, -1.0
 
 
 class TCPPerfStats:

@@ -58,11 +58,11 @@ class ServerSettings(BaseSettings):
     """Enable/Disable OpenTelemetry tracing"""
 
     @field_validator("data_folder", mode="after")
-    def data_folder_abs(cls, v):
+    def data_folder_abs(cls, v: Path) -> Path:
         return Path(v).expanduser().resolve()
 
     @model_validator(mode="after")
-    def auth_secret_not_empty(self):
+    def auth_secret_not_empty(self) -> "ServerSettings":
         secret_val = self.jwt_secret.get_secret_value()
         secret_val_is_set = len(secret_val) > 0 and secret_val != DEV_JWT_SECRET
 
@@ -72,7 +72,7 @@ class ServerSettings(BaseSettings):
         return self
 
     @model_validator(mode="after")
-    def sendgrid_secret_not_empty(self):
+    def sendgrid_secret_not_empty(self) -> "ServerSettings":
         if self.auth_enabled and self.sendgrid_secret is None:
             raise ValueError("auth is enabled, but no sendgrid_secret is defined")
 

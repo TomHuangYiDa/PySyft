@@ -8,15 +8,15 @@ router = APIRouter()
 
 
 @router.get("/")
-async def index():
+async def index() -> PlainTextResponse:
     return PlainTextResponse(f"SyftBox {__version__}")
 
 
 @router.get("/version")
-async def version():
+async def version() -> dict:
     return {"version": __version__}
 
 
 @router.get("/metadata")
-async def metadata(ctx: APIContext):
+async def metadata(ctx: APIContext) -> dict:
     return {"datasite": ctx.email}

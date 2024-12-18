@@ -18,7 +18,7 @@ from loguru import logger
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from opentelemetry.instrumentation.sqlite3 import SQLite3Instrumentor
 from opentelemetry.trace import Span
-from typing_extensions import Any, Optional, Union
+from typing_extensions import Any, AsyncGenerator, Optional, Union
 
 from syftbox import __version__
 from syftbox.lib.http import (
@@ -54,13 +54,13 @@ from .users.router import router as users_router
 current_dir = Path(__file__).parent
 
 
-def create_folders(folders: list[str]) -> None:
+def create_folders(folders: list[Path]) -> None:
     for folder in folders:
         if not os.path.exists(folder):
             os.makedirs(folder, exist_ok=True)
 
 
-def server_request_hook(span: Span, scope: dict[str, Any]):
+def server_request_hook(span: Span, scope: dict[str, Any]) -> None:
     if not span.is_recording():
         return
 
@@ -75,7 +75,7 @@ def server_request_hook(span: Span, scope: dict[str, Any]):
 
 
 @contextlib.asynccontextmanager
-async def lifespan(app: FastAPI, settings: Optional[ServerSettings] = None):
+async def lifespan(app: FastAPI, settings: Optional[ServerSettings] = None) -> AsyncGenerator:
     # Startup
     settings = settings or ServerSettings()
 
@@ -126,7 +126,7 @@ syftbox client
 
 
 @app.get("/", response_class=PlainTextResponse)
-async def get_ascii_art(request: Request):
+async def get_ascii_art(request: Request) -> str:
     return ascii_art.replace("[[SERVER_URL]]", str(request.url).rstrip("/"))
 
 
@@ -147,7 +147,9 @@ def get_file_list(directory: Union[str, Path] = ".") -> list[dict[str, Any]]:
 
 
 @app.get("/datasites", response_class=HTMLResponse)
-async def list_datasites(request: Request, server_settings: ServerSettings = Depends(get_server_settings)):
+async def list_datasites(
+    request: Request, server_settings: ServerSettings = Depends(get_server_settings)
+) -> HTMLResponse:
     files = get_file_list(server_settings.snapshot_folder)
     template_path = current_dir / "templates" / "datasites.html"
     html = ""
@@ -170,7 +172,7 @@ async def browse_datasite(
     request: Request,
     path: str,
     server_settings: ServerSettings = Depends(get_server_settings),
-):
+) -> HTMLResponse:
     if path == "":  # Check if path is empty (meaning "/datasites/")
         return RedirectResponse(url="/datasites")
 
@@ -243,7 +245,7 @@ async def browse_datasite(
 async def register(
     request: Request,
     server_settings: ServerSettings = Depends(get_server_settings),
-):
+) -> JSONResponse:
     data = await request.json()
     email = data["email"]
 
@@ -261,26 +263,26 @@ async def register(
 async def log_event(
     request: Request,
     email: str = Depends(get_current_user),
-):
+) -> JSONResponse:
     data = await request.json()
     log_analytics_event("/log_event", email, **data)
     return JSONResponse({"status": "success"}, status_code=200)
 
 
 @app.get("/install.sh")
-async def install():
+async def install() -> FileResponse:
     install_script = current_dir / "templates" / "install.sh"
     return FileResponse(install_script, media_type="text/plain")
 
 
 @app.get("/icon.png")
-async def icon():
+async def icon() -> FileResponse:
     icon_path = current_dir / "assets" / "icon.png"
     return FileResponse(icon_path, media_type="image/png")
 
 
 @app.get("/info")
-async def info():
+async def info() -> dict:
     return {
         "version": __version__,
     }
