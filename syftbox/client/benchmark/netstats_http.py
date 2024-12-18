@@ -121,18 +121,17 @@ class HTTPPerfStats:
             total_t = curl.getinfo(CurlInfo.TOTAL_TIME)  # total time or TTLB
             redirect_t = curl.getinfo(CurlInfo.REDIRECT_TIME)
 
-            # 1. Time spent waiting for the initial response
-            # 2. Time spent resolving the host name
+            # 1. Time spent resolving the host name
             dns = namelookup_t
-            # 3. Time spent establishing a TCP connection
+            # 2. Time spent establishing a TCP connection
             tcp_connect = connect_t - namelookup_t
-            # 4. Time spent performing the SSL handshake
+            # 3. Time spent performing the SSL handshake
             ssl_handshake = appconnect_t - connect_t
-            # 5. Time spent sending the request
+            # 4. Time spent sending the request
             send = pretransfer_t - appconnect_t
-            # 6. Time spent waiting for server to send the first byte
+            # 5. Time spent waiting for server to send the first byte
             server_wait = starttransfer_t - pretransfer_t
-            # 7. Time to download the response
+            # 6. Time to download the response
             content = total_t - starttransfer_t
 
             return HTTPTimings(
