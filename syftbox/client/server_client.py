@@ -3,11 +3,24 @@ from pathlib import Path
 from typing import Union
 
 import httpx
+import msgpack
+from pydantic import BaseModel
+from tqdm import tqdm
 
 from syftbox.client.base import ClientBase
+from syftbox.server.models.sync_models import ApplyDiffResponse, DiffResponse, FileMetadata, RelativePath
 
 # TODO move shared models to lib/models
-from syftbox.server.models.sync_models import ApplyDiffResponse, DiffResponse, FileMetadata
+
+
+class StreamedFile(BaseModel):
+    path: RelativePath
+    content: bytes
+
+    def write_bytes(self, output_dir: Path):
+        file_path = output_dir / self.path
+        file_path.parent.mkdir(parents=True, exist_ok=True)
+        file_path.write_bytes(self.content)
 
 
 class SyftBoxClient(ClientBase):
@@ -146,11 +159,34 @@ class SyncClient(ClientBase):
         self.raise_for_status(response)
         return response.content
 
-    def download_bulk(self, relative_paths: list[Path]) -> bytes:
+    def download_files_streaming(self, relative_paths: list[str], output_dir: Path) -> None:
+        if not relative_paths:
+            return []
         relative_paths = [path.as_posix() for path in relative_paths]
-        response = self.conn.post(
+
+        pbar = tqdm(
+            total=len(relative_paths), desc="Downloading files", unit="file", mininterval=1.0, dynamic_ncols=True
+        )
+        extracted_files = []
+
+        with self.conn.stream(
+            "POST",
             "/sync/download_bulk",
             json={"paths": relative_paths},
-        )
-        self.raise_for_status(response)
-        return response.content
+        ) as response:
+            response.raise_for_status()
+
+            unpacker = msgpack.Unpacker(
+                raw=False,
+            )
+
+            for chunk in response.iter_bytes():
+                unpacker.feed(chunk)
+                for file_json in unpacker:
+                    file = StreamedFile.model_validate(file_json)
+                    file.write_bytes(output_dir)
+                    extracted_files.append(file.path)
+                    pbar.update(1)
+
+        pbar.close()
+        return extracted_files

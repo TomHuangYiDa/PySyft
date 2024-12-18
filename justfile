@@ -40,16 +40,22 @@ run-server port="5001" gunicorn_args="":
     #!/bin/bash
     set -eou pipefail
 
-    export SYFTBOX_DATA_FOLDER=.server/data
+    export SYFTBOX_DATA_FOLDER=${SYFTBOX_DATA_FOLDER:-.server/data}
     uv run syftbox server migrate
     uv run gunicorn syftbox.server.server:app -k uvicorn.workers.UvicornWorker --bind 127.0.0.1:{{ port }} --reload {{ gunicorn_args }}
+
+migrate:
+    #!/bin/bash
+    set -eou pipefail
+
+    uv run syftbox server migrate
 
 [group('server')]
 run-server-uvicorn port="5001" uvicorn_args="":
     #!/bin/bash
     set -eou pipefail
 
-    export SYFTBOX_DATA_FOLDER=.server/data
+    export SYFTBOX_DATA_FOLDER=${SYFTBOX_DATA_FOLDER:-.server/data}
     uv run syftbox server migrate
     uv run uvicorn syftbox.server.server:app --host 127.0.0.1 --port {{ port }} --reload --reload-dir ./syftbox {{ uvicorn_args }}
 

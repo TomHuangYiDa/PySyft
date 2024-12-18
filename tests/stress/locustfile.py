@@ -54,7 +54,7 @@ class SyftBoxUser(FastHttpUser):
             all_files.extend(remote_state)
 
         all_paths = [f.path for f in all_files][:10]
-        self.syft_context.client.sync.download_bulk(all_paths)
+        self.syft_context.client.sync.download_files_streaming(all_paths, self.syft_context.workspace.datasites)
 
     @task
     def apply_diff(self):

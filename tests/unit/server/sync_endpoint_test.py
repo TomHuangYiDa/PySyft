@@ -1,7 +1,5 @@
 import base64
 import hashlib
-import zipfile
-from io import BytesIO
 from pathlib import Path
 
 import py_fast_rsync
@@ -243,12 +241,12 @@ def test_get_all_datasite_states(sync_client: SyncClient):
     assert all(isinstance(m, FileMetadata) for m in metadatas)
 
 
-def test_download_snapshot(sync_client: SyncClient):
+def test_download_snapshot(sync_client: SyncClient, tmpdir: Path):
+    tmpdir = Path(tmpdir)
     metadata = sync_client.get_remote_state(Path(TEST_DATASITE_NAME))
     paths = [m.path for m in metadata]
-    data = sync_client.download_bulk(paths)
-    zip_file = zipfile.ZipFile(BytesIO(data))
-    assert len(zip_file.filelist) == 3
+    filelist = sync_client.download_files_streaming(paths, tmpdir)
+    assert len(filelist) == 3
 
 
 def test_whoami(client: TestClient):
