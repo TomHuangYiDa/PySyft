@@ -209,4 +209,4 @@ def test_get_stats_delay_between_runs(sync_stats, mock_time, monkeypatch):
     sync_stats.get_stats(file_size_mb=1, num_runs=3)
 
     assert len(mock_time.sleep_calls) == 2
-    assert mock_time.sleep_calls == [30, 30]
+    assert mock_time.sleep_calls == [5, 5]
