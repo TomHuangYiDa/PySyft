@@ -2,6 +2,7 @@
 
 from syftbox.client.benchmark import Benchmark, BenchmarkReporter
 from syftbox.client.benchmark.network import NetworkBenchmark
+from syftbox.client.benchmark.sync import SyncBenchmark
 from syftbox.lib.client_config import SyftClientConfig
 
 
@@ -20,7 +21,7 @@ class SyftBenchmarkRunner:
         """Get the metric collectors for the benchmark tests."""
         return {
             "network": NetworkBenchmark,
-            # "sync": SyncPerformanceCollector,
+            "sync": SyncBenchmark,
         }
 
     def run(self, num_runs: int):

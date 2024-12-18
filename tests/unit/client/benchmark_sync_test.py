@@ -6,11 +6,11 @@ from curl_cffi import requests
 from curl_cffi.requests.errors import RequestsError
 from requests import HTTPError
 
-from syftbox.client.benchmark.sync_metric import (
+from syftbox.client.benchmark.sync import (
     PerformanceMetrics,
     SampleBenchmarkData,
-    SyncPerformanceCollector,
-    SyncPerformanceMetric,
+    SyncBenchmark,
+    SyncBenchmarkResult,
 )
 
 
@@ -35,7 +35,7 @@ def config():
 
 @pytest.fixture
 def collector(config):
-    return SyncPerformanceCollector(config)
+    return SyncBenchmark(config)
 
 
 @pytest.fixture
@@ -106,8 +106,8 @@ def test_collect_metrics_with_failures(collector, monkeypatch, mock_workspace, t
 
     result = collector.collect_metrics(num_runs=3, file_sizes_mb=[1])
 
-    assert isinstance(result, SyncPerformanceMetric)
-    size_data = result.size_metrics[0]
+    assert isinstance(result, SyncBenchmarkResult)
+    size_data = result.file_size_stats[0]
     assert size_data.upload_metrics.success_rate == 0.0
     assert size_data.upload_metrics.stddev_time == 0.0
 
@@ -145,12 +145,12 @@ def test_collect_metrics_success(collector, monkeypatch, mock_workspace, test_fi
         current_index += 1
         return None, time
 
-    monkeypatch.setattr(SyncPerformanceCollector, "_measure_operation_time", mock_measure_time)
+    monkeypatch.setattr(SyncBenchmark, "_measure_operation_time", mock_measure_time)
 
     result = collector.collect_metrics(num_runs=3, file_sizes_mb=[1])
 
-    assert isinstance(result, SyncPerformanceMetric)
-    size_data = result.size_metrics[0]
+    assert isinstance(result, SyncBenchmarkResult)
+    size_data = result.file_size_stats[0]
     assert size_data.upload_metrics.success_rate == 100.0
     assert size_data.upload_metrics.min_time == 100.0
     assert size_data.upload_metrics.max_time == 200.0

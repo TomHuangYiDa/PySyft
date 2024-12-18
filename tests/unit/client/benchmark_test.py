@@ -4,7 +4,7 @@ import pytest
 
 from syftbox.client.benchmark.network import NetworkBenchmark
 from syftbox.client.benchmark.runner import SyftBenchmarkRunner
-from syftbox.client.benchmark.sync_metric import SyncPerformanceCollector
+from syftbox.client.benchmark.sync import SyncBenchmark
 
 
 @pytest.fixture
@@ -53,7 +53,7 @@ def test_get_collectors(benchmark_runner):
     assert isinstance(collectors, dict)
     assert len(collectors) == 2
     assert collectors["network"] == NetworkBenchmark
-    assert collectors["sync"] == SyncPerformanceCollector
+    assert collectors["sync"] == SyncBenchmark
 
 
 def test_run_with_default_path(benchmark_runner, monkeypatch):

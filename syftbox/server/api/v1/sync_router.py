@@ -170,6 +170,8 @@ def create_file(
 
     contents = file.file.read()
 
+    print("Relative path", relative_path)
+
     file_store.put(
         relative_path,
         contents,

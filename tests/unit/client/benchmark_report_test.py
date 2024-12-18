@@ -10,7 +10,7 @@ from syftbox.client.benchmark.report import (
     NetworkBenchmarkResult,
     SyncPerformanceMetric,
 )
-from syftbox.client.benchmark.sync_metric import PerformanceMetrics, SizePerformanceData
+from syftbox.client.benchmark.sync import DataTransferStats, PerformanceMetrics
 
 
 @pytest.fixture
@@ -67,7 +67,7 @@ def performance_metrics():
 @pytest.fixture
 def sync_metric(performance_metrics):
     """Fixture for sync performance metric data."""
-    size_data = SizePerformanceData(
+    size_data = DataTransferStats(
         file_size_mb=5, upload_metrics=performance_metrics, download_metrics=performance_metrics
     )
     return SyncPerformanceMetric(size_metrics=[size_data], num_runs=5)
@@ -186,10 +186,10 @@ def test_invalid_save_path(reporter_class, network_metric, sync_metric):
 
 def test_sync_metric_multiple_sizes(performance_metrics):
     """Test report with multiple file sizes."""
-    size_data_1 = SizePerformanceData(
+    size_data_1 = DataTransferStats(
         file_size_mb=1, upload_metrics=performance_metrics, download_metrics=performance_metrics
     )
-    size_data_2 = SizePerformanceData(
+    size_data_2 = DataTransferStats(
         file_size_mb=5, upload_metrics=performance_metrics, download_metrics=performance_metrics
     )
 
