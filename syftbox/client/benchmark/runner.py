@@ -34,7 +34,10 @@ class SyftBenchmarkRunner:
         metrics = {}
         for name, collector in collectors.items():
             collector_instance = collector(self.config)
-            metrics[name] = collector_instance.collect_metrics(num_runs)
+            try:
+                metrics[name] = collector_instance.collect_metrics(num_runs)
+            except Exception as e:
+                print(f"Failed to collect metrics for {name}: {e}")
 
         # Generate the benchmark report
         self.reporter.generate(metrics)

@@ -135,7 +135,7 @@ class TCPPerfStats:
                 time.sleep(self.min_delay_between_requests)
                 return latency, jitter
 
-    def get_stats(self, num_runs: int) -> dict:
+    def get_stats(self, num_runs: int) -> TCPTimingStats:
         """Perform multiple TCP connections and gather statistics."""
         latencies = []
         jitters = []
@@ -155,7 +155,7 @@ class TCPPerfStats:
                     raise e
 
         if not latencies:
-            return {}
+            raise RuntimeError("No successful TCP measurements")
 
         return TCPTimingStats(
             latency_stats=self._calculate_stats(latencies),

@@ -54,6 +54,7 @@ class SyncDataTransferStats:
     def __make_request(
         self,
         path: str,
+        ignore_errors: bool = False,
         **kwargs: dict[str, any],
     ) -> float:
         """Make a request to the server and measure the time taken"""
@@ -61,9 +62,9 @@ class SyncDataTransferStats:
         headers = {"Authorization": f"Bearer {self.token}", "email": self.email}
         start_time = time.time()
         url = str(urljoin(self.url, path))
-        print(f"Making request to {url}")
         response = requests.post(url, headers=headers, **kwargs)
-        response.raise_for_status()
+        if not ignore_errors:
+            response.raise_for_status()
         return (time.time() - start_time) * 1000
 
     def upload_file(self, filepath: str, data: bytes) -> float:
@@ -87,11 +88,7 @@ class SyncDataTransferStats:
 
     def delete_file(self, filepath: str) -> float:
         """Delete a file from the server and measure the time taken"""
-        try:
-            self.__make_request("/sync/delete/", json={"path": filepath})
-        except Exception:
-            # Ignore errors when deleting a non-existent file
-            pass
+        return self.__make_request("/sync/delete/", json={"path": filepath}, ignore_errors=True)
 
     def measure_file_transfer(self, file_size_mb: int) -> FileTransferDuration:
         """Measure time taken to upload and download a file of the specified size"""
