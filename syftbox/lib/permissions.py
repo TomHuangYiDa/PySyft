@@ -207,7 +207,7 @@ class SyftPermission(BaseModel):
         with open(path, "w") as f:
             yaml.dump([x.as_file_json() for x in self.rules], f)
 
-    def ensure(self, path: Optional[Path] = None) -> bool:
+    def ensure(self, path: Path) -> bool:
         """For backwards compatibility, we ensure that the permission file exists with these permissions"""
         self.save(path)
         return True

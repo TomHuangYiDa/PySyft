@@ -87,6 +87,8 @@ class SyftClientConfig(BaseModel):
         try:
             # args or env or default
             path = conf_path or os.getenv(CONFIG_PATH_ENV, DEFAULT_CONFIG_PATH)
+            if path is None:
+                raise ClientConfigException(f"Config file path not provided or set in env '{CONFIG_PATH_ENV}'")
             path = to_path(path)
             data = {}
 

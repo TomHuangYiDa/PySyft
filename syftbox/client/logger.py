@@ -39,4 +39,4 @@ def setup_logger(
 
 def zip_logs(output_path: PathLike, log_dir: PathLike = DEFAULT_LOGS_DIR) -> str:
     logs_folder = to_path(log_dir)
-    return make_archive(output_path, "zip", logs_folder)
+    return make_archive(str(output_path), "zip", logs_folder)
