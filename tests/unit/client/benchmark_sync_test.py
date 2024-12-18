@@ -1,5 +1,7 @@
+import time
+
 import pytest
-from curl_cffi import requests
+import requests
 
 from syftbox.client.benchmark import Stats
 from syftbox.client.benchmark.syncstats import (
@@ -11,48 +13,20 @@ from syftbox.client.benchmark.syncstats import (
 )
 
 
-# Mock Classes
+# Mock classes
 class MockResponse:
     def __init__(self, status_code=200):
         self.status_code = status_code
 
     def raise_for_status(self):
         if self.status_code != 200:
-            raise requests.RequestsError(f"HTTP Error: {self.status_code}")
+            raise requests.RequestException(f"HTTP Error: {self.status_code}")
 
 
-class MockCurlMime:
-    """Mock CurlMime that properly handles initialization and cleanup"""
-
-    def __init__(self):
-        self._form = True  # Just needs to exist for __del__
-        self.parts = []
-
-    def addpart(self, **kwargs):
-        self.parts.append(kwargs)
-
-    def close(self):
-        self._form = None
-
-
-# Test data
-TEST_URL = "https://example.com"
-TEST_TOKEN = "test-token"
-TEST_EMAIL = "test@example.com"
-TEST_FILE_SIZE = 1  # 1MB
-
-
+# Fixtures
 @pytest.fixture
 def sync_stats():
-    return SyncDataTransferStats(TEST_URL, TEST_TOKEN, TEST_EMAIL)
-
-
-@pytest.fixture
-def mock_requests(monkeypatch):
-    def mock_post(*args, **kwargs):
-        return MockResponse(200)
-
-    monkeypatch.setattr(requests, "post", mock_post)
+    return SyncDataTransferStats(url="https://example.com", token="test-token", email="test@example.com")
 
 
 @pytest.fixture
@@ -60,23 +34,19 @@ def mock_time(monkeypatch):
     class MockTime:
         def __init__(self):
             self.current_time = 0.0
+            self.sleep_calls = []
 
         def time(self):
-            self.current_time += 0.5  # Simulate 500ms per operation
+            self.current_time += 0.5
             return self.current_time
 
+        def sleep(self, seconds):
+            self.sleep_calls.append(seconds)
+
     mock_timer = MockTime()
-    monkeypatch.setattr("time.time", mock_timer.time)
+    monkeypatch.setattr(time, "time", mock_timer.time)
+    monkeypatch.setattr(time, "sleep", mock_timer.sleep)
     return mock_timer
-
-
-@pytest.fixture
-def mock_curl_mime(monkeypatch):
-    def mock_curl_mime_constructor():
-        return MockCurlMime()
-
-    monkeypatch.setattr("curl_cffi.CurlMime", mock_curl_mime_constructor)
-    return MockCurlMime()
 
 
 def test_generate_byte_string():
@@ -100,114 +70,143 @@ def test_random_filename():
     assert len(filename) == len("5mb-") + 8 + len(".bytes")
 
 
-def test_make_request(sync_stats, mock_requests, mock_time):
-    """Test request making with timing"""
-    duration = sync_stats._SyncDataTransferStats__make_request("/test/path/", json={})
+def test_successful_file_operations(sync_stats, mock_time, monkeypatch):
+    """Test successful file upload, download, and delete operations"""
 
-    assert isinstance(duration, float)
-    assert duration == 500.0  # 0.5 seconds * 1000
+    def mock_post(*args, **kwargs):
+        return MockResponse(200)
 
+    monkeypatch.setattr(requests, "post", mock_post)
 
-def test_upload_file(sync_stats, mock_requests, mock_time, monkeypatch):
-    """Test file upload with timing"""
-    # Track all created CurlMime instances
-    mime_instances = []
+    # Test upload
+    upload_time = sync_stats.upload_file("test.txt", b"test data")
+    assert upload_time == 500.0  # 0.5 seconds * 1000
 
-    class MockCurlMime:
-        def __init__(self):
-            self._form = True
-            self.parts = []
-            mime_instances.append(self)
+    # Test download
+    download_time = sync_stats.download_file("test.txt")
+    assert download_time == 500.0
 
-        def addpart(self, **kwargs):
-            self.parts.append(kwargs)
-
-        def close(self):
-            self._form = None
-
-    # Replace the CurlMime class with our mock
-    monkeypatch.setattr("syftbox.client.benchmark.syncstats.CurlMime", MockCurlMime)
-
-    # Perform the upload
-    filepath = "test/path/file.txt"
-    data = b"test data"
-    duration = sync_stats.upload_file(filepath, data)
-
-    # Verify the mock was used correctly
-    assert len(mime_instances) == 1
-    mock_mime = mime_instances[0]
-    assert len(mock_mime.parts) == 1
-    assert mock_mime.parts[0]["name"] == "file"
-    assert mock_mime.parts[0]["filename"] == filepath
-    assert mock_mime.parts[0]["data"] == data
-    assert mock_mime.parts[0]["content_type"] == "text/plain"
-    assert duration == 500.0
+    # Test delete
+    delete_time = sync_stats.delete_file("test.txt")
+    assert delete_time == 500.0
 
 
-def test_download_file(sync_stats, mock_requests, mock_time):
-    """Test file download with timing"""
-    filepath = "test/path/file.txt"
-    duration = sync_stats.download_file(filepath)
+def test_file_operation_failures(sync_stats, mock_time, monkeypatch):
+    """Test handling of file operation failures"""
 
-    assert isinstance(duration, float)
-    assert duration == 500.0
+    def mock_post(*args, **kwargs):
+        return MockResponse(500)
 
+    monkeypatch.setattr(requests, "post", mock_post)
 
-def test_delete_file(sync_stats, mock_requests, mock_time, monkeypatch):
-    """Test file deletion"""
-    filepath = "test/path/file.txt"
+    # Test upload failure
+    with pytest.raises(requests.RequestException):
+        sync_stats.upload_file("test.txt", b"test data")
 
-    # Test successful deletion
-    sync_stats.delete_file(filepath)
+    # Test download failure
+    with pytest.raises(requests.RequestException):
+        sync_stats.download_file("test.txt")
 
-    # Test failed deletion (should not raise exception)
-    def mock_failed_request(*args, **kwargs):
-        return MockResponse(404)
-
-    monkeypatch.setattr(requests, "post", mock_failed_request)
-    sync_stats.delete_file(filepath)  # Should not raise exception
+    # Test delete failure (should not raise exception due to ignore_errors=True)
+    delete_time = sync_stats.delete_file("test.txt")
+    assert delete_time == 500.0
 
 
-def test_measure_file_transfer(sync_stats, mock_requests, mock_time, mock_curl_mime):
-    """Test complete file transfer measurement"""
-    result = sync_stats.measure_file_transfer(TEST_FILE_SIZE)
+def test_measure_file_transfer_success(sync_stats, mock_time, monkeypatch):
+    """Test successful file transfer measurement"""
 
+    def mock_post(*args, **kwargs):
+        return MockResponse(200)
+
+    monkeypatch.setattr(requests, "post", mock_post)
+
+    result = sync_stats.measure_file_transfer(1)
     assert isinstance(result, FileTransferDuration)
     assert result.upload == 500.0
     assert result.download == 500.0
 
 
-def test_get_stats(sync_stats, mock_requests, mock_time, mock_curl_mime):
-    """Test statistics gathering for multiple transfers"""
-    result = sync_stats.get_stats(TEST_FILE_SIZE, num_runs=3)
+def test_measure_file_transfer_failure(sync_stats, mock_time, monkeypatch, capsys):
+    """Test failed file transfer measurement"""
 
-    assert isinstance(result, DataTransferStats)
-    assert result.file_size_mb == TEST_FILE_SIZE
-    assert isinstance(result.upload, Stats)
-    assert isinstance(result.download, Stats)
-    assert result.upload.mean == 500.0
-    assert result.download.mean == 500.0
+    def mock_post(*args, **kwargs):
+        raise requests.RequestException("Simulated failure")
 
+    monkeypatch.setattr(requests, "post", mock_post)
 
-def test_error_handling(sync_stats, mock_time, monkeypatch):
-    """Test error handling during transfers"""
+    result = sync_stats.measure_file_transfer(1)
+    assert result is None
 
-    def mock_failed_request(*args, **kwargs):
-        raise requests.RequestsError("Simulated failure")
-
-    monkeypatch.setattr(requests, "post", mock_failed_request)
-
-    with pytest.raises(requests.RequestsError):
-        sync_stats.measure_file_transfer(TEST_FILE_SIZE)
+    captured = capsys.readouterr()
+    assert "Error during file transfer" in captured.out
 
 
-def test_get_stats_empty(sync_stats, mock_time, monkeypatch):
-    """Test statistics calculation with no successful transfers"""
+def test_get_stats_success(sync_stats, mock_time, monkeypatch):
+    """Test successful statistics collection"""
 
-    def mock_failed_transfer(*args, **kwargs):
-        raise requests.RequestsError("Simulated failure")
+    def mock_post(*args, **kwargs):
+        return MockResponse(200)
 
-    monkeypatch.setattr(sync_stats, "measure_file_transfer", mock_failed_transfer)
+    monkeypatch.setattr(requests, "post", mock_post)
 
-    with pytest.raises(Exception):
-        sync_stats.get_stats(TEST_FILE_SIZE, num_runs=3)
+    stats = sync_stats.get_stats(file_size_mb=1, num_runs=3)
+    assert isinstance(stats, DataTransferStats)
+    assert stats.file_size_mb == 1
+    assert stats.successful_runs == 3
+    assert stats.total_runs == 3
+    assert isinstance(stats.upload, Stats)
+    assert isinstance(stats.download, Stats)
+
+
+def test_get_stats_all_failures(sync_stats, mock_time, monkeypatch):
+    """Test statistics collection with all failures"""
+
+    def mock_post(*args, **kwargs):
+        raise requests.RequestException("Simulated failure")
+
+    monkeypatch.setattr(requests, "post", mock_post)
+    monkeypatch.setattr(time, "sleep", lambda x: None)  # Skip sleep delay
+
+    with pytest.raises(RuntimeError, match="All .* runs failed"):
+        sync_stats.get_stats(file_size_mb=1, num_runs=3)
+
+
+def test_get_stats_partial_failure(sync_stats, mock_time, monkeypatch):
+    """Test statistics collection with some failures"""
+    call_count = 0
+
+    def mock_measure_transfer(*args, **kwargs):
+        nonlocal call_count
+        call_count += 1
+        # Fail every other attempt
+        if call_count % 2 == 0:
+            return None
+        return FileTransferDuration(upload=500.0, download=500.0)
+
+    monkeypatch.setattr(sync_stats, "measure_file_transfer", mock_measure_transfer)
+    monkeypatch.setattr(time, "sleep", lambda x: None)  # Skip sleep delay
+
+    stats = sync_stats.get_stats(file_size_mb=1, num_runs=4)
+    assert isinstance(stats, DataTransferStats)
+    assert stats.successful_runs == 2  # Half of the runs should succeed
+    assert stats.total_runs == 4
+
+
+def test_get_stats_delay_between_runs(sync_stats, mock_time, monkeypatch):
+    """Test delay between runs"""
+    calls = []
+
+    def mock_measure_transfer(*args, **kwargs):
+        calls.append(1)
+        return FileTransferDuration(upload=500.0, download=500.0)
+
+    def mock_sleep(seconds):
+        mock_time.sleep_calls.append(seconds)
+
+    monkeypatch.setattr(sync_stats, "measure_file_transfer", mock_measure_transfer)
+    monkeypatch.setattr(time, "sleep", mock_sleep)
+
+    sync_stats.get_stats(file_size_mb=1, num_runs=3)
+
+    assert len(mock_time.sleep_calls) == 2
+    assert mock_time.sleep_calls == [30, 30]

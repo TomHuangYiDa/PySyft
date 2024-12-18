@@ -1,10 +1,11 @@
 import time
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Optional
 from urllib.parse import urljoin
 from uuid import uuid4
 
-from curl_cffi import CurlMime, requests
+import requests
 
 from syftbox.client.benchmark import Stats
 
@@ -29,6 +30,10 @@ class DataTransferStats:
     """Time taken to upload the file"""
     download: Stats
     """Time taken to download the file"""
+    successful_runs: int
+    """Number of successful runs"""
+    total_runs: int
+    """Total number of attempted runs"""
 
 
 @dataclass
@@ -46,7 +51,6 @@ class SyncDataTransferStats:
 
     def __init__(self, url: str, token: str, email: str):
         """Initialize the server URL, token, and email"""
-
         self.url = url
         self.token = token
         self.email = email
@@ -58,28 +62,20 @@ class SyncDataTransferStats:
         **kwargs: dict[str, any],
     ) -> float:
         """Make a request to the server and measure the time taken"""
-
         headers = {"Authorization": f"Bearer {self.token}", "email": self.email}
         start_time = time.time()
         url = str(urljoin(self.url, path))
-        response = requests.post(url, headers=headers, **kwargs)
+        response = requests.post(url=url, headers=headers, **kwargs)
         if not ignore_errors:
             response.raise_for_status()
         return (time.time() - start_time) * 1000
 
     def upload_file(self, filepath: str, data: bytes) -> float:
         """Upload a file to the server and measure the time taken"""
-
-        mime = CurlMime()
-        mime.addpart(
-            name="file",
-            filename=filepath,
-            data=data,
-            content_type="text/plain",
-        )
+        files = {"file": (filepath, data, "plain/text")}
         return self.__make_request(
             "/sync/create/",
-            multipart=mime,
+            files=files,
         )
 
     def download_file(self, filepath: str) -> float:
@@ -90,11 +86,8 @@ class SyncDataTransferStats:
         """Delete a file from the server and measure the time taken"""
         return self.__make_request("/sync/delete/", json={"path": filepath}, ignore_errors=True)
 
-    def measure_file_transfer(self, file_size_mb: int) -> FileTransferDuration:
+    def measure_file_transfer(self, file_size_mb: int) -> Optional[FileTransferDuration]:
         """Measure time taken to upload and download a file of the specified size"""
-
-        # Generate sample bytes of the specified size
-
         filepath = Path(self.email) / "benchmark" / random_filename(file_size_mb)
         file_bytes = generate_byte_string(file_size_mb)
 
@@ -113,20 +106,38 @@ class SyncDataTransferStats:
                 download=download_time,
             )
         except Exception as e:
-            raise e
+            print(f"Error during file transfer: {str(e)}")
+            return None
         finally:
             # Delete the file after the test
-            self.delete_file(str(filepath))
+            try:
+                self.delete_file(str(filepath))
+            except Exception as e:
+                print(f"Error deleting file: {str(e)}")
 
     def get_stats(self, file_size_mb: int, num_runs: int) -> DataTransferStats:
         """Get data transfer statistics for a specific file size"""
-
         # Collect measurements for each run
         measurements: list[FileTransferDuration] = []
+        successful_runs = 0
 
-        for _ in range(num_runs):
-            file_transfer_duration = self.measure_file_transfer(file_size_mb)
-            measurements.append(file_transfer_duration)
+        for run in range(num_runs):
+            try:
+                file_transfer_duration = self.measure_file_transfer(file_size_mb)
+
+                if file_transfer_duration is not None:
+                    measurements.append(file_transfer_duration)
+                    successful_runs += 1
+
+                if run < num_runs - 1:
+                    # Wait for a short interval between runs
+                    time.sleep(5)
+            except Exception as e:
+                print(f"Error during run {run + 1}: {str(e)}")
+                continue
+
+        if not measurements:
+            raise RuntimeError(f"All {num_runs} runs failed. No statistics available.")
 
         # Calculate statistics from the measurements
         def get_values(attr: str) -> list[float]:
@@ -136,4 +147,6 @@ class SyncDataTransferStats:
             file_size_mb=file_size_mb,
             upload=Stats.from_values(get_values("upload")),
             download=Stats.from_values(get_values("download")),
+            successful_runs=successful_runs,
+            total_runs=num_runs,
         )

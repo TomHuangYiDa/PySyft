@@ -188,7 +188,7 @@ def test_network_benchmark_with_empty_stats(mock_config, monkeypatch):
 
 @pytest.fixture
 def mock_data_transfer_stats(mock_stats):
-    return DataTransferStats(file_size_mb=1, upload=mock_stats, download=mock_stats)
+    return DataTransferStats(file_size_mb=1, upload=mock_stats, download=mock_stats, total_runs=3, successful_runs=3)
 
 
 def test_sync_benchmark_file_sizes():
@@ -202,7 +202,11 @@ def test_sync_collect_metrics(mock_config, mock_data_transfer_stats, monkeypatch
 
     def mock_get_stats(self, size_mb, num_runs):
         return DataTransferStats(
-            file_size_mb=size_mb, upload=mock_data_transfer_stats.upload, download=mock_data_transfer_stats.download
+            file_size_mb=size_mb,
+            upload=mock_data_transfer_stats.upload,
+            download=mock_data_transfer_stats.download,
+            total_runs=num_runs,
+            successful_runs=num_runs,
         )
 
     monkeypatch.setattr("syftbox.client.benchmark.syncstats.SyncDataTransferStats.get_stats", mock_get_stats)
@@ -235,6 +239,7 @@ def test_sync_benchmark_result_formatting(mock_data_transfer_stats):
     assert "File Size: 1 MB" in report
     assert "Upload Timings" in report
     assert "Download Timings" in report
+    assert "Success Rate" in report
 
 
 def test_collect_metrics_error_handling(mock_config, monkeypatch):
@@ -253,7 +258,14 @@ def test_collect_metrics_error_handling(mock_config, monkeypatch):
 def test_sync_benchmark_result_with_multiple_file_sizes(mock_stats):
     """Test benchmark result with multiple file sizes"""
     file_size_stats = [
-        DataTransferStats(file_size_mb=size, upload=mock_stats, download=mock_stats) for size in [1, 5, 9]
+        DataTransferStats(
+            file_size_mb=size,
+            upload=mock_stats,
+            download=mock_stats,
+            total_runs=3,
+            successful_runs=3,
+        )
+        for size in [1, 5, 9]
     ]
 
     result = SyncBenchmarkResult(url="https://test.example.com", num_runs=3, file_size_stats=file_size_stats)
@@ -274,6 +286,8 @@ def test_sync_benchmark_with_empty_results(mock_config, monkeypatch):
             file_size_mb=size_mb,
             upload=Stats(min=0, max=0, mean=0, stddev=0, p50=0, p95=0, p99=0),
             download=Stats(min=0, max=0, mean=0, stddev=0, p50=0, p95=0, p99=0),
+            total_runs=0,
+            successful_runs=0,
         )
 
     monkeypatch.setattr("syftbox.client.benchmark.syncstats.SyncDataTransferStats.get_stats", mock_get_empty_stats)
@@ -285,3 +299,5 @@ def test_sync_benchmark_with_empty_results(mock_config, monkeypatch):
     for stats in result.file_size_stats:
         assert stats.upload.mean == 0
         assert stats.download.mean == 0
+        assert stats.total_runs == 0
+        assert stats.successful_runs == 0

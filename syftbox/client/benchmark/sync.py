@@ -25,6 +25,7 @@ class SyncBenchmarkResult(BenchmarkResult):
                 f"File Size: {stats.file_size_mb} MB\n"
                 f"Upload Timings (ms): {stats.upload}\n"
                 f"Download Timings (ms): {stats.download}\n"
+                f"Success Rate: {100 * stats.successful_runs/stats.total_runs} %\n"
             )
 
         return report

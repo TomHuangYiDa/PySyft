@@ -34,4 +34,5 @@ class ConsoleReport(BenchmarkReporter):
         for name, metric in metrics.items():
             report.append(metric.readable_report())
 
+        print("\n")
         print("\n\n".join(report))

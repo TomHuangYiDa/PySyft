@@ -1,5 +1,7 @@
 """Benchmark class for Syft client."""
 
+from rich.progress import Progress, SpinnerColumn
+
 from syftbox.client.benchmark import Benchmark, BenchmarkReporter
 from syftbox.client.benchmark.network import NetworkBenchmark
 from syftbox.client.benchmark.sync import SyncBenchmark
@@ -35,7 +37,13 @@ class SyftBenchmarkRunner:
         for name, collector in collectors.items():
             collector_instance = collector(self.config)
             try:
-                metrics[name] = collector_instance.collect_metrics(num_runs)
+                with Progress(
+                    SpinnerColumn(),
+                    "{task.description}",
+                ) as progress:
+                    task = progress.add_task(f"Collecting {name.capitalize()} metrics", total=1)
+                    metrics[name] = collector_instance.collect_metrics(num_runs)
+                    progress.update(task, completed=True, description=f"Collected {name.capitalize()} metrics")
             except Exception as e:
                 print(f"Failed to collect metrics for {name}: {e}")
 
