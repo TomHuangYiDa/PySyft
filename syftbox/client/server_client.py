@@ -162,7 +162,7 @@ class SyncClient(ClientBase):
     def download_files_streaming(self, relative_paths: list[str], output_dir: Path) -> list[RelativePath]:
         if not relative_paths:
             return []
-        relative_paths = [path.as_posix() for path in relative_paths]
+        relative_paths = [Path(path).as_posix() for path in relative_paths]
 
         pbar = tqdm(
             total=len(relative_paths), desc="Downloading files", unit="file", mininterval=1.0, dynamic_ncols=True

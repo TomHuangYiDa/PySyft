@@ -4,6 +4,7 @@ import platform
 import shutil
 from pathlib import Path
 from types import TracebackType
+from typing import cast
 
 import uvicorn
 from loguru import logger
@@ -54,7 +55,7 @@ class SyftBoxRunner:
 
         self.workspace = SyftWorkspace(self.config.data_dir)
         self.pid = PidFile(pidname="syftbox.pid", piddir=self.workspace.data_dir)
-        self.client = SyftBoxClient.from_config(self.config)
+        self.client: SyftBoxClient = cast(SyftBoxClient, SyftBoxClient.from_config(self.config))
 
         # create a single client context shared across components
         self.__ctx = SyftBoxContext(
