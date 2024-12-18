@@ -18,6 +18,7 @@ from typing_extensions import Any, Optional, Union
 
 from syftbox.client.base import SyftBoxContextInterface
 from syftbox.lib.client_config import CONFIG_PATH_ENV
+from syftbox.lib.types import PathLike
 
 APP_LOG_FILE_NAME_FORMAT = "{app_name}.log"
 DEFAULT_INTERVAL = 10
@@ -139,7 +140,7 @@ def create_app_logger(log_file: Path) -> tuple[logging.Logger, RotatingFileHandl
 
 
 def run_with_logging(
-    command: str, app_path: Path, clean_env: dict, log_path: Optional[Path] = None
+    command: list[str], app_path: Path, clean_env: dict, log_path: Optional[Path] = None
 ) -> tuple[CompletedProcess[str], Path]:
     """
     Run a subprocess command and capture output to both a log file and return results.
@@ -228,7 +229,7 @@ def dict_to_namespace(data: Union[dict, list, Any]) -> Union[SimpleNamespace, li
         return data
 
 
-def load_config(path: str) -> Optional[Union[SimpleNamespace, list, Any]]:
+def load_config(path: PathLike) -> Optional[Union[SimpleNamespace, list, Any]]:
     try:
         with open(path, "r") as f:
             data = json.load(f)
@@ -303,7 +304,10 @@ def run_custom_app_config(app_config: SimpleNamespace, app_path: Path, client_co
         base_time = datetime.now()
         cron_iter = croniter(cron_schedule, base_time)
     elif getattr(app_config.app.run, "interval", None) is not None:
-        interval = app_config.app.run.interval
+        raw_interval = app_config.app.run.interval
+        if not isinstance(raw_interval, (int, float)):
+            raise ValueError(f"Invalid interval type: {type(raw_interval)}. Expected int or float.")
+        interval = raw_interval
     else:
         raise Exception("There's no schedule configuration. Please add schedule or interval in your app config.json")
 
@@ -336,7 +340,8 @@ def run_custom_app_config(app_config: SimpleNamespace, app_path: Path, client_co
                 f"⏲ Waiting for scheduled time. Current time: {current_time.strftime('%Y-%m-%d %H:%M:%S')}, Next execution: {next_execution.strftime('%Y-%m-%d %H:%M:%S')}"
             )
         else:
-            time_to_wait = int(interval)
+            if interval is not None:
+                time_to_wait = int(interval)
         time.sleep(time_to_wait)
 
 

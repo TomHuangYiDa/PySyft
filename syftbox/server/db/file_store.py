@@ -92,7 +92,7 @@ class FileStore:
             abs_path = self.server_settings.snapshot_folder / metadata.path
 
             if not Path(abs_path).exists():
-                self.delete(metadata.path.as_posix(), user)
+                self.delete(Path(metadata.path.as_posix()), user)
                 raise ValueError("File not found")
             return SyftFile(
                 metadata=metadata,

@@ -96,12 +96,12 @@ def sanitize_git_path(path: str) -> str:
         raise ValueError("Invalid Git repository path format. (eg: OpenMined/logged_in)")
 
 
-def delete_folder_if_exists(folder_path: str) -> None:
+def delete_folder_if_exists(folder_path: PathLike) -> None:
     """
     Deletes a folder if it exists at the specified path.
 
     Args:
-        folder_path (str): The path to the folder to be deleted.
+        folder_path (PathLike): The path to the folder to be deleted.
 
     Returns:
         None: This function does not return any value.
@@ -275,7 +275,7 @@ def dict_to_namespace(data: Any) -> Any:
         return data
 
 
-def load_config(path: str) -> SimpleNamespace:
+def load_config(path: PathLike) -> SimpleNamespace:
     """
     Loads a JSON configuration file and converts it to a SimpleNamespace object.
 
@@ -330,7 +330,7 @@ def load_config(path: str) -> SimpleNamespace:
     return dict_to_namespace(data)
 
 
-def create_symbolic_link(apps_dir: Path, sanitized_path: str) -> str:
+def create_symbolic_link(apps_dir: PathLike, sanitized_path: PathLike) -> str:
     """
     Creates a symbolic link from the application directory in the Syftbox directory to the user's sync folder.
 
@@ -359,7 +359,7 @@ def create_symbolic_link(apps_dir: Path, sanitized_path: str) -> str:
     """
     # TODO: Create a Symlink function
     # - Handles if path doesn't exists.
-    target_symlink_path = f"{apps_dir}/{sanitized_path.split('/')[-1]}"
+    target_symlink_path = f"{apps_dir}/{str(sanitized_path).split('/')[-1]}"
 
     # Create the symlink
     if os.path.exists(target_symlink_path) and os.path.islink(target_symlink_path):
@@ -372,7 +372,7 @@ def create_symbolic_link(apps_dir: Path, sanitized_path: str) -> str:
     return target_symlink_path
 
 
-def move_repository_to_syftbox(apps_dir: Path, tmp_clone_path: str, sanitized_path: str) -> str:
+def move_repository_to_syftbox(apps_dir: Path, tmp_clone_path: PathLike, sanitized_path: PathLike) -> str:
     """
     Moves a cloned Git repository to the Syftbox directory.
 
@@ -397,7 +397,7 @@ def move_repository_to_syftbox(apps_dir: Path, tmp_clone_path: str, sanitized_pa
         ```
         This will move the cloned repository to the Syftbox `apps` directory and return the final destination path.
     """
-    output_path = f"{apps_dir}/{sanitized_path.split('/')[-1]}"
+    output_path = f"{apps_dir}/{str(sanitized_path).split('/')[-1]}"
     delete_folder_if_exists(output_path)
     shutil.move(tmp_clone_path, output_path)
     return output_path

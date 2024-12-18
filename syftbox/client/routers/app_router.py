@@ -139,10 +139,10 @@ async def app_command(ctx: APIContext, app_name: str, request: dict) -> JSONResp
             command = f"uv run {app.path}/command.py {json_arg}"  # Complete command as a single string
             print("command", command)
 
-            # Define the environment variable
-            env = {
-                **os.environ,
-                "SYFTBOX_CLIENT_CONFIG_PATH": ctx.config.path,
+            # Create env dict with explicit string types
+            env: dict[str, str] = {
+                **{k: str(v) for k, v in os.environ.items()},
+                "SYFTBOX_CLIENT_CONFIG_PATH": str(ctx.config.path),
             }
 
             try:

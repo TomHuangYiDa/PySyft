@@ -59,7 +59,7 @@ def log_analytics_event(
 
 def log_file_change_event(
     endpoint: str,
-    email: Optional[str],
+    email: str,
     relative_path: Path,
     file_store: FileStore,
 ) -> None:

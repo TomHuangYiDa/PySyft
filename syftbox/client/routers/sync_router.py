@@ -17,6 +17,8 @@ jinja_env = Environment(loader=FileSystemLoader("syftbox/assets/templates"))
 
 
 def get_sync_manager(context: APIContext) -> SyncManager:
+    if context.plugins is None:
+        raise HTTPException(status_code=500, detail="Plugin manager not initialized")
     try:
         return context.plugins.sync_manager
     except SyftPluginException as e:

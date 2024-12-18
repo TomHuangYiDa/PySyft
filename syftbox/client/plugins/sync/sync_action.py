@@ -51,7 +51,7 @@ def determine_sync_action(
     action: SyncAction
 
     if in_sync:
-        action = NoopAction(local_metadata=current_local_metadata, remote_metadata=current_remote_metadata)
+        action = NoopAction(local_metadata=current_local_metadata, remote_metadata=current_remote_metadata)  # type: ignore[arg-type]
 
     # Pull changes from remote
     elif side_to_update == SyncSide.LOCAL and not local_exists:

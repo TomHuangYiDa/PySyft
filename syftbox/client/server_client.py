@@ -159,20 +159,20 @@ class SyncClient(ClientBase):
         self.raise_for_status(response)
         return response.content
 
-    def download_files_streaming(self, relative_paths: list[str], output_dir: Path) -> list[RelativePath]:
+    def download_files_streaming(self, relative_paths: list[Path], output_dir: Path) -> list[RelativePath]:
         if not relative_paths:
             return []
-        relative_paths = [Path(path).as_posix() for path in relative_paths]
+        relative_str_paths: list[str] = [Path(path).as_posix() for path in relative_paths]
 
         pbar = tqdm(
-            total=len(relative_paths), desc="Downloading files", unit="file", mininterval=1.0, dynamic_ncols=True
+            total=len(relative_str_paths), desc="Downloading files", unit="file", mininterval=1.0, dynamic_ncols=True
         )
         extracted_files = []
 
         with self.conn.stream(
             "POST",
             "/sync/download_bulk",
-            json={"paths": relative_paths},
+            json={"paths": relative_str_paths},
         ) as response:
             response.raise_for_status()
 
