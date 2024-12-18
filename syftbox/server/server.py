@@ -54,7 +54,7 @@ from .users.router import router as users_router
 current_dir = Path(__file__).parent
 
 
-def create_folders(folders: list[str]) -> None:
+def create_folders(folders: list[Path]) -> None:
     for folder in folders:
         if not os.path.exists(folder):
             os.makedirs(folder, exist_ok=True)

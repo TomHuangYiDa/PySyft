@@ -170,8 +170,12 @@ class FileStore:
             # If we write the file first and then insert, we might have to revert the file, but we need to
             # set it to the old date modified.
             metadata = hash_file(abs_path, root_dir=self.server_settings.snapshot_folder)
-            db.save_file_metadata(cursor, metadata)
-
+            if metadata is None:
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Failed to hash file {abs_path}",
+                )
+            db.save_file_metadata(conn, metadata)
             if path.name.endswith(PERM_FILE):
                 try:
                     permfile = SyftPermission.from_bytes(contents, path)

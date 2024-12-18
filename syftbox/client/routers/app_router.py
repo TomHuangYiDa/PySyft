@@ -10,6 +10,7 @@ from pydantic import BaseModel
 from typing_extensions import List
 
 from syftbox.client.routers.common import APIContext
+from syftbox.lib.types import PathLike
 
 router = APIRouter()
 
@@ -51,7 +52,7 @@ class AppDetails(BaseModel):
     path: str
 
 
-def get_all_apps(apps_dir: str) -> List[AppDetails]:
+def get_all_apps(apps_dir: PathLike) -> List[AppDetails]:
     """
     Get all apps in the given directory.
 
