@@ -4,6 +4,7 @@ SyftBox CLI - Setup scripts
 
 import json
 import shutil
+import time
 from pathlib import Path
 
 import httpx
@@ -162,7 +163,12 @@ def prompt_email() -> str:
 
 def verify_installation(conf: SyftClientConfig, client: httpx.Client) -> None:
     try:
-        response = client.get("/info")
+        try:
+            response = client.get("/info")
+        except httpx.ConnectError:
+            # try one more time, server may be starting (dev mode)
+            time.sleep(2)
+            response = client.get("/info")
         response.raise_for_status()
         server_info = response.json()
         server_version = server_info["version"]

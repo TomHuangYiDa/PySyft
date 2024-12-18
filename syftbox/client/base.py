@@ -4,7 +4,6 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 import httpx
-from loguru import logger
 from typing_extensions import Protocol
 
 from syftbox.client.exceptions import SyftAuthenticationError, SyftPermissionError, SyftServerError
@@ -102,7 +101,6 @@ class ClientBase:
         if config.access_token is not None:
             headers["Authorization"] = f"Bearer {config.access_token}"
 
-        logger.debug(f"Server headers: {headers}")
         return headers
 
     @classmethod

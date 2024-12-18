@@ -4,10 +4,13 @@ from pathlib import Path
 from shutil import make_archive
 from typing import Union
 
+import loguru
 from loguru import logger
 
 from syftbox.lib.constants import DEFAULT_LOGS_DIR
 from syftbox.lib.types import PathLike, to_path
+
+LOGS_FORMAT = loguru
 
 
 def setup_logger(
@@ -26,6 +29,7 @@ def setup_logger(
         level="DEBUG",
         rotation=None,
         compression=None,
+        colorize=True,
     )
 
     # keep last 5 logs

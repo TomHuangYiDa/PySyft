@@ -2,7 +2,7 @@ from typing import List, Optional
 
 import wcmatch.glob
 from fastapi import APIRouter, Depends, HTTPException
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from jinja2 import Environment, FileSystemLoader
 
 from syftbox.client.exceptions import SyftPluginException
@@ -88,18 +88,36 @@ def filter_by_path_glob(items: List[SyncStatusInfo], pattern: Optional[str]) -> 
     return result
 
 
+def apply_limit_offset(items: List[SyncStatusInfo], limit: Optional[int], offset: int) -> List[SyncStatusInfo]:
+    if offset:
+        items = items[offset:]
+    if limit:
+        items = items[:limit]
+    return items
+
+
+@router.get("/health")
+def health_check(sync_manager: SyncManager = Depends(get_sync_manager)) -> JSONResponse:
+    if not sync_manager.is_alive():
+        raise HTTPException(status_code=503, detail="Sync service unavailable")
+    return JSONResponse(content={"status": "ok"})
+
+
 @router.get("/state")
 def get_status_info(
     order_by: str = "timestamp",
     order: str = "desc",
     path_glob: Optional[str] = None,
     sync_manager: SyncManager = Depends(get_sync_manager),
+    limit: Optional[int] = None,
+    offset: int = 0,
 ) -> List[SyncStatusInfo]:
     all_items = get_all_status_info(sync_manager)
     items_deduplicated = deduplicate_status_info(all_items)
     items_filtered = filter_by_path_glob(items_deduplicated, path_glob)
     items_sorted = sort_status_info(items_filtered, order_by, order)
-    return items_sorted
+    items_paginated = apply_limit_offset(items_sorted, limit, offset)
+    return items_paginated
 
 
 @router.get("/")
