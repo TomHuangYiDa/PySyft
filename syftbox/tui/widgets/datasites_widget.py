@@ -1,9 +1,21 @@
+import shutil
+import subprocess
 from pathlib import Path
 from typing import List
 
 from textual.containers import Container
 from textual.suggester import Suggester, SuggestFromList
 from textual.widgets import DirectoryTree, Input, Label, Static
+
+
+def is_vscode_installed() -> bool:
+    return shutil.which("code") is not None
+
+
+def launch_file_in_vscode(file_path: Path) -> None:
+    if not is_vscode_installed():
+        raise RuntimeError("VSCode is not installed")
+    subprocess.run(["code", str(file_path)])
 
 
 class DatasiteSuggester(Suggester):
@@ -60,9 +72,3 @@ class DatasiteSelector(Static):
             self.error_message.visible = False
             self.files_container.visible = True
             self.query_one(DirectoryTree).path = str(self.current_datasite)
-
-    CSS = """
-    .spacer {
-        height: 1;
-    }
-    """

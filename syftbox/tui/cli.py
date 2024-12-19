@@ -5,9 +5,8 @@ from venv import logger
 from rich import print as rprint
 from typer import Exit, Option, Typer
 
-from syftbox.client.base import SyftBoxContextInterface
-from syftbox.client.core import SyftBoxRunner
 from syftbox.lib.client_config import SyftClientConfig
+from syftbox.lib.client_shim import Client
 from syftbox.lib.constants import DEFAULT_CONFIG_PATH
 from syftbox.lib.exceptions import ClientConfigException
 from syftbox.tui.app import SyftBoxTUI
@@ -32,10 +31,10 @@ def run_tui(
     tui.run()
 
 
-def get_syftbox_context(config_path: Path) -> SyftBoxContextInterface:
+def get_syftbox_context(config_path: Path) -> Client:
     try:
         conf = SyftClientConfig.load(config_path)
-        context = SyftBoxRunner(conf).context
+        context = Client(conf)
         return context
     except ClientConfigException:
         msg = (

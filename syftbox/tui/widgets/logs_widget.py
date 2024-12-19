@@ -5,7 +5,7 @@ from rich.text import Text
 from textual.containers import Vertical
 from textual.widgets import RichLog, Static
 
-from syftbox.client.base import SyftBoxContextInterface
+from syftbox.lib import Client
 
 
 class SyftTUIError(Exception):
@@ -17,7 +17,7 @@ class SyftTUIError(Exception):
 class SyftLogsWidget(Static):
     def __init__(
         self,
-        context: SyftBoxContextInterface,
+        context: Client,
         endpoint: str,
         title: Optional[str] = None,
         refresh_every: int = 2,

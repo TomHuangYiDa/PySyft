@@ -172,13 +172,12 @@ async def app_logs(
     offset: int = 0,
 ) -> JSONResponse:
     apps_dir = ctx.workspace.apps
-    all_apps = get_all_apps(apps_dir)
-    app_details = next((app for app in all_apps if app_name == app.name), None)
-    if app_details is None:
+    app_dir = Path(apps_dir) / app_name
+    if not app_dir.is_dir():
         raise HTTPException(status_code=404, detail="App not found")
 
     logs: List[str] = []
-    log_file = Path(app_details.path) / "logs" / f"{app_name}.log"
+    log_file = app_dir / "logs" / f"{app_name}.log"
     try:
         if log_file.is_file():
             async with aopen(log_file, "r") as file:
