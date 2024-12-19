@@ -15,14 +15,15 @@ class LoguruMiddleware(BaseHTTPMiddleware):
 
         return response
 
+
 class RequestSizeLimitMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
         request_size_limit_in_mb = request.state.server_settings.request_size_limit_in_mb
         request_body = await request.body()
         if len(request_body) > request_size_limit_in_mb * 1024 * 1024:
-            return Response(status_code=413, content=f"Request Denied. Message size is greater than {request_size_limit_in_mb} MB")
+            return Response(
+                status_code=413, content=f"Request Denied. Message size is greater than {request_size_limit_in_mb} MB"
+            )
 
         response = await call_next(request)
         return response
-    
-    

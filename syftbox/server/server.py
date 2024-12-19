@@ -34,8 +34,7 @@ from syftbox.lib.lib import (
 )
 from syftbox.server.analytics import log_analytics_event
 from syftbox.server.logger import setup_logger
-from syftbox.server.middleware import LoguruMiddleware
-from syftbox.server.middleware import RequestSizeLimitMiddleware
+from syftbox.server.middleware import LoguruMiddleware, RequestSizeLimitMiddleware
 from syftbox.server.settings import ServerSettings, get_server_settings
 from syftbox.server.telemetry import (
     OTEL_ATTR_CLIENT_OS_ARCH,
