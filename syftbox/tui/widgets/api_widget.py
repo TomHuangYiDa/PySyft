@@ -40,6 +40,7 @@ class APIWidget(Widget):
             yield self.log_widget
 
     def set_app_logs(self, app_name: str) -> None:
+        """Update the logs widget to show logs for the given app."""
         app_name = urllib.parse.quote(app_name)
         endpoint = f"/apps/logs/{app_name}"
         self.log_widget.endpoint = endpoint

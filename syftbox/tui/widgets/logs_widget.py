@@ -17,15 +17,18 @@ class SyftTUIError(Exception):
 class SyftLogsWidget(Static):
     def __init__(
         self,
-        context: Client,
+        syftbox_context: Client,
         endpoint: str,
         title: Optional[str] = None,
         refresh_every: int = 2,
         classes: str | None = None,
     ) -> None:
         super().__init__(classes=classes)
-        self.context = context
+        self.syftbox_context = syftbox_context
         self.endpoint = endpoint
+        # Track what we polled last time to determine scrolling behavior
+        self._previous_source = self.endpoint
+
         self.title = title
         self.refresh_every = refresh_every
         self.logs_viewer = RichLog(
@@ -43,8 +46,9 @@ class SyftLogsWidget(Static):
             return response.text
 
     def _fetch_logs(self) -> str:
+        self._previous_source = self.endpoint
         try:
-            response = requests.get(f"{self.context.config.client_url}{self.endpoint}")
+            response = requests.get(f"{self.syftbox_context.config.client_url}{self.endpoint}")
             if response.status_code != 200:
                 raise SyftTUIError({self._get_err(response)})
             logs = response.json()["logs"]
@@ -54,7 +58,13 @@ class SyftLogsWidget(Static):
         except Exception as e:
             raise SyftTUIError(f"Failed to fetch logs: {str(e)}")
 
+    def should_scroll_to_end(self) -> bool:
+        if self.endpoint != self._previous_source:
+            return True
+        return self.logs_viewer.is_vertical_scroll_end and self.logs_viewer.scroll_offset.y > 0
+
     def refresh_logs(self) -> None:
+        should_scroll = self.should_scroll_to_end()
         try:
             logs = self._fetch_logs()
             logs = Text.from_ansi(logs)
@@ -62,7 +72,9 @@ class SyftLogsWidget(Static):
             logs = f"[red]{e.message}[/red]\n"
         self.logs_viewer.clear()
         self.logs_viewer.write(logs)
-        self.logs_viewer.scroll_end(animate=False)
+
+        if should_scroll:
+            self.logs_viewer.scroll_end(animate=False)
 
     def compose(self):
         with Vertical():

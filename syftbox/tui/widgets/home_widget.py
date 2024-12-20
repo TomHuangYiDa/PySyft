@@ -108,7 +108,7 @@ class HomeWidget(Widget):
         self.syftbox_context = syftbox_context
         self.info_widget = Markdown(intro_md, classes="info")
         self.logs_widget = SyftLogsWidget(
-            context=self.syftbox_context,
+            syftbox_context=self.syftbox_context,
             endpoint="/logs",
             title="SyftBox Logs",
             refresh_every=2,

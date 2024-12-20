@@ -3,7 +3,7 @@ from typing import List, Optional
 import requests
 from textual.binding import Binding
 from textual.containers import ScrollableContainer
-from textual.widgets import DataTable, Input, Static
+from textual.widgets import DataTable, Input, Label, Static
 
 from syftbox.client.base import SyftBoxContextInterface
 from syftbox.client.plugins.sync.local_state import SyncStatusInfo
@@ -15,15 +15,18 @@ class SyncWidget(Static):
         Binding("f", "focus_search", "Search", show=True),
     ]
 
-    def __init__(self, context: SyftBoxContextInterface) -> None:
+    def __init__(self, syftbox_context: SyftBoxContextInterface) -> None:
         super().__init__()
-        self.context = context
+        self.syftbox_context = syftbox_context
+        self.default_filter = f"{syftbox_context.email}/**"
 
     def compose(self):
-        yield Input(placeholder="Filter paths (glob pattern)...", id="path_filter")
+        yield Label("Filter Files")
+        yield Input(value=self.default_filter, placeholder="glob pattern", id="path_filter")
 
         self.table = DataTable()
         self.table.add_columns("Path", "Status", "Action", "Last Update", "Message")
+        yield Label("Sync Events", classes="padding-top")
         yield ScrollableContainer(self.table)
         yield Static(f"Showing last {self.LIMIT} sync events", classes="dim")
 
@@ -46,7 +49,7 @@ class SyncWidget(Static):
     def _get_sync_state(self, path_glob: Optional[str] = None) -> List[SyncStatusInfo]:
         try:
             response = requests.get(
-                f"{self.context.config.client_url}/sync/state",
+                f"{self.syftbox_context.config.client_url}/sync/state",
                 params={"path_glob": path_glob, "limit": self.LIMIT},
             )
             response.raise_for_status()
