@@ -8,6 +8,7 @@ HEADER_SYFTBOX_USER = b"x-syftbox-user"
 HEADER_OS_NAME = b"x-os-name"
 HEADER_OS_VERSION = b"x-os-ver"
 HEADER_OS_ARCH = b"x-os-arch"
+HEADER_GEO_COUNTRY = b"x-geo-country"  # Country of the user, added by Azure Front Door
 
 SYFTBOX_HEADERS = {
     "User-Agent": f"SyftBox/{__version__} (Python {PYTHON_VERSION}; {OS_NAME} {OS_VERSION}; {OS_ARCH})",

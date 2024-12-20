@@ -10,6 +10,7 @@ from syftbox import __version__
 OTEL_ATTR_CLIENT_VERSION = "syftbox.client.version"
 OTEL_ATTR_CLIENT_PYTHON = "syftbox.client.python"
 OTEL_ATTR_CLIENT_USER = "syftbox.client.user"
+OTEL_ATTR_CLIENT_USER_LOC = "syftbox.client.user.location"
 OTEL_ATTR_CLIENT_OS_NAME = "syftbox.client.os.name"
 OTEL_ATTR_CLIENT_OS_VER = "syftbox.client.os.version"
 OTEL_ATTR_CLIENT_OS_ARCH = "syftbox.client.os.arch"
