@@ -9,7 +9,6 @@ from syftbox.lib.client_config import SyftClientConfig
 from syftbox.lib.client_shim import Client
 from syftbox.lib.constants import DEFAULT_CONFIG_PATH
 from syftbox.lib.exceptions import ClientConfigException
-from syftbox.tui.app import SyftBoxTUI
 
 app = Typer(
     name="SyftBox Terminal UI",
@@ -25,6 +24,9 @@ CONFIG_OPTS = Option("-c", "--config", "--config_path", help="Path to the SyftBo
 def run_tui(
     config_path: Annotated[Path, CONFIG_OPTS] = DEFAULT_CONFIG_PATH,
 ) -> None:
+    # Late import to avoid long startup times
+    from syftbox.tui.app import SyftBoxTUI
+
     syftbox_context = get_syftbox_context(config_path)
     tui = SyftBoxTUI(syftbox_context)
     logger.debug("Running SyftBox TUI")
