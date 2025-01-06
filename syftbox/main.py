@@ -8,6 +8,7 @@ from syftbox import __version__
 from syftbox.app.cli import app as app_cli
 from syftbox.client.cli import app as client_cli
 from syftbox.server.cli import app as server_cli
+from syftbox.tui.cli import app as tui_cli
 
 app = Typer(
     name="SyftBox",
@@ -44,6 +45,7 @@ def debug(config_path: Annotated[Optional[Path], CONFIG_OPTS] = None) -> None:
 app.add_typer(client_cli, name="client")
 app.add_typer(server_cli, name="server")
 app.add_typer(app_cli, name="app")
+app.add_typer(tui_cli, name="tui")
 
 
 def main() -> None:
