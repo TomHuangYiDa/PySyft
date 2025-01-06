@@ -1,12 +1,12 @@
 import sqlite3
 from pathlib import Path
-from typing import List, Optional
+from typing import Optional
 
 from syftbox.lib.permissions import PermissionRule, SyftPermission
 from syftbox.server.models.sync_models import FileMetadata, RelativePath
 
 
-def save_file_metadata(conn: sqlite3.Connection, metadata: FileMetadata):
+def save_file_metadata(conn: sqlite3.Connection, metadata: FileMetadata) -> None:
     # Insert the metadata into the database or update if a conflict on 'path' occurs
     conn.execute(
         """
@@ -30,7 +30,7 @@ def save_file_metadata(conn: sqlite3.Connection, metadata: FileMetadata):
     )
 
 
-def delete_file_metadata(conn: sqlite3.Connection, path: str):
+def delete_file_metadata(conn: sqlite3.Connection, path: str) -> None:
     cur = conn.execute("DELETE FROM file_metadata WHERE path = ?", (path,))
     # get number of changes
     if cur.rowcount != 1:
@@ -39,7 +39,7 @@ def delete_file_metadata(conn: sqlite3.Connection, path: str):
 
 def get_all_metadata(conn: sqlite3.Connection, path_like: Optional[str] = None) -> list[FileMetadata]:
     query = "SELECT * FROM file_metadata"
-    params = ()
+    params: tuple = ()
 
     if path_like:
         if "%" in path_like:
@@ -73,7 +73,7 @@ def get_all_datasites(conn: sqlite3.Connection) -> list[str]:
     return [row[0] for row in cursor if row[0]]
 
 
-def query_rules_for_permfile(cursor, file: SyftPermission):
+def query_rules_for_permfile(cursor: sqlite3.Cursor, file: SyftPermission) -> list[sqlite3.Row]:
     cursor.execute(
         """
         SELECT * FROM rules WHERE permfile_path = ? ORDER BY priority
@@ -83,12 +83,12 @@ def query_rules_for_permfile(cursor, file: SyftPermission):
     return cursor.fetchall()
 
 
-def get_rules_for_permfile(connection: sqlite3.Connection, file: SyftPermission):
+def get_rules_for_permfile(connection: sqlite3.Connection, file: SyftPermission) -> list[PermissionRule]:
     cursor = connection.cursor()
     return [PermissionRule.from_db_row(row) for row in query_rules_for_permfile(cursor, file)]
 
 
-def get_all_files(cursor):
+def get_all_files(cursor: sqlite3.Cursor) -> list:
     cursor.execute(
         """
         SELECT * FROM file_metadata
@@ -97,7 +97,7 @@ def get_all_files(cursor):
     return cursor.fetchall()
 
 
-def get_all_files_under_syftperm(cursor, permfile: SyftPermission) -> List[Path]:
+def get_all_files_under_syftperm(cursor: sqlite3.Cursor, permfile: SyftPermission) -> list[tuple[int, FileMetadata]]:
     cursor.execute(
         """
         SELECT * FROM file_metadata WHERE path LIKE ?
@@ -113,7 +113,7 @@ def get_all_files_under_syftperm(cursor, permfile: SyftPermission) -> List[Path]
     ]
 
 
-def get_rules_for_path(connection: sqlite3.Connection, path: Path):
+def get_rules_for_path(connection: sqlite3.Connection, path: Path) -> list[PermissionRule]:
     parents = path.parents
     placeholders = ",".join("?" * len(parents))
     cursor = connection.cursor()
@@ -126,7 +126,7 @@ def get_rules_for_path(connection: sqlite3.Connection, path: Path):
     return [PermissionRule.from_db_row(row) for row in cursor.fetchall()]
 
 
-def set_rules_for_permfile(connection, file: SyftPermission):
+def set_rules_for_permfile(connection: sqlite3.Connection, file: SyftPermission) -> None:
     """
     Atomically set the rules for a permission file. Basically its just a write operation, but
     we also make sure we delete the rules that are no longer in the file.
@@ -186,7 +186,7 @@ def set_rules_for_permfile(connection, file: SyftPermission):
         raise e
 
 
-def get_metadata_for_file(connection: sqlite3.Connection, path: Path):
+def get_metadata_for_file(connection: sqlite3.Connection, path: Path) -> tuple[int, FileMetadata]:
     cursor = connection.cursor()
     cursor.execute("SELECT * FROM file_metadata WHERE path = ?", (str(path),))
     row = cursor.fetchone()
@@ -196,7 +196,7 @@ def get_metadata_for_file(connection: sqlite3.Connection, path: Path):
     )
 
 
-def link_existing_rules_to_file(connection: sqlite3.Connection, path: Path):
+def link_existing_rules_to_file(connection: sqlite3.Connection, path: Path) -> None:
     # 1 find all rules in that branch of the tree
     # 2 check which rules apply to the file
     # 3 link them
@@ -242,7 +242,7 @@ def get_read_permissions_for_user(
     """
     cursor = connection.cursor()
 
-    params = (user, user, user)
+    params: tuple = (user, user, user)
     like_clause = ""
     if path_like:
         if "%" in path_like:
@@ -298,7 +298,7 @@ def get_read_permissions_for_user(
     return res.fetchall()
 
 
-def print_table(connection: sqlite3.Connection, table: str):
+def print_table(connection: sqlite3.Connection, table: str) -> None:
     """util function for debugging"""
     cursor = connection.cursor()
     cursor.execute(f"SELECT * FROM {table}")

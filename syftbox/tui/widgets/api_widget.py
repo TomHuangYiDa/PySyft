@@ -1,5 +1,6 @@
 import urllib
 import urllib.parse
+from typing import Any, List
 
 from textual.containers import Horizontal
 from textual.widget import Widget
@@ -22,9 +23,9 @@ class APIWidget(Widget):
     ):
         super().__init__()
         self.syftbox_context = syftbox_context
-        self.apps = []
+        self.apps: List[str] = []
 
-    def compose(self):
+    def compose(self) -> Any:
         self.apps = self.get_installed_apps()
 
         with Horizontal():

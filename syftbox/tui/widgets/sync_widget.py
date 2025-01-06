@@ -1,12 +1,12 @@
-from typing import List, Optional
+from typing import Any, List, Optional
 
 import requests
 from textual.binding import Binding
 from textual.containers import ScrollableContainer
 from textual.widgets import DataTable, Input, Label, Static
 
-from syftbox.client.base import SyftBoxContextInterface
 from syftbox.client.plugins.sync.local_state import SyncStatusInfo
+from syftbox.lib import Client
 
 
 class SyncWidget(Static):
@@ -15,12 +15,12 @@ class SyncWidget(Static):
         Binding("f", "focus_search", "Search", show=True),
     ]
 
-    def __init__(self, syftbox_context: SyftBoxContextInterface) -> None:
+    def __init__(self, syftbox_context: Client) -> None:
         super().__init__()
         self.syftbox_context = syftbox_context
         self.default_filter = f"{syftbox_context.email}/**"
 
-    def compose(self):
+    def compose(self) -> Any:
         yield Label("Filter Files")
         yield Input(value=self.default_filter, placeholder="glob pattern", id="path_filter")
 

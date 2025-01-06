@@ -1,6 +1,6 @@
 import base64
 from pathlib import Path
-from typing import Union
+from typing import Any, Union
 
 import httpx
 import msgpack
@@ -17,7 +17,7 @@ class StreamedFile(BaseModel):
     path: RelativePath
     content: bytes
 
-    def write_bytes(self, output_dir: Path):
+    def write_bytes(self, output_dir: Path) -> None:
         file_path = output_dir / self.path
         file_path.parent.mkdir(parents=True, exist_ok=True)
         file_path.write_bytes(self.content)
@@ -40,7 +40,7 @@ class SyftBoxClient(ClientBase):
         self.raise_for_status(response)
         return response.json()
 
-    def log_analytics_event(self, event_name: str, **kwargs) -> None:
+    def log_analytics_event(self, event_name: str, **kwargs: Any) -> None:
         """Log an event to the server"""
         event_data = {
             "event_name": event_name,
@@ -52,7 +52,7 @@ class SyftBoxClient(ClientBase):
 
 
 class AuthClient(ClientBase):
-    def whoami(self):
+    def whoami(self) -> Any:
         response = self.conn.post("/auth/whoami")
         self.raise_for_status(response)
         return response.json()
@@ -159,20 +159,20 @@ class SyncClient(ClientBase):
         self.raise_for_status(response)
         return response.content
 
-    def download_files_streaming(self, relative_paths: list[str], output_dir: Path) -> None:
+    def download_files_streaming(self, relative_paths: list[Path], output_dir: Path) -> list[RelativePath]:
         if not relative_paths:
             return []
-        relative_paths = [path.as_posix() for path in relative_paths]
+        relative_str_paths: list[str] = [Path(path).as_posix() for path in relative_paths]
 
         pbar = tqdm(
-            total=len(relative_paths), desc="Downloading files", unit="file", mininterval=1.0, dynamic_ncols=True
+            total=len(relative_str_paths), desc="Downloading files", unit="file", mininterval=1.0, dynamic_ncols=True
         )
         extracted_files = []
 
         with self.conn.stream(
             "POST",
             "/sync/download_bulk",
-            json={"paths": relative_paths},
+            json={"paths": relative_str_paths},
         ) as response:
             response.raise_for_status()
 

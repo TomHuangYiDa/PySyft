@@ -22,14 +22,14 @@ CONFIG_OPTS = Option("-c", "--config", "--config_path", help="Path to the SyftBo
 
 
 @app.command(rich_help_panel="General Options")
-def version():
+def version() -> None:
     """Print SyftBox version"""
 
     print(__version__)
 
 
 @app.command(rich_help_panel="General Options")
-def debug(config_path: Annotated[Optional[Path], CONFIG_OPTS] = None):
+def debug(config_path: Annotated[Optional[Path], CONFIG_OPTS] = None) -> None:
     """Print SyftBox debug data"""
 
     # lazy import to improve CLI startup performance
@@ -48,7 +48,7 @@ app.add_typer(app_cli, name="app")
 app.add_typer(tui_cli, name="tui")
 
 
-def main():
+def main() -> None:
     app()
 
 

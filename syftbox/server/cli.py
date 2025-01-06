@@ -28,7 +28,7 @@ EXAMPLE_OPTS = Option(
 
 
 @app.command()
-def migrate():
+def migrate() -> None:
     """Run database migrations"""
 
     try:
@@ -41,7 +41,7 @@ def migrate():
         raise Exit(1)
 
 
-def main():
+def main() -> None:
     app()
 
 

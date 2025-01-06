@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import Any
 
 from textual.app import App
 from textual.widgets import Footer, Header, TabbedContent, TabPane
@@ -32,7 +33,7 @@ class SyftBoxTUI(App):
     def on_mount(self) -> None:
         self.title = "SyftBox"
 
-    def compose(self):
+    def compose(self) -> Any:
         yield Header(name="SyftBox")
         with TabbedContent():
             with TabPane("Home", id="Home"):

@@ -1,3 +1,4 @@
+from pathlib import Path
 from typing import List, Optional
 
 import wcmatch.glob
@@ -16,6 +17,8 @@ jinja_env = Environment(loader=FileSystemLoader("syftbox/assets/templates"))
 
 
 def get_sync_manager(context: APIContext) -> SyncManager:
+    if context.plugins is None:
+        raise HTTPException(status_code=500, detail="Plugin manager not initialized")
     try:
         return context.plugins.sync_manager
     except SyftPluginException as e:
@@ -51,7 +54,7 @@ def get_all_status_info(sync_manager: SyncManager) -> List[SyncStatusInfo]:
 
 def deduplicate_status_info(status_info_list: List[SyncStatusInfo]) -> List[SyncStatusInfo]:
     """Deduplicate status info by path, keeping the entry with latest timestamp"""
-    path_to_info = {}
+    path_to_info: dict[Path, SyncStatusInfo] = {}
     for info in status_info_list:
         existing_info = path_to_info.get(info.path)
         if not existing_info or info.timestamp > existing_info.timestamp:
@@ -121,6 +124,6 @@ def get_status_info(
 
 
 @router.get("/")
-def sync_dashboard(context: APIContext):
+def sync_dashboard(context: APIContext) -> HTMLResponse:
     template = jinja_env.get_template("sync_dashboard.jinja2")
     return HTMLResponse(template.render(base_url=context.config.client_url))

@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Any, Optional
 
 import requests
 from rich.text import Text
@@ -18,7 +18,7 @@ class SyftLogsWidget(Static):
     def __init__(
         self,
         syftbox_context: Client,
-        endpoint: str,
+        endpoint: Optional[str] = None,
         title: Optional[str] = None,
         refresh_every: int = 2,
         classes: str | None = None,
@@ -47,10 +47,12 @@ class SyftLogsWidget(Static):
 
     def _fetch_logs(self) -> str:
         self._previous_source = self.endpoint
+        if self.endpoint is None:
+            raise SyftTUIError("No logs endpoint provided")
         try:
             response = requests.get(f"{self.syftbox_context.config.client_url}{self.endpoint}")
             if response.status_code != 200:
-                raise SyftTUIError({self._get_err(response)})
+                raise SyftTUIError(self._get_err(response))
             logs = response.json()["logs"]
             return "".join(logs)
         except requests.exceptions.ConnectionError:
@@ -76,7 +78,7 @@ class SyftLogsWidget(Static):
         if should_scroll:
             self.logs_viewer.scroll_end(animate=False)
 
-    def compose(self):
+    def compose(self) -> Any:
         with Vertical():
             if self.title:
                 yield Static(f"[blue]{self.title}[/blue]\n")

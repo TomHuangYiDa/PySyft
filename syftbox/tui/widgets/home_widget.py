@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Any, Optional
 
 import requests
 from textual.containers import Horizontal, Vertical
@@ -9,7 +9,7 @@ from syftbox import __version__
 from syftbox.lib import Client
 from syftbox.tui.widgets.logs_widget import SyftLogsWidget
 
-intro_md = """
+INTRO_MD = """
 ### Welcome to SyftBox!
 
 SyftBox is an innovative project by [OpenMined](https://openmined.org) that aims to make privacy-enhancing technologies (PETs) more accessible and user-friendly for developers. It provides a modular and intuitive framework for building PETs applications with minimal barriers, regardless of the programming language or environment.
@@ -42,7 +42,7 @@ class StatusDashboard(Widget):
             classes=classes,
         )
 
-    def compose(self):
+    def compose(self) -> Any:
         yield Static("[blue]Status[/blue]\n")
         server_url = f"[link={self.syftbox_context.config.server_url}]{self.syftbox_context.config.server_url}[/link]"
         client_url = f"[link={self.syftbox_context.config.client_url}]{self.syftbox_context.config.client_url}[/link]"
@@ -64,7 +64,7 @@ class StatusDashboard(Widget):
 
         self.set_interval(1, self.update_values)
 
-    def update_values(self):
+    def update_values(self) -> None:
         sync_status_widget = self.query_exactly_one("#sync_status", expect_type=Label)
         api_count_widget = self.query_exactly_one("#api_count", expect_type=Label)
 
@@ -90,12 +90,6 @@ class StatusDashboard(Widget):
         return len([d for d in api_dir.iterdir() if d.is_dir() and not d.name.startswith(".")])
 
 
-class SyftTUIError(Exception):
-    def __init__(self, message: str):
-        self.message = message
-        super().__init__(message)
-
-
 class HomeWidget(Widget):
     DEFAULT_CSS = """
     HomeWidget {
@@ -106,7 +100,7 @@ class HomeWidget(Widget):
     def __init__(self, syftbox_context: Client) -> None:
         super().__init__()
         self.syftbox_context = syftbox_context
-        self.info_widget = Markdown(intro_md, classes="info")
+        self.info_widget = Markdown(INTRO_MD, classes="info")
         self.logs_widget = SyftLogsWidget(
             syftbox_context=self.syftbox_context,
             endpoint="/logs",
@@ -115,7 +109,7 @@ class HomeWidget(Widget):
             classes="syftbox-logs",
         )
 
-    def compose(self):
+    def compose(self) -> Any:
         with Horizontal():
             yield StatusDashboard(self.syftbox_context, classes="status")
             yield Vertical(

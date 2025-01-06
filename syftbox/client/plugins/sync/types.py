@@ -23,7 +23,7 @@ class SyncSide(str, Enum):
     REMOTE = "remote"
 
 
-class FileChangeInfo(BaseModel, frozen=True):
+class FileChangeInfo(BaseModel):
     local_sync_folder: Path
     path: Path
     side_last_modified: SyncSide

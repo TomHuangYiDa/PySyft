@@ -31,7 +31,7 @@ class SyftFile(BaseModel):
     absolute_path: AbsolutePath
 
 
-def computed_permission_for_user_and_path(connection: sqlite3.Connection, user: str, path: Path):
+def computed_permission_for_user_and_path(connection: sqlite3.Connection, user: str, path: Path) -> ComputedPermission:
     rules: List[PermissionRule] = get_rules_for_path(connection, path)
     return ComputedPermission.from_user_rules_and_path(rules=rules, user=user, path=path)
 
@@ -65,7 +65,7 @@ class FileStore:
             cursor = conn.cursor()
             cursor.execute("BEGIN IMMEDIATE;")
             try:
-                db.delete_file_metadata(cursor, str(path))
+                db.delete_file_metadata(conn, str(path))
             except ValueError:
                 pass
 
@@ -92,7 +92,7 @@ class FileStore:
             abs_path = self.server_settings.snapshot_folder / metadata.path
 
             if not Path(abs_path).exists():
-                self.delete(metadata.path.as_posix(), user)
+                self.delete(Path(metadata.path.as_posix()), user)
                 raise ValueError("File not found")
             return SyftFile(
                 metadata=metadata,
@@ -170,8 +170,12 @@ class FileStore:
             # If we write the file first and then insert, we might have to revert the file, but we need to
             # set it to the old date modified.
             metadata = hash_file(abs_path, root_dir=self.server_settings.snapshot_folder)
-            db.save_file_metadata(cursor, metadata)
-
+            if metadata is None:
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Failed to hash file {abs_path}",
+                )
+            db.save_file_metadata(conn, metadata)
             if path.name.endswith(PERM_FILE):
                 try:
                     permfile = SyftPermission.from_bytes(contents, path)

@@ -5,26 +5,26 @@ import os
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from typing_extensions import Any, Self, Union
+from typing_extensions import Any, Iterator, Self, Union
 
 if TYPE_CHECKING:
     pass
 
-SyftBoxContext = Union["Client", "SyftClientInterface"]
+SyftBoxContext = Union["Client", "SyftClientInterface"]  # type: ignore[name-defined]
 
 USER_GROUP_GLOBAL = "GLOBAL"
 
 ICON_FILE = "Icon"  # special
-IGNORE_FILES = []
+IGNORE_FILES: list = []
 
 
-def is_primitive_json_serializable(obj):
+def is_primitive_json_serializable(obj: Any) -> bool:
     if isinstance(obj, (str, int, float, bool, type(None))):
         return True
     return False
 
 
-def pack(obj) -> Any:
+def pack(obj: Any) -> Any:
     if is_primitive_json_serializable(obj):
         return obj
 
@@ -52,18 +52,19 @@ class Jsonable:
             output[k] = pack(v)
         return output
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[tuple[str, Any]]:
         for key, val in self.to_dict().items():
             if key.startswith("_"):
                 yield key, val
 
-    def __getitem__(self, key):
+    def __getitem__(self, key: str) -> Any:
         if key.startswith("_"):
             return None
         return self.to_dict()[key]
 
     @classmethod
     def load(cls, file_or_bytes: Union[str, Path, bytes]) -> Self:
+        data: Union[str, bytes]
         try:
             if isinstance(file_or_bytes, (str, Path)):
                 with open(file_or_bytes) as f:

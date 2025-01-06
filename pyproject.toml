@@ -25,6 +25,7 @@ dependencies = [
     "pydantic[email]==2.10.3",
     "pyjwt==2.10.1",
     "wcmatch==10.0",
+    "curl-cffi>=0.7.4",
     "opentelemetry-instrumentation-fastapi==0.50b0",
     "opentelemetry-instrumentation-sqlite3==0.50b0",
     "opentelemetry-exporter-otlp-proto-grpc==1.29.0",
@@ -52,6 +53,7 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.sdist]
 include = ["syftbox", "default_apps", "./uv.lock", "./README.md"]
+exclude = ["syftbox/assets/icon/*"]
 
 [tool.uv]
 # add using `uv add --dev <group> <pip package>`
