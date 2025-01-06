@@ -33,7 +33,7 @@ class SyncWidget(Static):
     def on_mount(self) -> None:
         self._refresh_table()
 
-    def _refresh_table(self, path_filter: str | None = None) -> None:
+    def _refresh_table(self, path_filter: Optional[str] = None) -> None:
         self.table.clear()
 
         status_info = self._get_sync_state(path_filter)
