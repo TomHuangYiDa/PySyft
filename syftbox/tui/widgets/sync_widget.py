@@ -18,11 +18,13 @@ class SyncWidget(Static):
     def __init__(self, syftbox_context: Client) -> None:
         super().__init__()
         self.syftbox_context = syftbox_context
-        self.default_filter = f"{syftbox_context.email}/**"
 
     def compose(self) -> Any:
         yield Label("Filter Files")
-        yield Input(value=self.default_filter, placeholder="glob pattern", id="path_filter")
+        yield Input(
+            placeholder="Enter a glob pattern to filter files",
+            id="path_filter",
+        )
 
         self.table = DataTable()
         self.table.add_columns("Path", "Status", "Action", "Last Update", "Message")

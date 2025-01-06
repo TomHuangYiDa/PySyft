@@ -18,6 +18,7 @@ class SyftBoxTUI(App):
         ("a", "switch_tab('APIs')", "APIs"),
         ("d", "switch_tab('Datasites')", "Datasites"),
         ("s", "switch_tab('Sync')", "Sync"),
+        ("q", "quit", "Quit"),
     ]
 
     def __init__(
