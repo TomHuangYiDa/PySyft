@@ -21,7 +21,7 @@ class SyftLogsWidget(Static):
         endpoint: Optional[str] = None,
         title: Optional[str] = None,
         refresh_every: int = 2,
-        classes: str | None = None,
+        classes: Optional[str] = None,
     ) -> None:
         super().__init__(classes=classes)
         self.syftbox_context = syftbox_context
