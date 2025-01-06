@@ -1249,7 +1249,6 @@ name = "importlib-metadata"
 version = "8.5.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "zipp", marker = "python_full_version <= '3.11'" },
     { name = "zipp" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/cd/12/33e59336dca5be0c398a7482335911a33aa0e20776128f038019f1a95f1b/importlib_metadata-8.5.0.tar.gz", hash = "sha256:71522656f0abace1d072b9e5481a48f07c138e00f079c38c8f883823f9c26bd7", size = 55304 }
@@ -2765,6 +2764,7 @@ dependencies = [
     { name = "pyjwt" },
     { name = "python-multipart" },
     { name = "pyyaml" },
+    { name = "requests" },
     { name = "rich" },
     { name = "textual" },
     { name = "tqdm" },
@@ -2814,6 +2814,7 @@ requires-dist = [
     { name = "pyjwt", specifier = "==2.10.1" },
     { name = "python-multipart", specifier = "==0.0.19" },
     { name = "pyyaml", specifier = "==6.0.2" },
+    { name = "requests", specifier = ">=2.32.3" },
     { name = "rich", specifier = "==13.9.4" },
     { name = "textual", specifier = ">=1.0.0" },
     { name = "tqdm", specifier = ">=4.67.1" },
