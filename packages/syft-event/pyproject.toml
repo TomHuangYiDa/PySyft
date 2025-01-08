@@ -7,16 +7,14 @@ requires-python = ">=3.9"
 dependencies = [
     "pathspec>=0.12.1",
     "pydantic>=2.9.2",
-    "syftbox",
     "watchdog>=5.0.3",
+    "syftbox>=0.2.10",
+    "syft-rpc",
 ]
 
-[tool.setuptools]
-packages = { find = {} }    # Use the find directive as a table
-include-package-data = true # Include package data
-
 [tool.uv.sources]
-syft-rpc = { path = "../syft-rpc" }
+syft-rpc = { workspace = true }
 
-[dependency-groups]
-dev = ["syft-rpc"]
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

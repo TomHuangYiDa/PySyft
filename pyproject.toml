@@ -1,0 +1,23 @@
+[project]
+name = "syft-extras"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "syft-event",
+    "syft-proxy",
+    "syft-rpc",
+    "syft-requests",
+    "syft-files",
+]
+
+[tool.uv.sources]
+syft-event = { workspace = true }
+syft-proxy = { workspace = true }
+syft-rpc = { workspace = true }
+syft-requests = { workspace = true }
+syft-files = { workspace = true }
+
+[tool.uv.workspace]
+members = ["packages/*"]

@@ -6,7 +6,6 @@ readme = "README.md"
 requires-python = ">=3.9"
 dependencies = []
 
-
-[tool.setuptools]
-packages = { find = {} }    # Use the find directive as a table
-include-package-data = true # Include package data
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
