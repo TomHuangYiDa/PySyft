@@ -1207,7 +1207,7 @@ requires-dist = [
 [[package]]
 name = "syft-extras"
 version = "0.1.0"
-source = { virtual = "." }
+source = { editable = "." }
 dependencies = [
     { name = "syft-core" },
     { name = "syft-event" },
@@ -1241,7 +1241,6 @@ dependencies = [
     { name = "syft-core" },
     { name = "syft-event" },
     { name = "syft-rpc" },
-    { name = "syftbox" },
 ]
 
 [package.metadata]
@@ -1250,7 +1249,6 @@ requires-dist = [
     { name = "syft-core", editable = "packages/syft-core" },
     { name = "syft-event", editable = "packages/syft-event" },
     { name = "syft-rpc", editable = "packages/syft-rpc" },
-    { name = "syftbox", specifier = ">=0.2.10" },
 ]
 
 [[package]]
@@ -1273,7 +1271,6 @@ dependencies = [
     { name = "pydantic" },
     { name = "python-ulid" },
     { name = "syft-core" },
-    { name = "syftbox" },
     { name = "typing-extensions" },
 ]
 
@@ -1283,7 +1280,6 @@ requires-dist = [
     { name = "pydantic", specifier = ">=2.9.2" },
     { name = "python-ulid", specifier = ">=3.0.0" },
     { name = "syft-core", editable = "packages/syft-core" },
-    { name = "syftbox", specifier = ">=0.2.10" },
     { name = "typing-extensions", specifier = ">=4.12.2" },
 ]
 

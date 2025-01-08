@@ -13,6 +13,13 @@ dependencies = [
     "syft-files",
 ]
 
+[project.scripts]
+syft-extras = "syft_extras:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
 [tool.uv.sources]
 syft-core = { workspace = true }
 syft-event = { workspace = true }
