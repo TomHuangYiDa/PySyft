@@ -1,21 +1,14 @@
 [project]
-name = "syft-rpc"
+name = "syft-core"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.9"
 dependencies = [
-    "cbor2>=5.6.5",
-    "pydantic>=2.9.2",
-    "python-ulid>=3.0.0",
-    "syft-core",
-    "syftbox>=0.2.10",
+    "pydantic[email]>=2.10.4",
     "typing-extensions>=4.12.2",
 ]
 
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
-
-[tool.uv.sources]
-syft-core = { workspace = true }

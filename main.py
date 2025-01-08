@@ -1,3 +1,4 @@
+import syft_core
 import syft_event
 import syft_proxy
 import syft_requests
@@ -5,6 +6,7 @@ import syft_rpc
 import syft_files
 
 if __name__ == "__main__":
+    print("syft-core", syft_core.__version__)
     print("syft-event", syft_event.__version__)
     print("syft-proxy", syft_proxy.__version__)
     print("syft-requests", syft_rpc.__version__)

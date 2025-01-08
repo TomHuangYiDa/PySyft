@@ -13,7 +13,7 @@ from pydantic import BaseModel, field_validator
 from typing_extensions import Any, Self
 from ulid import ULID
 
-from syftbox.lib import Client
+from syft_core import Client
 
 from .json import JSONModel
 from .serde import base64_to_bytes, serializers

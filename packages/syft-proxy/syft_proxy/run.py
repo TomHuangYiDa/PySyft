@@ -6,7 +6,7 @@ import uvicorn
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, Response
 from syft_rpc import Request as RPCRequest, SyftBoxURL
-from syftbox.lib import Client
+from syft_core import Client
 from contextlib import asynccontextmanager
 import asyncio
 
