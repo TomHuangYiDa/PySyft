@@ -1,5 +1,5 @@
 [project]
-name = "syft-requests"
+name = "syft-files"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
@@ -10,9 +10,3 @@ dependencies = []
 [tool.setuptools]
 packages = { find = {} }    # Use the find directive as a table
 include-package-data = true # Include package data
-
-[tool.uv.sources]
-syft-rpc = { path = "../syft-rpc", editable = true }
-
-[dependency-groups]
-dev = ["syft-rpc"]

@@ -4,7 +4,12 @@ version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.9"
-dependencies = ["pydantic>=2.9.2", "syftbox", "watchdog>=5.0.3"]
+dependencies = [
+    "pathspec>=0.12.1",
+    "pydantic>=2.9.2",
+    "syftbox",
+    "watchdog>=5.0.3",
+]
 
 [tool.setuptools]
 packages = { find = {} }    # Use the find directive as a table
