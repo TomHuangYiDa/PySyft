@@ -21,6 +21,7 @@ _nc := '\033[0m'
 # ---------------------------------------------------------------------------------------------------------------------
 # Aliases
 
+alias ba := build-all
 alias rj := run-jupyter
 
 # ---------------------------------------------------------------------------------------------------------------------
@@ -28,14 +29,13 @@ alias rj := run-jupyter
 @default:
     just --list
 
+[group('build')]
+build-all:
+    uv build --all-packages
 
 [group('utils')]
 run-jupyter jupyter_args="":
-    uv venv
-    uv pip install --reinstall ./syft-event
-    uv pip install --reinstall ./syft-files
-    uv pip install --reinstall ./syft-requests
-    uv pip install --reinstall ./syft-rpc
+    uv sync
 
     uv run --frozen --with "jupyterlab" \
         jupyter lab {{ jupyter_args }}

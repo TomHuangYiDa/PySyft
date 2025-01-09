@@ -1,0 +1,32 @@
+[project]
+name = "syft-extras"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+    "syft-core",
+    "syft-event",
+    "syft-proxy",
+    "syft-rpc",
+    "syft-requests",
+    "syft-files",
+]
+
+[project.scripts]
+syft-extras = "syft_extras:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.uv.sources]
+syft-core = { workspace = true }
+syft-event = { workspace = true }
+syft-proxy = { workspace = true }
+syft-rpc = { workspace = true }
+syft-requests = { workspace = true }
+syft-files = { workspace = true }
+
+[tool.uv.workspace]
+members = ["packages/*"]

@@ -1,0 +1,21 @@
+[project]
+name = "syft-event"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+    "syft-rpc",
+    "pathspec>=0.12.1",
+    "pydantic>=2.9.2",
+    "watchdog>=5.0.3",
+    "syftbox>=0.2.10",
+    "typing-extensions>=4.12.2",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.uv.sources]
+syft-rpc = { workspace = true }
