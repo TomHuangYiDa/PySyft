@@ -73,60 +73,44 @@ the permission for a client:
 Ignoring this change will break any app you have already developed so please take note.
 
 
-## What's Changed
-* prepare sync plugin for dashboard by @eelcovdw in https://github.com/OpenMined/syft/pull/440
-* Cleanup sync and log sync status locally by @eelcovdw in https://github.com/OpenMined/syft/pull/443
-* Fix flaky e2e test by @khoaguin in https://github.com/OpenMined/syft/pull/448
-* add path alias for file_path in LocalState by @shubham3121 in https://github.com/OpenMined/syft/pull/452
-* Check client version on startup + log user OS to analytics by @eelcovdw in https://github.com/OpenMined/syft/pull/451
-* sync dashboard by @eelcovdw in https://github.com/OpenMined/syft/pull/404
-* revert localstate path by @eelcovdw in https://github.com/OpenMined/syft/pull/454
-* Fix symlink race condition by @eelcovdw in https://github.com/OpenMined/syft/pull/453
-* change model arch filename by @shubham3121 in https://github.com/OpenMined/syft/pull/459
-* fix client shutdown by @abyesilyurt in https://github.com/OpenMined/syft/pull/457
-* Remove git as a dependency for the starter_app by @abyesilyurt in https://github.com/OpenMined/syft/pull/458
-* refactor sync endpoints by @eelcovdw in https://github.com/OpenMined/syft/pull/460
-* [ci] temporarily disable fl model training by @rasswanth-s in https://github.com/OpenMined/syft/pull/464
-* enable globstar and fill permission tables in db init by @abyesilyurt in https://github.com/OpenMined/syft/pull/462
-* Add permission + rejection logic to Consumer by @eelcovdw in https://github.com/OpenMined/syft/pull/465
-* ADD cpu_tracker as a default app by @IonesioJunior in https://github.com/OpenMined/syft/pull/466
-* permission integration tests by @eelcovdw in https://github.com/OpenMined/syft/pull/469
-* Added Computed Permissions tests by @teo-milea in https://github.com/OpenMined/syft/pull/471
-* Removing terminal permissions by @teo-milea in https://github.com/OpenMined/syft/pull/472
-* cleanup repo by @yashgorana in https://github.com/OpenMined/syft/pull/475
-* Bump pyjwt from 2.10.0 to 2.10.1 by @dependabot in https://github.com/OpenMined/syft/pull/477
-* Bump python-multipart from 0.0.12 to 0.0.19 by @dependabot in https://github.com/OpenMined/syft/pull/476
-* pin new versions by @yashgorana in https://github.com/OpenMined/syft/pull/478
-* Configure Renovate by @renovate in https://github.com/OpenMined/syft/pull/479
-* Test Renovate by @rasswanth-s in https://github.com/OpenMined/syft/pull/483
-* Update astral-sh/setup-uv action to v4 by @renovate in https://github.com/OpenMined/syft/pull/480
-* Update dcarbone/install-jq-action action to v3 by @renovate in https://github.com/OpenMined/syft/pull/481
-* update renovate schema by @rasswanth-s in https://github.com/OpenMined/syft/pull/486
-* Lock file maintenance by @renovate in https://github.com/OpenMined/syft/pull/488
-* Update dependency pyjwt to v2.10.1 [SECURITY] by @renovate in https://github.com/OpenMined/syft/pull/489
-* permissions implementation by @koenvanderveen in https://github.com/OpenMined/syft/pull/397
-* migration fix by @koenvanderveen in https://github.com/OpenMined/syft/pull/490
-* fix staging issues by @eelcovdw in https://github.com/OpenMined/syft/pull/491
-* fix logic by @koenvanderveen in https://github.com/OpenMined/syft/pull/492
-* fix public write method by @koenvanderveen in https://github.com/OpenMined/syft/pull/493
-* add permission method by @koenvanderveen in https://github.com/OpenMined/syft/pull/494
-* FastAPI OTEL instrumentation by @khoaguin in https://github.com/OpenMined/syft/pull/468
-* OTEL disabled by default by @yashgorana in https://github.com/OpenMined/syft/pull/496
-* Fix perm factory methods by @eelcovdw in https://github.com/OpenMined/syft/pull/497
-* Telemetry: Add OS name, version and arch attributes by @khoaguin in https://github.com/OpenMined/syft/pull/495
-* update save by @abyesilyurt in https://github.com/OpenMined/syft/pull/499
-* migrate + gunicorn by @yashgorana in https://github.com/OpenMined/syft/pull/500
-* Migrate before running the server by @eelcovdw in https://github.com/OpenMined/syft/pull/498
-* move to hatchling + leaner builds by @yashgorana in https://github.com/OpenMined/syft/pull/503
-* Sync Benchmark Metrics by @shubham3121 in https://github.com/OpenMined/syft/pull/504
-* rename clientside components, add client for server communication by @eelcovdw in https://github.com/OpenMined/syft/pull/467
-* add streaming bulk downloads by @abyesilyurt in https://github.com/OpenMined/syft/pull/507
-* Enable mypy by @khoaguin in https://github.com/OpenMined/syft/pull/419
-* Benchmark Report by @shubham3121 in https://github.com/OpenMined/syft/pull/463
-* Server Request Size Limit by @rasswanth-s in https://github.com/OpenMined/syft/pull/512
-* track user geo location of the client user by @shubham3121 in https://github.com/OpenMined/syft/pull/514
-* Textual TUI prototype by @eelcovdw in https://github.com/OpenMined/syft/pull/508
-* staging fix by @eelcovdw in https://github.com/OpenMined/syft/pull/519
+# Changelog
+
+## New Features
+- **Sync Plugin for Dashboard**: Prepared the sync plugin for dashboard integration. ([#440](https://github.com/OpenMined/syft/pull/440))
+- **Streaming Bulk Downloads**: Added support for streaming bulk downloads. ([#507](https://github.com/OpenMined/syft/pull/507))
+- **Permission Management**: Implemented permissions and rejection logic for Consumer. ([#465](https://github.com/OpenMined/syft/pull/465))
+- **Telemetry Enhancements**: Added OS name, version, and architecture to telemetry. ([#495](https://github.com/OpenMined/syft/pull/495))
+- **Textual TUI Prototype**: Introduced a prototype for a Textual TUI. ([#508](https://github.com/OpenMined/syft/pull/508))
+- **Default App**: Added `cpu_tracker` as a default app. ([#466](https://github.com/OpenMined/syft/pull/466))
+
+## Improvements
+- **Client Version Check**: Added version validation on startup and OS logging to analytics. ([#451](https://github.com/OpenMined/syft/pull/451))
+- **Path Alias Support**: Introduced a path alias for `file_path` in `LocalState`. ([#452](https://github.com/OpenMined/syft/pull/452))
+- **Server Communication Enhancements**: Renamed client-side components and added a client for server communication. ([#467](https://github.com/OpenMined/syft/pull/467))
+- **Mypy Integration**: Enabled mypy for static type checking. ([#419](https://github.com/OpenMined/syft/pull/419))
+- **Lean Builds**: Migrated to `hatchling` for leaner builds. ([#503](https://github.com/OpenMined/syft/pull/503))
+
+## Fixes
+- **E2E Test Stability**: Fixed flaky end-to-end tests. ([#448](https://github.com/OpenMined/syft/pull/448))
+- **Client Shutdown**: Addressed issues with client shutdown handling. ([#457](https://github.com/OpenMined/syft/pull/457))
+- **Symlink Race Condition**: Resolved a race condition with symlinks. ([#453](https://github.com/OpenMined/syft/pull/453))
+- **Staging Issues**: Applied fixes to staging environments. ([#491](https://github.com/OpenMined/syft/pull/491), [#519](https://github.com/OpenMined/syft/pull/519))
+- **Public Write Method**: Corrected logic in the public write method. ([#493](https://github.com/OpenMined/syft/pull/493))
+
+## Refactoring and Cleanup
+- **Sync Refactor**: Refactored sync endpoints and cleaned up sync-related code. ([#443](https://github.com/OpenMined/syft/pull/443), [#460](https://github.com/OpenMined/syft/pull/460))
+- **Repo Cleanup**: Performed repository-wide cleanup and maintenance. ([#475](https://github.com/OpenMined/syft/pull/475))
+- **Pin Versions**: Pinned dependencies to specific versions. ([#478](https://github.com/OpenMined/syft/pull/478))
+
+## Dependency Updates
+- **`pyjwt`**: Bumped from 2.10.0 to 2.10.1. ([#477](https://github.com/OpenMined/syft/pull/477))
+- **`python-multipart`**: Bumped from 0.0.12 to 0.0.19. ([#476](https://github.com/OpenMined/syft/pull/476))
+
+## Miscellaneous
+- **OTEL Instrumentation**: Added FastAPI OTEL instrumentation (disabled by default). ([#468](https://github.com/OpenMined/syft/pull/468), [#496](https://github.com/OpenMined/syft/pull/496))
+- **Benchmarking**: Added benchmark metrics and reports. ([#504](https://github.com/OpenMined/syft/pull/504), [#463](https://github.com/OpenMined/syft/pull/463))
+- **Server Configurations**: Introduced a server request size limit and migration handling. ([#512](https://github.com/OpenMined/syft/pull/512), [#498](https://github.com/OpenMined/syft/pull/498))
+
 
 **Full Changelog**: https://github.com/OpenMined/syft/compare/0.2.11...0.2.12
 
