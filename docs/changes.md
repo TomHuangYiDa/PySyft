@@ -11,7 +11,7 @@ you might need as a `SyftBox` user (Logs, Tutorials, APIs, FileSystem and more),
 You can try it by running the following command:
 
 ```
-python syftbox/main.py tui --config path/to/syftbox/config.json
+syftbox tui --config path/to/syftbox/config.json
 ```
 
 You need to clone our repo and have a client already running. Here is a preview in case you are not convinced yet:
