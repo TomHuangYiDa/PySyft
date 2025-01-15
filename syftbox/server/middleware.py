@@ -52,7 +52,7 @@ class RequestSizeLimitMiddleware(BaseHTTPMiddleware):
         return response
 
 
-class VersionCheckMIddleware(BaseHTTPMiddleware):
+class VersionCheckMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
         logger.info(request.headers)
         client_version = request.headers.get(HEADER_SYFTBOX_VERSION.decode("utf-8"))
@@ -62,6 +62,9 @@ class VersionCheckMIddleware(BaseHTTPMiddleware):
             #     status_code=status.HTTP_400_BAD_REQUEST,
             #     content="Client version not provided. Please include the 'Version' header.",
             # )
+            response = await call_next(request)
+            return response
+
 
         if version.parse(client_version) < version.parse(MIN_SUPPORTED_VERSION):
             logger.warning("version too old, next release we will return an error")
@@ -69,6 +72,9 @@ class VersionCheckMIddleware(BaseHTTPMiddleware):
             #     status_code=status.HTTP_426_UPGRADE_REQUIRED,
             #     content=f"Client version is too old. Minimum version required is {MIN_SUPPORTED_VERSION}",
             # )
+            response = await call_next(request)
+            return response
+
 
         response = await call_next(request)
         return response
