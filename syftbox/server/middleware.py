@@ -65,7 +65,6 @@ class VersionCheckMiddleware(BaseHTTPMiddleware):
             response = await call_next(request)
             return response
 
-
         if version.parse(client_version) < version.parse(MIN_SUPPORTED_VERSION):
             logger.warning("version too old, next release we will return an error")
             # return Response(
@@ -74,7 +73,6 @@ class VersionCheckMiddleware(BaseHTTPMiddleware):
             # )
             response = await call_next(request)
             return response
-
 
         response = await call_next(request)
         return response
