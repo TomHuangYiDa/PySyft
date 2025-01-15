@@ -11,6 +11,7 @@ from syftbox.lib.client_config import SyftClientConfig
 from syftbox.lib.http import HEADER_SYFTBOX_USER, SYFTBOX_HEADERS
 from syftbox.lib.workspace import SyftWorkspace
 
+
 class PluginManagerInterface(Protocol):
     """All initialized plugins."""
 
