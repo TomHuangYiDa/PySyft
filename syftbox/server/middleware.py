@@ -58,17 +58,17 @@ class VersionCheckMIddleware(BaseHTTPMiddleware):
         client_version = request.headers.get(HEADER_SYFTBOX_VERSION.decode("utf-8"))
         if not client_version:
             logger.warning("version not found, next release we will return an error")
-            return Response(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                content="Client version not provided. Please include the 'Version' header.",
-            )
+            # return Response(
+            #     status_code=status.HTTP_400_BAD_REQUEST,
+            #     content="Client version not provided. Please include the 'Version' header.",
+            # )
 
         if version.parse(client_version) < version.parse(MIN_SUPPORTED_VERSION):
             logger.warning("version too old, next release we will return an error")
-            return Response(
-                status_code=status.HTTP_426_UPGRADE_REQUIRED,
-                content=f"Client version is too old. Minimum version required is {MIN_SUPPORTED_VERSION}",
-            )
+            # return Response(
+            #     status_code=status.HTTP_426_UPGRADE_REQUIRED,
+            #     content=f"Client version is too old. Minimum version required is {MIN_SUPPORTED_VERSION}",
+            # )
 
         response = await call_next(request)
         return response
