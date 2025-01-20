@@ -17,9 +17,13 @@ from pydantic.main import IncEx
 from pydantic_core import Url
 from typing_extensions import Self
 
-from .constants import DEFAULT_CONFIG_PATH, DEFAULT_DATA_DIR, DEFAULT_SERVER_URL
-from .exceptions import ClientConfigException
-from .types import PathLike, to_path
+from syft_core.constants import (
+    DEFAULT_CONFIG_PATH,
+    DEFAULT_DATA_DIR,
+    DEFAULT_SERVER_URL,
+)
+from syft_core.exceptions import ClientConfigException
+from syft_core.types import PathLike, to_path
 
 __all__ = ["SyftClientConfig"]
 
