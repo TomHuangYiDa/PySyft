@@ -78,6 +78,7 @@ class Message(JSONModel):
 
     def send(self, client):
         file = self.file_path(client)
+        file.parent.mkdir(parents=True, exist_ok=True)
         with open(file, "wb") as f:
             output = self.dump()
             if isinstance(output, str):

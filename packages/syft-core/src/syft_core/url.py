@@ -65,9 +65,10 @@ class SyftBoxURL:
         http_url = f"http://{rpc_url}?{url_params}"
         return http_url
 
-    def from_path(self, path: PathLike, workspace: SyftWorkspace) -> str:
+    @classmethod
+    def from_path(cls, path: PathLike, workspace: SyftWorkspace) -> str:
         rel_path = to_path(path).relative_to(workspace.datasites)
-        return f"syft://{rel_path}"
+        return cls(f"syft://{rel_path}")
 
     def __repr__(self):
         return self.url
