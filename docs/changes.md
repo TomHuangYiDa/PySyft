@@ -2,8 +2,7 @@
 
 ### Textual UI
 
-In this release we have started experimenting with new ways to improve the user experience as we are aware the main
-blocker for most people to use our library is a trustworthy interface.
+In this release we have started experimenting with new ways to improve the user experience using SyftBox.
 
 The first step in this regard is a GUI using [Textual](https://textual.textualize.io/) which will have all the information
 you might need as a `SyftBox` user (Logs, Tutorials, APIs, FileSystem and more), neatly organized and easily accessible.
@@ -14,7 +13,7 @@ You can try it by running the following command:
 syftbox tui --config path/to/syftbox/config.json
 ```
 
-You need to clone our repo and have a client already running. Here is a preview in case you are not convinced yet:
+Make sure you have a client already running. Here is a preview in case you are not convinced yet:
 
 <img src="assets/tui_example.png" alt="drawing" width="1280"/>
 
