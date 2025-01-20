@@ -2,13 +2,13 @@ from syftbox import __version__
 from syftbox.lib.platform import OS_ARCH, OS_NAME, OS_VERSION, PYTHON_VERSION
 
 # keep these as bytes as otel hooks return headers as bytes
-HEADER_SYFTBOX_VERSION = b"x-syftbox-version"
-HEADER_SYFTBOX_PYTHON = b"x-syftbox-python"
-HEADER_SYFTBOX_USER = b"x-syftbox-user"
-HEADER_OS_NAME = b"x-os-name"
-HEADER_OS_VERSION = b"x-os-ver"
-HEADER_OS_ARCH = b"x-os-arch"
-HEADER_GEO_COUNTRY = b"x-geo-country"  # Country of the user, added by Azure Front Door
+HEADER_SYFTBOX_VERSION = "x-syftbox-version"
+HEADER_SYFTBOX_USER = "x-syftbox-user"
+HEADER_SYFTBOX_PYTHON = "x-syftbox-python"
+HEADER_OS_NAME = "x-os-name"
+HEADER_OS_VERSION = "x-os-ver"
+HEADER_OS_ARCH = "x-os-arch"
+HEADER_GEO_COUNTRY = "x-geo-country"  # Country of the user, added by Azure Front Door
 
 SYFTBOX_HEADERS = {
     "User-Agent": f"SyftBox/{__version__} (Python {PYTHON_VERSION}; {OS_NAME} {OS_VERSION}; {OS_ARCH})",
