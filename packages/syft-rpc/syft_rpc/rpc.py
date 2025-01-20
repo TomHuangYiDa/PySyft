@@ -1,198 +1,32 @@
-import json
-import os
-import time
-from collections import defaultdict
-from datetime import datetime, timezone
-from pathlib import Path
+from datetime import datetime, timedelta, timezone
 
-import cbor2
-from pydantic import BaseModel, field_validator
-from syft_core import Client, SyftBoxURL
-from typing_extensions import Any, Self
-from ulid import ULID
+from syft_core.client_shim import Client
+from syft_core.url import SyftBoxURL
 
-from .json import JSONModel
-from .serde import base64_to_bytes, serializers
+from .proto import SyftFuture, SyftMethod, SyftRequest
 
 
-class RPCRegistry:
-    requests: dict[str, str | None] = defaultdict(lambda: None)
+def send(
+    client: Client,
+    method: SyftMethod,
+    url: SyftBoxURL,
+    headers: dict[str, str],
+    body: str | bytes | None = None,
+    expiry_secs: int = 86400,
+) -> SyftFuture:
+    syft_request = SyftRequest(
+        sender=client.email,
+        method=method,
+        url=url,
+        headers=headers,
+        body=body.encode() if isinstance(body, str) else body,
+        expires=datetime.now(timezone.utc) + timedelta(seconds=expiry_secs),
+    )
 
-
-serializers[SyftBoxURL] = str
-
-
-def mk_timestamp() -> float:
-    return datetime.now(timezone.utc).timestamp()
-
-
-class Message(JSONModel):
-    ulid: ULID
-    sender: str
-    headers: dict[str, str]
-    timestamp: float = mk_timestamp()
-    body: bytes | None
-    url: SyftBoxURL
-
-    @property
-    def url_path(self):
-        return self.url.path
-
-    @field_validator("url", mode="before")
-    @classmethod
-    def validate_url(cls, value: Any) -> SyftBoxURL:
-        """
-        Custom field validator for 'url' to convert a string to SyftBoxURL.
-        """
-        if isinstance(value, str):
-            return SyftBoxURL(value)
-        if isinstance(value, SyftBoxURL):
-            return value
-        raise ValueError(
-            f"Invalid type for url: {type(value)}. Expected str or SyftBoxURL."
-        )
-
-    def local_path(self, client):
-        return self.url.to_local_path(client.workspace.datasites)
-
-    def file_path(self, client):
-        p = self.local_path(client) / f"{self.ulid}.{self.message_type}"
-        p.parent.mkdir(parents=True, exist_ok=True)
-        return p
-
-    def decode(self):
-        if "content-type" in self.headers:
-            if self.headers["content-type"] == "application/json":
-                try:
-                    b = base64_to_bytes(self.body)
-                    return json.loads(b)
-                except Exception as e:
-                    raise e
-            if self.headers["content-type"] == "application/cbor":
-                try:
-                    return cbor2.loads(self.body)
-                except Exception as e:
-                    raise e
-        else:
-            return self.body.decode("utf-8")
-
-    def send(self, client):
-        file = self.file_path(client)
-        file.parent.mkdir(parents=True, exist_ok=True)
-        with open(file, "wb") as f:
-            output = self.dump()
-            if isinstance(output, str):
-                output = output.encode("utf-8")
-            f.write(output)
-
-
-class ResponseMessage(Message):
-    message_type: str = "response"
-    status_code: int = 200
-
-
-class RequestMessage(Message):
-    message_type: str = "request"
-
-    def reply(
-        self,
-        from_sender: str,
-        body: object | str | bytes,
-        headers: dict[str, str] | None,
-        status_code: int = 200,
-    ) -> Self:
-        if headers is None:
-            headers = {}
-        if isinstance(body, str):
-            body = body.encode("utf-8")
-        elif hasattr(body, "dump"):
-            body = body.dump()
-        elif not isinstance(body, bytes):
-            raise Exception(f"Invalid body type: {type(body)}")
-
-        return ResponseMessage(
-            ulid=self.ulid,
-            sender=from_sender,
-            headers=headers,
-            status_code=status_code,
-            timestamp=mk_timestamp(),
-            body=body,
-            url=self.url,
-        )
-
-
-def read_response(local_path: Path) -> ResponseMessage | None:
-    try:
-        if not os.path.exists(local_path):
-            # not ready
-            return None
-
-        with open(local_path, "rb") as file:
-            return Message.load(file.read())
-    except Exception as e:
-        print("read_messsage got an error", e)
-        raise e
-
-
-class Future(BaseModel):
-    local_path: Path
-    value: Any = None
-
-    def wait(self, timeout=5):
-        start = time.time()
-        while time.time() - start < timeout:
-            self.check(silent=True)
-            if self.value is not None:
-                return self.value
-            time.sleep(0.1)
-        raise TimeoutError(f"Timeout reached waiting {timeout} for response")
-
-    @property
-    def resolve(self):
-        if self.value is None:
-            self.check()
-        return self.value
-
-    def check(self, silent=False):
-        result = read_response(local_path=self.local_path)
-        if result is None:
-            if not silent:
-                print("not ready yet waiting")
-        self.value = result
-
-
-rpc_registry = RPCRegistry()
-
-
-class Request:
-    def __init__(self, client=None):
-        if client is None:
-            self.client = Client.load()
-        else:
-            self.client = client
-
-    def get(self, url: str, body: Any, headers: dict[str, str] | None = None) -> Future:
-        syftbox_url = SyftBoxURL(url)
-        return self.send_request(syftbox_url, body=body, headers=headers)
-
-    def send_request(
-        self, url, body: Any, headers: dict[str, str] | None = None
-    ) -> Future:
-        if headers is None:
-            headers = {}
-        m = RequestMessage(
-            ulid=ULID(),
-            url=url,
-            sender=self.client.email,
-            timestamp=mk_timestamp(),
-            body=body,
-            headers=headers,
-        )
-        request_path = m.file_path(self.client)
-        if request_path in rpc_registry.requests:
-            raise Exception(f"Already sent request: {request_path}")
-
-        response_path = Path(str(request_path).replace("request", "response"))
-        m.send(self.client)
-        rpc_registry.requests[request_path] = None
-        return Future(local_path=response_path)
+    local_path = url.to_local_path(client.workspace.datasites)
+    file_path = local_path / f"{syft_request.ulid}.request"
+    local_path.mkdir(parents=True, exist_ok=True)
+    output = syft_request.dump()
+    file_path.write_text(output)
+    future = SyftFuture(request_path=file_path)
+    return future
