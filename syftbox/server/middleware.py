@@ -55,7 +55,7 @@ class RequestSizeLimitMiddleware(BaseHTTPMiddleware):
 class VersionCheckMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
         logger.info(request.headers)
-        client_version = request.headers.get(HEADER_SYFTBOX_VERSION.decode("utf-8"))
+        client_version = request.headers.get(HEADER_SYFTBOX_VERSION)
         if not client_version:
             logger.warning("version not found, next release we will return an error")
             # return Response(
