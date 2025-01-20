@@ -8,7 +8,7 @@ dependencies = [
     "fastapi==0.115.6",
     "uvicorn==0.32.1",
     "gunicorn==23.0.0",
-    "jinja2==3.1.4",
+    "jinja2==3.1.5",
     "typing-extensions==4.12.2",
     "pydantic-settings==2.6.1",
     "httpx==0.28.1",
@@ -30,8 +30,11 @@ dependencies = [
     "opentelemetry-instrumentation-sqlite3==0.50b0",
     "opentelemetry-exporter-otlp-proto-grpc==1.29.0",
     "distro==1.9.0",
+    "textual>=1.0.0",
     "msgpack>=1.1.0",
     "tqdm>=4.67.1",
+    "aiofiles>=24.1.0",
+    "requests>=2.32.3",
 ]
 
 # Local dependencies for development
@@ -68,6 +71,7 @@ dev-dependencies = [
     "pytest-timeout>=2.3.1",
     "pytest-xdist[psutil]>=3.6.1",
     "pytest>=8.3.3",
+    "textual-dev>=1.7.0",
 ]
 
 [tool.pytest.ini_options]

@@ -4,6 +4,7 @@ import subprocess
 from pathlib import Path
 
 import yaml
+from aiofiles import open as aopen
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
@@ -165,26 +166,36 @@ async def app_command(ctx: APIContext, app_name: str, request: dict) -> JSONResp
 
 
 @router.get("/logs/{app_name}")
-async def app_logs(ctx: APIContext, app_name: str) -> JSONResponse:
+async def app_logs(
+    ctx: APIContext,
+    app_name: str,
+    limit: int = 256,
+    offset: int = 0,
+) -> JSONResponse:
     apps_dir = ctx.workspace.apps
-    all_apps = get_all_apps(apps_dir)
-    app_details = None
-    for app in all_apps:
-        if app_name == app.name:
-            app_details = app
-
-    # Raise 404 if app not found
-    if app_details is None:
+    app_dir = Path(apps_dir) / app_name
+    if not app_dir.is_dir():
         raise HTTPException(status_code=404, detail="App not found")
 
-    logs = []
+    logs: List[str] = []
+    log_file = app_dir / "logs" / f"{app_name}.log"
+    try:
+        if log_file.is_file():
+            async with aopen(log_file, "r") as file:
+                logs = await file.readlines()
 
-    # Read the log file if it exists
-    app_path = Path(app_details.path)
+        # Calculate pagination indices
+        total_logs = len(logs)
+        start_idx = max(0, total_logs - offset - limit)
+        end_idx = total_logs - offset if offset > 0 else total_logs
+        logs = logs[start_idx:end_idx]
 
-    log_file = app_path / "logs" / f"{app_name}.log"
-    if log_file.exists():
-        with open(log_file, "r") as file:
-            logs = file.readlines()
-
-    return JSONResponse(content={"logs": logs})
+        return JSONResponse(
+            content={
+                "logs": logs,
+                "total": total_logs,
+                "source": str(log_file),
+            }
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to retrieve logs: {str(e)}")
