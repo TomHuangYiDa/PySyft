@@ -3,7 +3,7 @@ from datetime import datetime, timedelta, timezone
 from syft_core.client_shim import Client
 from syft_core.url import SyftBoxURL
 
-from .proto import SyftFuture, SyftMethod, SyftRequest
+from .protocol import SyftFuture, SyftMethod, SyftRequest
 
 
 def send(
@@ -28,5 +28,18 @@ def send(
     local_path.mkdir(parents=True, exist_ok=True)
     output = syft_request.dump()
     file_path.write_text(output)
-    future = SyftFuture(request_path=file_path)
+
+    request_path = client.to_syft_url(file_path)
+    future = SyftFuture(request_path=request_path)
     return future
+
+
+if __name__ == "__main__":
+    client = Client.load()
+    send(
+        client,
+        SyftMethod.GET,
+        SyftBoxURL(url="syft://tauquir@openmined.org/public/rpc/"),
+        {},
+        "ping",
+    )

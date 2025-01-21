@@ -55,3 +55,5 @@ class SyftResponse(SyftMessage):
 
 class SyftFuture(BaseModel):
     request_path: SyftBoxURL
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)

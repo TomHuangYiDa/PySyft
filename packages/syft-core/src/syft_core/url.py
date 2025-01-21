@@ -1,50 +1,36 @@
 import re
 from pathlib import Path
-from typing import Dict
-from urllib.parse import ParseResult, urlencode, urlparse
-
-from pydantic import BaseModel, computed_field, field_validator
+from urllib.parse import urlencode, urlparse
 
 from syft_core.types import PathLike, to_path
 from syft_core.workspace import SyftWorkspace
 
 
-class SyftBoxURL(BaseModel):
-    url: str
-
-    # Configure Pydantic to use property getters
-    model_config = {
-        "validate_assignment": True,
-        "frozen": True,  # Make the model immutable like the original class
-    }
-
-    @field_validator("url")
-    def validate_url(cls, url: str) -> str:
-        """Validates the given URL matches the syft:// protocol and email-based schema."""
-        if isinstance(url, SyftBoxURL):
-            url = str(url)
-
-        pattern = r"^syft://([a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+)(/.*)?$"
-        if not re.match(pattern, url):
+class SyftBoxURL(str):
+    def __new__(cls, url: str):
+        instance = super().__new__(cls, url)
+        if not cls.is_valid(url):
             raise ValueError(f"Invalid SyftBoxURL: {url}")
-        return url
+        instance.parsed = urlparse(url)
+        return instance
 
-    @computed_field
-    def parsed(self) -> ParseResult:
-        """Returns the parsed URL components."""
-        return urlparse(self.url)
+    @classmethod
+    def is_valid(cls, url: str) -> bool:
+        """Validates the given URL matches the syft:// protocol and email-based schema."""
+        pattern = r"^syft://([a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+)(/.*)?$"
+        return bool(re.match(pattern, url))
 
-    @computed_field
+    @property
     def protocol(self) -> str:
         """Returns the protocol (syft://)."""
         return self.parsed.scheme + "://"
 
-    @computed_field
+    @property
     def host(self) -> str:
         """Returns the host, which is the email part."""
         return self.parsed.netloc
 
-    @computed_field
+    @property
     def path(self) -> str:
         """Returns the path component after the email."""
         return self.parsed.path
@@ -63,7 +49,7 @@ class SyftBoxURL(BaseModel):
         local_path = to_path(datasites_path) / self.host / self.path.lstrip("/")
         return local_path.resolve()
 
-    def as_http_params(self) -> Dict[str, str]:
+    def as_http_params(self) -> dict[str, str]:
         return {
             "method": "get",
             "datasite": self.host,
@@ -80,23 +66,16 @@ class SyftBoxURL(BaseModel):
     @classmethod
     def from_path(cls, path: PathLike, workspace: SyftWorkspace) -> "SyftBoxURL":
         rel_path = to_path(path).relative_to(workspace.datasites)
-        return cls(url=f"syft://{rel_path}")
-
-    def __str__(self) -> str:
-        return self.url
-
-    def __repr__(self) -> str:
-        return self.url
+        return cls(f"syft://{rel_path}")
 
 
 if __name__ == "__main__":
-    # Example usage
-    syftbox_url = SyftBoxURL(url="syft://info@domain.com/datasite1")
+    syftbox_url = SyftBoxURL("syft://info@domain.com/datasite1")
     print(syftbox_url.parsed)
     print(syftbox_url.to_local_path(Path("~/SyftBox/datasites")))
     print(syftbox_url.as_http_params())
     print(
-        syftbox_url.from_path(
+        SyftBoxURL.from_path(
             "~/SyftBox/datasites/test@openmined.org/public/some/path",
             SyftWorkspace(Path("~/SyftBox")),
         )
