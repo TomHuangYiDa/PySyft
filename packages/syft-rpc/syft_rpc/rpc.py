@@ -66,8 +66,7 @@ def send(
     output = syft_request.dump()
     file_path.write_text(output)
 
-    request_path = client.to_syft_url(file_path)
-    future = SyftFuture(request_path=request_path)
+    future = SyftFuture(ulid=syft_request.ulid, url=syft_request.url)
     return future
 
 

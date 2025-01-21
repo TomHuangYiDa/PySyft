@@ -18,6 +18,7 @@ class SyftMethod(StrEnum):
 
 class SyftStatus(IntEnum):
     SYFT_200_OK = 200
+    SYFT_201_CREATED = 201
 
 
 class SyftMessage(BaseModel):
@@ -64,6 +65,8 @@ class SyftResponse(SyftMessage):
 
 
 class SyftFuture(BaseModel):
-    request_path: SyftBoxURL
+    ulid: ULID
+    url: SyftBoxURL
+    status: SyftStatus = SyftStatus.SYFT_201_CREATED
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
