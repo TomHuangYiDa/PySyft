@@ -12,7 +12,6 @@ const humanMessage = {
 };
 
 const rpcMessage = {
-  content: "can you list the files inside the folder 'super_secret_stuff' in Shubham's datasite",
 };
 
 // Send human messages to the server
@@ -65,10 +64,34 @@ async function send_rpc(rpcMessage) {
   }
 }
 
-send_message(humanMessage)
-  .then(data => console.log('Got response from server:', data))  // Then use the JSON data
-  .catch(error => console.error('Error:', error));
+async function check_request_status(requestKey) {
+  try {
+    const url = `${config.proxyUrl}/rpc/status/${requestKey}`
+    console.log('sending url:', url)
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: config.headers,
+    });
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    const data = await response.json();
+    console.log('checking request status:', data);
+  } catch (error) {
+    console.error('Error checking request status:', error);
+    throw error;
+  }
+}
+
+
+// send_message(humanMessage)
+//   .then(data => console.log('Got response from server:', data))  // Then use the JSON data
+//   .catch(error => console.error('Error:', error));
 
 send_rpc(rpcMessage)
 .then(data => console.log('Got response from server:', data))  // Then use the JSON data
 .catch(error => console.error('Error:', error));
+
+// check_request_status("abc123")
+//   .then(data => console.log('Got response from server:', data))  // Then use the JSON data
+//   .catch(error => console.error('Error:', error));
