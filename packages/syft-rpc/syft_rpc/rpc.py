@@ -136,3 +136,4 @@ if __name__ == "__main__":
         url="syft://tauquir@openmined.org/public/rpc/",
         body="ping",
     )
+    print(future)

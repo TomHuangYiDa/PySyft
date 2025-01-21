@@ -1,4 +1,3 @@
-import json
 from datetime import datetime, timezone
 from enum import IntEnum, StrEnum
 
@@ -21,7 +20,40 @@ class SyftStatus(IntEnum):
     SYFT_201_CREATED = 201
 
 
-class SyftMessage(BaseModel):
+class Base(BaseModel):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    def dumps(self) -> str:
+        """
+        Serialize the model instance to JSON formatted ``str``.
+        """
+        return self.model_dump_json()
+
+    def dump(self, path: PathLike) -> str:
+        """
+        Serialize the model instance as a JSON formatted stream to the file at ``path``.
+        """
+        return path.write_text(self.dumps())
+
+    @classmethod
+    def loads(cls, s: str | bytes | bytearray) -> Self:
+        """
+        Load a model instance from ``s`` (a ``str``, ``bytes`` or
+        ``bytearray`` instance containing a JSON document).
+        """
+        return cls.model_validate_json(s)
+
+    @classmethod
+    def load(cls, path: PathLike) -> Self:
+        """
+        Load a model instance from ``fp`` (a ``.read()``-supporting
+        file-like object containing a JSON document)
+        """
+        file_path = to_path(path)
+        return cls.loads(file_path.read_text())
+
+
+class SyftMessage(Base):
     version: int = 1
     ulid: ULID = Field(default_factory=ULID)
     timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
@@ -30,30 +62,6 @@ class SyftMessage(BaseModel):
     url: SyftBoxURL
     headers: dict[str, str]
     body: bytes | None = None
-
-    model_config = ConfigDict(arbitrary_types_allowed=True)
-
-    def dump(self) -> str:
-        """
-        Serialize the model instance to JSON format.
-        """
-        return self.model_dump_json()
-
-    @classmethod
-    def load(cls, data: bytes) -> Self:
-        """
-        Deserialize JSON data into a model instance.
-        """
-        obj = json.loads(data)
-        return cls.model_validate(obj)
-
-    @classmethod
-    def from_path(cls, path: PathLike) -> Self:
-        """
-        Load a model instance from a file path.
-        """
-        file_path = to_path(path)
-        return cls.load(file_path.read_bytes())
 
 
 class SyftRequest(SyftMessage):
@@ -64,9 +72,7 @@ class SyftResponse(SyftMessage):
     status_code: SyftStatus = SyftStatus.SYFT_200_OK
 
 
-class SyftFuture(BaseModel):
+class SyftFuture(Base):
     ulid: ULID
     url: SyftBoxURL
     status: SyftStatus = SyftStatus.SYFT_201_CREATED
-
-    model_config = ConfigDict(arbitrary_types_allowed=True)
