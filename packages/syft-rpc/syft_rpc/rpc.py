@@ -122,8 +122,7 @@ def reply_to(
     local_path = response.url.to_local_path(client.workspace.datasites)
     file_path = local_path / f"{response.ulid}.response"
     local_path.mkdir(parents=True, exist_ok=True)
-    output = response.dump()
-    file_path.write_text(output)
+    response.dump(file_path)
 
     return response
 

@@ -1,7 +1,8 @@
+import json
 from datetime import datetime, timezone
 from enum import IntEnum, StrEnum
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from syft_core.types import PathLike, to_path
 from syft_core.url import SyftBoxURL
 from typing_extensions import Self
@@ -41,7 +42,8 @@ class Base(BaseModel):
         Load a model instance from ``s`` (a ``str``, ``bytes`` or
         ``bytearray`` instance containing a JSON document).
         """
-        return cls.model_validate_json(s)
+        data = json.loads(s)
+        return cls.model_validate(data)
 
     @classmethod
     def load(cls, path: PathLike) -> Self:
@@ -62,6 +64,17 @@ class SyftMessage(Base):
     url: SyftBoxURL
     headers: dict[str, str]
     body: bytes | None = None
+
+    @field_validator("url", mode="before")
+    @classmethod
+    def validate_url(cls, value) -> SyftBoxURL:
+        if isinstance(value, str):
+            return SyftBoxURL(value)
+        if isinstance(value, SyftBoxURL):
+            return value
+        raise ValueError(
+            f"Invalid type for url: {type(value)}. Expected str or SyftBoxURL."
+        )
 
 
 class SyftRequest(SyftMessage):
