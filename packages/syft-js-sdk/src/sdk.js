@@ -7,12 +7,16 @@ const config = {
 };
 
 // Some example data
-const userMessage = {
+const humanMessage = {
   content: "can you list the files inside the folder 'super_secret_stuff' in Shubham's datasite",
 };
 
-// Example function to demonstrate usage
-async function ask(message) {
+const rpcMessage = {
+  content: "can you list the files inside the folder 'super_secret_stuff' in Shubham's datasite",
+};
+
+// Send human messages to the server
+async function send_message(message) {
   try {
       const response = await fetch(`${config.proxyUrl}/ask`, {
           method: 'POST',
@@ -31,6 +35,40 @@ async function ask(message) {
   }
 }
 
-ask(userMessage)
+
+// send rpc requests to the server
+async function send_rpc(rpcMessage) {
+  const params = {
+    method: 'get',
+    datasite: 'khoa@openmined.org',
+    path: 'public/apps/chat'
+  }
+  // const queryString = new URLSearchParams(params).toString();
+  // const url = `${config.proxyUrl}/rpc?${queryString}`;
+  const url = `${config.proxyUrl}/rpc` + '/' + params.datasite + '/' + params.path;
+  console.log('sending url:', url)
+
+  try {
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: config.headers,
+      // body: JSON.stringify(rpcMessage)
+    });
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error('Error sending user data:', error);
+    throw error;
+  }
+}
+
+send_message(humanMessage)
   .then(data => console.log('Got response from server:', data))  // Then use the JSON data
   .catch(error => console.error('Error:', error));
+
+send_rpc(rpcMessage)
+.then(data => console.log('Got response from server:', data))  // Then use the JSON data
+.catch(error => console.error('Error:', error));
