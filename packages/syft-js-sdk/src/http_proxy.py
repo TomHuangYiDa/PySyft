@@ -66,7 +66,7 @@ async def ask(request: Request) -> JSONResponse:
     headers = dict(request.headers)
     query_params = dict(request.query_params)
     client_ip = request.client.host
-    # we need to forward LLM and get back the Future?
+    # we need to forward the message to the LLM and get back the Future?
     result = {
         "response": f"Got the message: {body['content']} from IP: {client_ip}",
         "files": [
@@ -140,7 +140,7 @@ async def rpc(full_path: str, request: Request):
     print(">>> syftbox_url_from_full_path", syftbox_url)
     
     # calls .get
-    future_response = rpc.send(syftbox_url, body=body, headers=headers, method="get")
+    # future_response = rpc.send(syftbox_url, body=body, headers=headers, method="get")
     
     # returns future
     # return future_response.wait(timeout=timeout - 1.1)
