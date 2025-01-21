@@ -1,39 +1,26 @@
-import json
 import time
-from datetime import datetime, timezone
+from json import JSONDecodeError
 from multiprocessing import Process
 from pathlib import Path
 
 from syft_core import Client
-from syft_rpc.rpc import Request, RequestMessage
+from syft_rpc import rpc
+from syft_rpc.protocol import SyftRequest
 
 client = Client.load("~/.syftbox/stage/config.json")
 APP_NAME = "test_app"
 url_path = f"~/SyftBoxStage/datasites/{client.email}/api_data/{APP_NAME}/rpc/"
 
 
-def process_request(request: Path, client: Client):
-    with open(request, "rb") as f:
-        request_data = f.read()
+def process_request(request_path: Path, client: Client):
+    try:
+        request = SyftRequest.from_path(request_path)
+    except JSONDecodeError as e:
+        print("Invalid request", e)
+        return
 
-        if not request_data:
-            return
-
-        msg = RequestMessage.load(request_data)
-
-        response_msg = msg.reply(
-            from_sender=client.email,
-            body=json.dumps(
-                {
-                    "timestamp": datetime.now(timezone.utc).isoformat(),
-                    "data": "Pong !!!",
-                }
-            ),
-            status_code=200,
-            headers={"content-type": "application/json"},
-        )
-        response_msg.send(client=client)
-        request.unlink(missing_ok=True)
+    rpc.reply_to(request, client, body="Pong !!!")
+    request.unlink(missing_ok=True)
 
 
 def pong_server(client, url_path):
@@ -45,8 +32,8 @@ def pong_server(client, url_path):
     while True:
         try:
             requests = path.glob("*.request")
-            for request in requests:
-                process_request(request, client)
+            for request_path in requests:
+                process_request(request_path, client)
         except FileNotFoundError:
             pass
         except KeyboardInterrupt:
@@ -55,14 +42,13 @@ def pong_server(client, url_path):
 
 
 def send_ping():
-    requests = Request(client=client)
-    url = client.to_syft_url(url_path)
-    data = {"timestamp": datetime.now(timezone.utc).isoformat(), "data": "Ping !!!"}
-    print(f"Sending: {data}")
-    future = requests.get(
-        url=url,
+    future = rpc.send(
+        client=client,
+        method="GET",
+        url=client.to_syft_url(url_path),
         headers={"content-type": "application/json"},
-        body=json.dumps(data),
+        body="Ping !!!",
+        expiry_secs=120,
     )
     response = future.wait(timeout=120)
     if future.value:

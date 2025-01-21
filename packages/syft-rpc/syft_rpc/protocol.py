@@ -3,7 +3,9 @@ from datetime import datetime, timezone
 from enum import IntEnum, StrEnum
 
 from pydantic import BaseModel, ConfigDict, Field
+from syft_core.types import PathLike, to_path
 from syft_core.url import SyftBoxURL
+from typing_extensions import Self
 from ulid import ULID
 
 
@@ -37,12 +39,20 @@ class SyftMessage(BaseModel):
         return self.model_dump_json()
 
     @classmethod
-    def load(cls, data: bytes):
+    def load(cls, data: bytes) -> Self:
         """
         Deserialize JSON data into a model instance.
         """
         obj = json.loads(data)
         return cls.model_validate(obj)
+
+    @classmethod
+    def from_path(cls, path: PathLike) -> Self:
+        """
+        Load a model instance from a file path.
+        """
+        file_path = to_path(path)
+        return cls.load(file_path.read_bytes())
 
 
 class SyftRequest(SyftMessage):
