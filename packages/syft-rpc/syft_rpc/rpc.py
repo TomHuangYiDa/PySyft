@@ -8,22 +8,22 @@ from .protocol import SyftFuture, SyftMethod, SyftRequest
 
 def send(
     client: Client,
-    method: SyftMethod,
-    url: SyftBoxURL,
-    headers: dict[str, str],
+    method: SyftMethod | str,
+    url: SyftBoxURL | str,
+    headers: dict[str, str] | None = None,
     body: str | bytes | None = None,
-    expiry_secs: int = 86400,
+    expiry_secs: int = 10,
 ) -> SyftFuture:
     syft_request = SyftRequest(
         sender=client.email,
-        method=method,
-        url=url,
-        headers=headers,
+        method=method.upper() if isinstance(method, str) else method,
+        url=url if isinstance(url, SyftBoxURL) else SyftBoxURL(url),
+        headers=headers or {},
         body=body.encode() if isinstance(body, str) else body,
         expires=datetime.now(timezone.utc) + timedelta(seconds=expiry_secs),
     )
 
-    local_path = url.to_local_path(client.workspace.datasites)
+    local_path = syft_request.url.to_local_path(client.workspace.datasites)
     file_path = local_path / f"{syft_request.ulid}.request"
     local_path.mkdir(parents=True, exist_ok=True)
     output = syft_request.dump()
@@ -37,9 +37,8 @@ def send(
 if __name__ == "__main__":
     client = Client.load()
     send(
-        client,
-        SyftMethod.GET,
-        SyftBoxURL(url="syft://tauquir@openmined.org/public/rpc/"),
-        {},
-        "ping",
+        client=client,
+        method="get",
+        url="syft://tauquir@openmined.org/public/rpc/",
+        body="ping",
     )
