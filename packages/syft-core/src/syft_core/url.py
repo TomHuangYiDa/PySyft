@@ -6,34 +6,32 @@ from syft_core.types import PathLike, to_path
 from syft_core.workspace import SyftWorkspace
 
 
-class SyftBoxURL:
-    def __init__(self, url: str):
-        if isinstance(url, SyftBoxURL):
-            url = str(url)
-        elif not SyftBoxURL.is_valid(url):
+class SyftBoxURL(str):
+    def __new__(cls, url: str):
+        instance = super().__new__(cls, url)
+        if not cls.is_valid(url):
             raise ValueError(f"Invalid SyftBoxURL: {url}")
-
-        self.url = url
-        self.parsed = urlparse(self.url)
+        instance.parsed = urlparse(url)
+        return instance
 
     @classmethod
-    def is_valid(self, url: str):
+    def is_valid(cls, url: str) -> bool:
         """Validates the given URL matches the syft:// protocol and email-based schema."""
         pattern = r"^syft://([a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+)(/.*)?$"
-        return re.match(pattern, url)
+        return bool(re.match(pattern, url))
 
     @property
-    def protocol(self):
+    def protocol(self) -> str:
         """Returns the protocol (syft://)."""
         return self.parsed.scheme + "://"
 
     @property
-    def host(self):
+    def host(self) -> str:
         """Returns the host, which is the email part."""
         return self.parsed.netloc
 
     @property
-    def path(self):
+    def path(self) -> str:
         """Returns the path component after the email."""
         return self.parsed.path
 
@@ -65,12 +63,10 @@ class SyftBoxURL:
         http_url = f"http://{rpc_url}?{url_params}"
         return http_url
 
-    def from_path(self, path: PathLike, workspace: SyftWorkspace) -> str:
+    @classmethod
+    def from_path(cls, path: PathLike, workspace: SyftWorkspace) -> "SyftBoxURL":
         rel_path = to_path(path).relative_to(workspace.datasites)
-        return f"syft://{rel_path}"
-
-    def __repr__(self):
-        return self.url
+        return cls(f"syft://{rel_path}")
 
 
 if __name__ == "__main__":
@@ -79,7 +75,7 @@ if __name__ == "__main__":
     print(syftbox_url.to_local_path(Path("~/SyftBox/datasites")))
     print(syftbox_url.as_http_params())
     print(
-        syftbox_url.from_path(
+        SyftBoxURL.from_path(
             "~/SyftBox/datasites/test@openmined.org/public/some/path",
             SyftWorkspace(Path("~/SyftBox")),
         )

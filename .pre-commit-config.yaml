@@ -61,7 +61,7 @@ repos:
   #     - id: mypy
   #       name: "mypy"
   #       always_run: true
-  #       files: ^syftbox
+  #       files: ^packages/syft_rpc/
 
   # - repo: meta
   #   hooks:
