@@ -30,6 +30,7 @@ syft-files = { workspace = true }
 
 [tool.uv.workspace]
 members = ["packages/*"]
+exclude = ["packages/syft-js-sdk"]
 
 [tool.ruff.lint]
 extend-select = ["I"]

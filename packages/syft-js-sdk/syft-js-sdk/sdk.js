@@ -1,6 +1,6 @@
 // Configuration object for API settings
 const config = {
-  proxyUrl: 'http://localhost:8000',
+  proxyUrl: 'http://localhost:9081',
   headers: {
       'Content-Type': 'application/json',
   }
@@ -84,14 +84,14 @@ async function check_request_status(requestKey) {
 }
 
 
-// send_message(humanMessage)
-//   .then(data => console.log('Got response from server:', data))  // Then use the JSON data
-//   .catch(error => console.error('Error:', error));
+send_message(humanMessage)
+  .then(data => console.log('Got response from server:', data))  // Then use the JSON data
+  .catch(error => console.error('Error:', error));
 
 send_rpc(rpcMessage)
 .then(data => console.log('Got response from server:', data))  // Then use the JSON data
 .catch(error => console.error('Error:', error));
 
-// check_request_status("abc123")
-//   .then(data => console.log('Got response from server:', data))  // Then use the JSON data
-//   .catch(error => console.error('Error:', error));
+check_request_status("abc123")
+  .then(data => console.log('Got response from server:', data))  // Then use the JSON data
+  .catch(error => console.error('Error:', error));
