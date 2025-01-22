@@ -5,7 +5,7 @@ import time
 import uvicorn
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, Response
-from syft_rpc import Request as RPCRequest, SyftBoxURL
+# from syft_rpc import Request as RPCRequest, SyftBoxURL
 from syft_core import Client
 from contextlib import asynccontextmanager
 import asyncio
@@ -28,7 +28,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-client_config = Client.load()
+# client_config = Client.load()
 
 app = FastAPI()
 

@@ -1,6 +1,6 @@
 import logging
 
-from syft_rpc import Request as RPCRequest
+# from syft_rpc import Request as RPCRequest
 from syft_core import SyftBoxURL
 import hashlib
 from fastapi.responses import Response
