@@ -9,6 +9,7 @@ But we need it to maintain compatibility with apps
 from pathlib import Path
 
 from pydantic import EmailStr
+from syft_core.url import SyftBoxURL
 from typing_extensions import Optional, Self
 
 from .config import SyftClientConfig
@@ -108,3 +109,6 @@ class Client:
 
         for path in paths:
             to_path(path).mkdir(parents=True, exist_ok=True)
+
+    def to_syft_url(self, path: PathLike) -> SyftBoxURL:
+        return SyftBoxURL.from_path(path, self.workspace)

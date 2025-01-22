@@ -30,3 +30,9 @@ syft-files = { workspace = true }
 
 [tool.uv.workspace]
 members = ["packages/*"]
+
+[tool.ruff.lint]
+extend-select = ["I"]
+
+[tool.ruff.lint.per-file-ignores]
+"**/__init__.py" = ["F401"]

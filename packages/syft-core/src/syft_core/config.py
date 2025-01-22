@@ -4,7 +4,15 @@ import shutil
 from pathlib import Path
 from typing import Optional, Union
 
-from pydantic import AliasChoices, AnyHttpUrl, BaseModel, ConfigDict, EmailStr, Field, field_validator
+from pydantic import (
+    AliasChoices,
+    AnyHttpUrl,
+    BaseModel,
+    ConfigDict,
+    EmailStr,
+    Field,
+    field_validator,
+)
 from pydantic.main import IncEx
 from pydantic_core import Url
 from typing_extensions import Self
@@ -26,7 +34,9 @@ class SyftClientConfig(BaseModel):
     """SyftBox client configuration"""
 
     # model config
-    model_config = ConfigDict(extra="ignore", json_encoders={AnyHttpUrl: lambda v: str(v)})
+    model_config = ConfigDict(
+        extra="ignore", json_encoders={AnyHttpUrl: lambda v: str(v)}
+    )
 
     data_dir: Path = Field(
         validation_alias=AliasChoices("data_dir", "sync_folder"),
@@ -51,11 +61,15 @@ class SyftClientConfig(BaseModel):
     """Email address of the user"""
 
     token: Optional[str] = Field(
-        default=None, description="Depracated: Use access_token instead. API token for the user", deprecated=True
+        default=None,
+        description="Depracated: Use access_token instead. API token for the user",
+        deprecated=True,
     )
     """Depracated: Use access_token instead. API token for the user"""
 
-    access_token: Optional[str] = Field(default=None, description="Access token for the user")
+    access_token: Optional[str] = Field(
+        default=None, description="Access token for the user"
+    )
     """Access token for the user"""
 
     # WARN: we don't need `path` to be serialized, hence exclude=True
@@ -88,7 +102,9 @@ class SyftClientConfig(BaseModel):
             # args or env or default
             path = conf_path or os.getenv(CONFIG_PATH_ENV, DEFAULT_CONFIG_PATH)
             if path is None:
-                raise ClientConfigException(f"Config file path not provided or set in env '{CONFIG_PATH_ENV}'")
+                raise ClientConfigException(
+                    f"Config file path not provided or set in env '{CONFIG_PATH_ENV}'"
+                )
             path = to_path(path)
             data = {}
 
@@ -107,7 +123,9 @@ class SyftClientConfig(BaseModel):
 
             return cls(path=path, **data)
         except Exception as e:
-            raise ClientConfigException(f"Failed to load config from '{conf_path}' - {e}")
+            raise ClientConfigException(
+                f"Failed to load config from '{conf_path}' - {e}"
+            )
 
     @classmethod
     def exists(cls, path: PathLike) -> bool:

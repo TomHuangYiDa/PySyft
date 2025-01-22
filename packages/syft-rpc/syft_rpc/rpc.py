@@ -1,19 +1,15 @@
 import json
 import os
-from urllib.parse import urlencode
-import re
 import time
 from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
-from urllib.parse import unquote
 
 import cbor2
 from pydantic import BaseModel, field_validator
+from syft_core import Client, SyftBoxURL
 from typing_extensions import Any, Self
 from ulid import ULID
-
-from syft_core import Client
 
 from .json import JSONModel
 from .serde import base64_to_bytes, serializers
@@ -21,77 +17,6 @@ from .serde import base64_to_bytes, serializers
 
 class RPCRegistry:
     requests: dict[str, str | None] = defaultdict(lambda: None)
-
-
-class SyftBoxURL:
-    def __init__(self, url: str):
-        if isinstance(url, SyftBoxURL):
-            url = str(url)
-        self.url = url
-        self._validate_url()
-        self._parsed_url = self._parse_url()
-
-    def _validate_url(self):
-        """Validates the given URL matches the syft:// protocol and email-based schema."""
-        pattern = r"^syft://([a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+)(/.*)?$"
-        if not re.match(pattern, self.url):
-            raise ValueError(f"Invalid SyftBoxURL: {self.url}")
-
-    def _parse_url(self):
-        """Parses the URL using `urlparse` and custom logic for extracting the email."""
-        url_without_protocol = self.url[len("syft://") :]
-        email, _, path = url_without_protocol.partition("/")
-        return {
-            "protocol": "syft://",
-            "host": email,
-            "path": f"/{path}" if path else "/",
-        }
-
-    @property
-    def protocol(self):
-        """Returns the protocol (syft://)."""
-        return self._parsed_url["protocol"]
-
-    @property
-    def host(self):
-        """Returns the host, which is the email part."""
-        return self._parsed_url["host"]
-
-    @property
-    def path(self):
-        """Returns the path component after the email."""
-        return unquote(self._parsed_url["path"])
-
-    def to_local_path(self, datasites_path: Path) -> Path:
-        """
-        Converts the SyftBoxURL to a local file system path.
-
-        Args:
-            datasites_path (Path): Base directory for datasites.
-
-        Returns:
-            Path: Local file system path.
-        """
-        # Remove the protocol and prepend the datasites_path
-        local_path = datasites_path / self.host / self.path.lstrip("/")
-        return local_path.resolve()
-
-    def __repr__(self):
-        return f"{self.protocol}{self.host}{self.path}"
-
-    def as_http_params(self) -> dict[str, str]:
-        return {
-            "method": "get",
-            "datasite": self.host,
-            "path": self.path,
-        }
-
-    def to_http_get(self, rpc_url: str) -> str:
-        rpc_url = rpc_url.split("//")[-1]
-        params = self.as_http_params()
-        url_params = urlencode(params)
-        http_url = f"http://{rpc_url}?{url_params}"
-        return http_url
 
 
 serializers[SyftBoxURL] = str
@@ -131,7 +56,9 @@ class Message(JSONModel):
         return self.url.to_local_path(client.workspace.datasites)
 
     def file_path(self, client):
-        return self.local_path(client) / f"{self.ulid}.{self.message_type}"
+        p = self.local_path(client) / f"{self.ulid}.{self.message_type}"
+        p.parent.mkdir(parents=True, exist_ok=True)
+        return p
 
     def decode(self):
         if "content-type" in self.headers:
