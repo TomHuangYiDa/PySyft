@@ -63,8 +63,7 @@ def send(
     local_path = syft_request.url.to_local_path(client.workspace.datasites)
     file_path = local_path / f"{syft_request.ulid}.request"
     local_path.mkdir(parents=True, exist_ok=True)
-    output = syft_request.dump()
-    file_path.write_text(output)
+    syft_request.dump(file_path)
 
     future = SyftFuture(ulid=syft_request.ulid, url=syft_request.url)
     return future
