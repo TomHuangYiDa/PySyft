@@ -2,6 +2,8 @@ import re
 from pathlib import Path
 from urllib.parse import urlencode, urlparse
 
+from typing_extensions import Self
+
 from syft_core.types import PathLike, to_path
 from syft_core.workspace import SyftWorkspace
 
@@ -64,7 +66,7 @@ class SyftBoxURL(str):
         return http_url
 
     @classmethod
-    def from_path(cls, path: PathLike, workspace: SyftWorkspace) -> "SyftBoxURL":
+    def from_path(cls, path: PathLike, workspace: SyftWorkspace) -> Self:
         rel_path = to_path(path).relative_to(workspace.datasites)
         return cls(f"syft://{rel_path}")
 

@@ -1,69 +1,160 @@
-import json
-from datetime import datetime, timezone
+import logging
+import time
+from datetime import datetime, timedelta, timezone
 from enum import IntEnum, StrEnum
+from typing import ClassVar, Optional, TypeAlias
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import ValidationError as PydanticValidationError
 from syft_core.types import PathLike, to_path
 from syft_core.url import SyftBoxURL
 from typing_extensions import Self
 from ulid import ULID
 
+logger = logging.getLogger(__name__)
+
+# Type aliases for better readability
+JSON: TypeAlias = str | bytes | bytearray
+Headers: TypeAlias = dict[str, str]
+
+
+# Constants
+DEFAULT_MESSAGE_EXPIRY: float = 60.0 * 5  # 5 minutes
+
 
 class SyftMethod(StrEnum):
+    """HTTP methods supported by the Syft protocol."""
+
     GET = "GET"
+    HEAD = "HEAD"
     POST = "POST"
     PUT = "PUT"
+    PATCH = "PATCH"
     DELETE = "DELETE"
 
 
 class SyftStatus(IntEnum):
+    """Standard HTTP-like status codes for Syft responses."""
+
     SYFT_200_OK = 200
-    SYFT_201_CREATED = 201
+    SYFT_403_FORBIDDEN = 403
+    SYFT_419_EXPIRED = 419
+    SYFT_500_SERVER_ERROR = 500
+
+    @property
+    def is_success(self) -> bool:
+        """Check if the status code indicates success."""
+        return 200 <= self.value < 300
+
+    @property
+    def is_error(self) -> bool:
+        """Check if the status code indicates an error."""
+        return self.value >= 400
 
 
 class Base(BaseModel):
-    model_config = ConfigDict(arbitrary_types_allowed=True)
+    """Base model with enhanced serialization capabilities."""
+
+    model_config = ConfigDict(
+        arbitrary_types_allowed=True,
+        json_encoders={
+            ULID: str,
+            datetime: lambda dt: dt.isoformat(),
+            bytes: lambda b: b.hex(),
+        },
+    )
 
     def dumps(self) -> str:
-        """
-        Serialize the model instance to JSON formatted ``str``.
+        """Serialize the model instance to JSON formatted str.
+
+        Returns:
+            JSON string representation of the model instance.
+
+        Raises:
+            pydantic.ValidationError: If the model contains invalid data.
+            TypeError: If the model contains types that cannot be JSON serialized.
         """
         return self.model_dump_json()
 
-    def dump(self, path: PathLike) -> str:
+    def dump(self, path: PathLike) -> None:
+        """Serialize the model instance as JSON to a file.
+
+        Args:
+            path: The file path where the JSON data will be written.
+
+        Raises:
+            pydantic.ValidationError: If the model contains invalid data.
+            TypeError: If the model contains types that cannot be JSON serialized.
+            PermissionError: If lacking permission to write to the path.
+            OSError: If there are I/O related errors.
+            FileNotFoundError: If the parent directory doesn't exist.
         """
-        Serialize the model instance as a JSON formatted stream to the file at ``path``.
-        """
-        return path.write_text(self.dumps())
+        to_path(path).write_text(self.dumps())
 
     @classmethod
-    def loads(cls, s: str | bytes | bytearray) -> Self:
+    def loads(cls, data: JSON) -> Self:
+        """Load a model instance from a JSON string or bytes.
+
+        Args:
+            data: JSON data to parse. Can be string or binary data.
+
+        Returns:
+            A new instance of the model class.
+
+        Raises:
+            pydantic.ValidationError: If JSON doesn't match the model's schema.
+            ValueError: If the input is not valid JSON.
+            TypeError: If input type is not str, bytes, or bytearray.
+            UnicodeDecodeError: If binary input cannot be decoded as UTF-8.
         """
-        Load a model instance from ``s`` (a ``str``, ``bytes`` or
-        ``bytearray`` instance containing a JSON document).
-        """
-        data = json.loads(s)
-        return cls.model_validate(data)
+        return cls.model_validate_json(data)
 
     @classmethod
     def load(cls, path: PathLike) -> Self:
+        """Load a model instance from a JSON file.
+
+        Args:
+            path: Path to the JSON file to read.
+
+        Returns:
+            A new instance of the model class.
+
+        Raises:
+            pydantic.ValidationError: If JSON doesn't match the model's schema.
+            ValueError: If file content is not valid JSON.
+            FileNotFoundError: If the file doesn't exist.
+            PermissionError: If lacking permission to read the file.
+            OSError: If there are I/O related errors.
+            UnicodeDecodeError: If content cannot be decoded as UTF-8.
         """
-        Load a model instance from ``fp`` (a ``.read()``-supporting
-        file-like object containing a JSON document)
-        """
-        file_path = to_path(path)
-        return cls.loads(file_path.read_text())
+        return cls.loads(to_path(path).read_text())
 
 
 class SyftMessage(Base):
-    version: int = 1
+    """Base message class for Syft protocol communication."""
+
+    VERSION: ClassVar[int] = 1
+
     ulid: ULID = Field(default_factory=ULID)
     timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    expires: datetime
+    expires: datetime = Field(
+        default_factory=lambda: datetime.now(timezone.utc)
+        + timedelta(seconds=DEFAULT_MESSAGE_EXPIRY)
+    )
     sender: str
     url: SyftBoxURL
-    headers: dict[str, str]
-    body: bytes | None = None
+    headers: Headers = Field(default_factory=dict)
+    body: Optional[bytes] = None
+
+    @property
+    def age(self) -> float:
+        """Return the age of the message in seconds."""
+        return (datetime.now(timezone.utc) - self.timestamp).total_seconds()
+
+    @property
+    def is_expired(self) -> bool:
+        """Check if the message has expired."""
+        return datetime.now(timezone.utc) > self.expires
 
     @field_validator("url", mode="before")
     @classmethod
@@ -78,14 +169,153 @@ class SyftMessage(Base):
 
 
 class SyftRequest(SyftMessage):
+    """Request message in the Syft protocol."""
+
     method: SyftMethod = SyftMethod.GET
 
 
 class SyftResponse(SyftMessage):
+    """Response message in the Syft protocol."""
+
     status_code: SyftStatus = SyftStatus.SYFT_200_OK
+
+    @property
+    def is_success(self) -> bool:
+        """Check if the response indicates success."""
+        return self.status_code.is_success
+
+
+class SyftError(Exception):
+    """Base exception for Syft-related errors."""
+
+    pass
+
+
+class SyftTimeoutError(SyftError):
+    """Raised when a request times out."""
+
+    pass
 
 
 class SyftFuture(Base):
+    """Represents an asynchronous Syft RPC operation.
+
+    Attributes:
+        ulid: Identifier of the corresponding request and response.
+        local_path: Path where request and response files are stored.
+        DEFAULT_POLL_INTERVAL: Default time between polling attempts in seconds.
+    """
+
+    DEFAULT_POLL_INTERVAL: ClassVar[float] = 0.1
+
     ulid: ULID
-    url: SyftBoxURL
-    status: SyftStatus = SyftStatus.SYFT_201_CREATED
+    local_path: PathLike
+
+    @property
+    def request_path(self) -> PathLike:
+        """Path to the request file."""
+        return to_path(self.local_path) / f"{self.ulid}.request"
+
+    @property
+    def response_path(self) -> PathLike:
+        """Path to the response file."""
+        return to_path(self.local_path) / f"{self.ulid}.response"
+
+    @property
+    def rejected_path(self) -> PathLike:
+        """Path to the rejected request marker file."""
+        return self.request_path.with_suffix(f"{self.request_path.suffix}.rejected")
+
+    @property
+    def is_rejected(self) -> bool:
+        """Check if the request has been rejected."""
+        return self.rejected_path.exists()
+
+    def wait(
+        self,
+        timeout: Optional[float] = None,
+        poll_interval: float = DEFAULT_POLL_INTERVAL,
+    ) -> SyftResponse:
+        """Wait for the future to complete and return the Response.
+
+        Args:
+            timeout: Maximum time to wait in seconds. None means wait until the request expires.
+            poll_interval: Time in seconds between polling attempts.
+
+        Returns:
+            The response object.
+
+        Raises:
+            SyftTimeoutError: If timeout is reached before receiving a response.
+            ValueError: If timeout or poll_interval is negative.
+        """
+        if timeout is not None and timeout <= 0:
+            raise ValueError("Timeout must be greater than 0")
+        if poll_interval <= 0:
+            raise ValueError("Poll interval must be greater than 0")
+
+        deadline = time.monotonic() + (timeout or float("inf"))
+
+        while time.monotonic() < deadline:
+            try:
+                response = self.resolve(silent=True)
+                if response is not None:
+                    return response
+                time.sleep(poll_interval)
+            except Exception as e:
+                logger.error(f"Error while resolving future: {str(e)}")
+                raise
+
+        raise SyftTimeoutError(
+            f"Timeout reached after waiting {timeout} seconds for response"
+        )
+
+    def resolve(self, silent: bool = False) -> Optional[SyftResponse]:
+        """Attempt to resolve the future to a response.
+
+        Args:
+            silent: If True, suppress waiting messages.
+
+        Returns:
+            The response if available, None if still pending.
+        """
+        # TODO: SyftResponse requires sender and url, figure out how to get them.
+
+        # Check for rejection first
+        if self.is_rejected:
+            return SyftResponse(status_code=SyftStatus.SYFT_403_FORBIDDEN)
+
+        # Check for existing response
+        if self.response_path.exists():
+            return self._handle_existing_response()
+
+        # Check for expired request
+        if self.request_path.exists():
+            request = SyftRequest.load(self.request_path)
+            if request.is_expired:
+                return SyftResponse(status_code=SyftStatus.SYFT_419_EXPIRED)
+
+        if not silent:
+            logger.info("Response not ready, still waiting...")
+        return None
+
+    def _handle_existing_response(self) -> SyftResponse:
+        """Process an existing response file.
+
+        Returns:
+            The loaded response object.
+
+        Note:
+            If the response file exists but is invalid or expired,
+            returns an appropriate error response instead of raising an exception.
+        """
+        try:
+            response = SyftResponse.load(self.response_path)
+            if response.is_expired:
+                return SyftResponse(status_code=SyftStatus.SYFT_419_EXPIRED)
+            return response
+        except (PydanticValidationError, ValueError, UnicodeDecodeError) as e:
+            logger.error(f"Error loading response: {str(e)}")
+            return SyftResponse(
+                status_code=SyftStatus.SYFT_500_SERVER_ERROR, body=str(e).encode()
+            )
