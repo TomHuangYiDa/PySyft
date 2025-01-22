@@ -283,7 +283,11 @@ class SyftFuture(Base):
 
         # Check for rejection first
         if self.is_rejected:
-            return SyftResponse(status_code=SyftStatus.SYFT_403_FORBIDDEN)
+            return SyftResponse(
+                status_code=SyftStatus.SYFT_403_FORBIDDEN,
+                url="syft://system@openmined.org/dummy",
+                sender="system@openmined.org",
+            )
 
         # Check for existing response
         if self.response_path.exists():
@@ -293,7 +297,11 @@ class SyftFuture(Base):
         if self.request_path.exists():
             request = SyftRequest.load(self.request_path)
             if request.is_expired:
-                return SyftResponse(status_code=SyftStatus.SYFT_419_EXPIRED)
+                return SyftResponse(
+                    status_code=SyftStatus.SYFT_419_EXPIRED,
+                    url=request.url,
+                    sender="system@openmined.org",
+                )
 
         if not silent:
             logger.info("Response not ready, still waiting...")
@@ -312,10 +320,17 @@ class SyftFuture(Base):
         try:
             response = SyftResponse.load(self.response_path)
             if response.is_expired:
-                return SyftResponse(status_code=SyftStatus.SYFT_419_EXPIRED)
+                return SyftResponse(
+                    status_code=SyftStatus.SYFT_419_EXPIRED,
+                    url=response.url,
+                    sender=response.sender,
+                )
             return response
         except (PydanticValidationError, ValueError, UnicodeDecodeError) as e:
             logger.error(f"Error loading response: {str(e)}")
             return SyftResponse(
-                status_code=SyftStatus.SYFT_500_SERVER_ERROR, body=str(e).encode()
+                status_code=SyftStatus.SYFT_500_SERVER_ERROR,
+                body=str(e).encode(),
+                url="syft://system@openmined.org/dummy",
+                sender="system@openmined.org",
             )
