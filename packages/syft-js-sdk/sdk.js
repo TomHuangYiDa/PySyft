@@ -111,7 +111,10 @@ check_request_status("abc123")
 //  8. The rpc.send needs a client to be included in the call. How the JS SDK knows which client
 //      is sending the request if there are multiple clients running in one machine?
 // 9. Does the RPC 
-
+// 10. Should we keep the SDK JS oritented, like how `fetch` was called (just functions), 
+//      or should we write the SDK as a class and take objects as inputs?
+// what are we using to serialize the Request / Response objects (protobuf / JSON)
+// can we use TypeScript, or just using JSDoc
 
 // class SyftSDK {
 //   constructor(config) {
