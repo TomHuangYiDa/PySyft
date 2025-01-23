@@ -5,12 +5,11 @@ from fastapi import Request, Response, status
 from loguru import logger
 from packaging import version
 from starlette.middleware.base import BaseHTTPMiddleware
-
+from syftbox import __version__
 from syftbox.lib.http import (
     HEADER_SYFTBOX_VERSION,
 )
-
-MIN_SUPPORTED_VERSION = "0.3.0"
+from syftbox.lib.version_utils import get_range_for_version
 
 
 class LoguruMiddleware(BaseHTTPMiddleware):
@@ -57,22 +56,44 @@ class VersionCheckMiddleware(BaseHTTPMiddleware):
         logger.info(request.headers)
         client_version = request.headers.get(HEADER_SYFTBOX_VERSION)
         if not client_version:
-            logger.warning("version not found, next release we will return an error")
-            # return Response(
-            #     status_code=status.HTTP_400_BAD_REQUEST,
-            #     content="Client version not provided. Please include the 'Version' header.",
-            # )
-            response = await call_next(request)
-            return response
+            # logger.warning("version not found, next release we will return an error")
+            return Response(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                content="Client version not provided. Please include the 'Version' header.",
+            )
+            # response = await call_next(request)
+            # return response
 
-        if version.parse(client_version) < version.parse(MIN_SUPPORTED_VERSION):
+        version_range = get_range_for_version(client_version)
+        lower_bound_version = version_range[0]
+        # upper_bound_version = version_range[1]
+        print(client_version, lower_bound_version)
+
+        if version.parse(client_version) < version.parse(lower_bound_version):
             logger.warning("version too old, next release we will return an error")
-            # return Response(
-            #     status_code=status.HTTP_426_UPGRADE_REQUIRED,
-            #     content=f"Client version is too old. Minimum version required is {MIN_SUPPORTED_VERSION}",
-            # )
-            response = await call_next(request)
-            return response
+            return Response(
+                status_code=status.HTTP_426_UPGRADE_REQUIRED,
+                content=f"Client version is too old. Minimum version required is {lower_bound_version}",
+            )
+            
+        
+        # if version.parse(client_version) < version.parse(lower_bound_version):
+        #     logger.warning("version too old, next release we will return an error")
+        #     return Response(
+        #         status_code=status.HTTP_426_UPGRADE_REQUIRED,
+        #         content=f"Client version is too old. Minimum version required is {lower_bound_version}",
+        #     )
 
         response = await call_next(request)
-        return response
+        response.headers[HEADER_SYFTBOX_VERSION] = __version__
+        print(response.headers)
+        body = b""
+        async for chunk in response.body_iterator:
+            body += chunk
+        # return response
+        return Response(
+            content=body,
+            status_code=response.status_code,
+            headers=dict(response.headers),
+            media_type=response.media_type
+        )
