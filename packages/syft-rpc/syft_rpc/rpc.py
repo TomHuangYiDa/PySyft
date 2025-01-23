@@ -69,7 +69,9 @@ def send(
     except Exception as e:
         raise SyftError(f"Failed to write request to {file_path}: {e}")
 
-    future = SyftFuture(ulid=syft_request.ulid, url=syft_request.url, local_path=local_path)
+    future = SyftFuture(
+        ulid=syft_request.ulid, url=syft_request.url, local_path=local_path
+    )
     return future
 
 

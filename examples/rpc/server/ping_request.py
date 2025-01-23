@@ -4,15 +4,7 @@ from syft_core import Client
 from syft_rpc import rpc
 
 client = Client.load("~/.syftbox/stage/config.json")
-url_path = "~/SyftBoxStage/datasites/tauquir@openmined.org/public/rpc"
-
-
-def wait_for_response(future, client):
-    response_file = future.response_path
-    while True:
-        if response_file.exists():
-            print("Response received at: ", time.time())
-            break
+url_path = "~/SyftBoxStage/datasites/shubham@openmined.org/public/rpc"
 
 
 def send_ping():
@@ -25,7 +17,8 @@ def send_ping():
         body="Ping !!!",
         expiry_secs=120,
     )
-    wait_for_response(future, client)
+    response = future.wait(timeout=300)
+    print(response.body.decode())
     end = time.time()
     print("Time taken: ", end - start)
 

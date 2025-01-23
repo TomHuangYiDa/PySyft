@@ -2,6 +2,7 @@ import logging
 import time
 from datetime import datetime, timedelta, timezone
 from enum import IntEnum, StrEnum
+from pathlib import Path
 from typing import ClassVar, Optional, TypeAlias
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -60,8 +61,9 @@ class Base(BaseModel):
         json_encoders={
             ULID: str,
             datetime: lambda dt: dt.isoformat(),
-            bytes: lambda b: b.hex(),
         },
+        ser_json_bytes="hex",
+        val_json_bytes="hex",
     )
 
     def dumps(self) -> str:
@@ -212,17 +214,17 @@ class SyftFuture(Base):
     local_path: PathLike
 
     @property
-    def request_path(self) -> PathLike:
+    def request_path(self) -> Path:
         """Path to the request file."""
         return to_path(self.local_path) / f"{self.ulid}.request"
 
     @property
-    def response_path(self) -> PathLike:
+    def response_path(self) -> Path:
         """Path to the response file."""
         return to_path(self.local_path) / f"{self.ulid}.response"
 
     @property
-    def rejected_path(self) -> PathLike:
+    def rejected_path(self) -> Path:
         """Path to the rejected request marker file."""
         return self.request_path.with_suffix(f"{self.request_path.suffix}.rejected")
 
