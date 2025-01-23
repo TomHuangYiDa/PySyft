@@ -4,7 +4,7 @@ from syft_core import Client
 from watchdog.events import FileCreatedEvent, FileModifiedEvent, FileSystemEvent
 from watchdog.observers import Observer
 
-from .handlers import AnyPatternHandler, RpcRequestHandler
+from syft_event.handlers import AnyPatternHandler, RpcRequestHandler
 
 
 class SyftEvents:
