@@ -1,42 +1,10 @@
 from time import sleep
+
 from syft_core import Client
+from watchdog.events import FileCreatedEvent, FileModifiedEvent, FileSystemEvent
 from watchdog.observers import Observer
-from watchdog.events import (
-    FileSystemEventHandler,
-    FileSystemEvent,
-    PatternMatchingEventHandler,
-    FileCreatedEvent,
-    FileModifiedEvent,
-)
-from fnmatch import fnmatch
 
-
-class FnmatchEventHandler(FileSystemEventHandler):
-    def __init__(self, pattern):
-        self.pattern = pattern
-
-    def dispatch(self, event: FileSystemEvent) -> None:
-        if fnmatch(event.src_path, self.pattern):
-            super().dispatch(event)
-
-
-class RpcRequestHandler(PatternMatchingEventHandler):
-    def __init__(self, handler):
-        super().__init__(patterns=["**/*.request"], ignore_directories=True)
-        self.handler = handler
-
-    def on_any_event(self, event: FileSystemEvent):
-        # read the file here itslef
-        self.handler(event)
-
-
-class AnyPatternHandler(FnmatchEventHandler):
-    def __init__(self, pattern, handler):
-        super().__init__(pattern)
-        self.handler = handler
-
-    def on_any_event(self, event: FileSystemEvent):
-        self.handler(event)
+from .handlers import AnyPatternHandler, RpcRequestHandler
 
 
 class SyftEvents:
@@ -60,13 +28,12 @@ class SyftEvents:
     def stop(self):
         self.obs.stop()
 
-    def on_any_request(self, handler_func):
+    def on_any_request(self, func):
         """Invoke the handler for any request"""
 
         def wrapper(event):
-            return handler_func(event)
+            return func(event)
 
-        print("Scheduled handler for *")
         self.obs.schedule(
             RpcRequestHandler(wrapper),
             path=self.app_rpc_dir,
@@ -75,7 +42,7 @@ class SyftEvents:
         )
 
     def on_request(self, endpoint: str):
-        """Invoke the handler for a specific endpoint"""
+        """Handle requests at `{api_data}/rpc/{endpoint}`"""
 
         if "*" in endpoint or "?" in endpoint:
             raise ValueError("wildcards are not allowed in path")
@@ -95,23 +62,31 @@ class SyftEvents:
                 recursive=True,
                 event_filter=[FileCreatedEvent],
             )
-            print("Scheduled handler for", endpoint)
             return wrapper
 
         return decorater
 
     def on_file_change(
         self,
-        glob_path: str,
+        glob_path: str | list[str],
         event_filter: list[type[FileSystemEvent]] | None = [FileModifiedEvent],
     ):
         """Invoke the handler if any file changes in the glob path"""
 
-        # substitute the {datasite} with client's datasite in the glob path
-        glob_path = glob_path.format(datasite=self.client.email)
+        if not isinstance(glob_path, list):
+            glob_path = [glob_path]
 
-        if not glob_path.startswith("**/"):
-            glob_path = f"**/{glob_path}"
+        def format_globs(path: str):
+            # replace placeholders with actual values
+            path = path.format(
+                datasite=self.client.email,
+                api_data=self.client.api_data(self.app_name),
+            )
+            if not path.startswith("**/"):
+                path = f"**/{path}"
+            return path
+
+        globs = list(map(format_globs, glob_path))
 
         def decorater(func):
             def wrapper(event):
@@ -119,12 +94,11 @@ class SyftEvents:
 
             self.obs.schedule(
                 # use raw path for glob which will be convert to path/*.request
-                AnyPatternHandler(glob_path, wrapper),
+                AnyPatternHandler(globs, wrapper),
                 path=self.client.datasites,
                 recursive=True,
                 event_filter=event_filter,
             )
-            print("Scheduled handler for file change on", glob_path)
             return wrapper
 
         return decorater
@@ -145,14 +119,24 @@ if __name__ == "__main__":
     def another_request(event):
         print("another", event)
 
+    # Any request on any endpoint
     @box.on_any_request
     def any_request(event):
         print("any", event)
 
     # root path = ~/SyftBox/datasites/
-    # how do i watch for changes on other's datasite?
     @box.on_file_change("{datasite}/**/*.json")
-    def on_any_json_file(event):
+    def all_json_on_my_datasite(event):
+        print("json file", event)
+
+    # root path = ~/SyftBox/datasites/
+    @box.on_file_change("test@openined.org/*.json")
+    def all_jsons_in_some_datasite(event):
+        print("json file", event)
+
+    # root path = ~/SyftBox/datasites/
+    @box.on_file_change("**/*.json")
+    def all_jsons_everywhere(event):
         print("json file", event)
 
     print("Running rpc server on", box.app_rpc_dir)
