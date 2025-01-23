@@ -4,6 +4,7 @@ from syft_core.client_shim import Client
 from syft_core.url import SyftBoxURL
 
 from syft_rpc.protocol import (
+    SyftError,
     SyftFuture,
     SyftMethod,
     SyftRequest,
@@ -62,9 +63,11 @@ def send(
 
     local_path = syft_request.url.to_local_path(client.workspace.datasites)
     file_path = local_path / f"{syft_request.ulid}.request"
-    local_path.mkdir(parents=True, exist_ok=True)
-    output = syft_request.dump(file_path)
-    # file_path.write_text(str(output))
+    try:
+        local_path.mkdir(parents=True, exist_ok=True)
+        syft_request.dump(file_path)
+    except Exception as e:
+        raise SyftError(f"Failed to write request to {file_path}: {e}")
 
     future = SyftFuture(ulid=syft_request.ulid, url=syft_request.url)
     return future
