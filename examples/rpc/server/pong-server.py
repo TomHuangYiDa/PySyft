@@ -7,7 +7,7 @@ from syft_rpc import rpc
 from syft_rpc.protocol import SyftRequest
 
 client = Client.load("~/.syftbox/stage/config.json")
-url_path = "~/SyftBoxStage/datasites/shubham@openmined.org/public/rpc"
+url_path = "~/SyftBoxStage/datasites/tauquir@openmined.org/public/rpc"
 
 
 def process_request(request_path: Path, client: Client):

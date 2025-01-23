@@ -1,26 +1,36 @@
 import hashlib
 import logging
-from fastapi import HTTPException
 import time
+from pathlib import Path
 import uvicorn
+from fastapi import HTTPException
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, Response
-# from syft_rpc import Request as RPCRequest, SyftBoxURL
-from syft_core import Client
 from contextlib import asynccontextmanager
 import asyncio
 from asyncio import Future
+from ulid import ULID
 
-from utils import (
+from syft_core.url import SyftBoxURL
+from syft_core import Client
+from syft_rpc.protocol import SyftFuture, SyftTimeoutError, SyftResponse, SyftRequest
+from syft_rpc import rpc
+from syft_proxy.utils import (
     create_response,
     generate_request_key,
     get_blocking,
     make_request,
     syftbox_url_from_params,
-    syftbox_url_from_full_path
+    syftbox_url_from_full_path,
+    syft_to_json_response,
 )
 
-from futures import add_future, clean_expired_futures, futures, FUTURE_EXPIRATION_SECONDS
+from syft_proxy.futures import (
+    add_future, 
+    clean_expired_futures, 
+    futures, 
+    FUTURE_EXPIRATION_SECONDS
+)
 
 # Configure logging
 logging.basicConfig(
@@ -31,6 +41,7 @@ logger = logging.getLogger(__name__)
 # client_config = Client.load()
 
 app = FastAPI()
+client = Client.load("~/.syftbox/stage/config.json")
 
 
 @asynccontextmanager
@@ -59,7 +70,7 @@ app = FastAPI(lifespan=lifespan)
 
 
 @app.post("/chat", include_in_schema=False)
-async def ask(request: Request) -> JSONResponse:
+async def chat(request: Request) -> JSONResponse:
     body = await request.json()
     headers = dict(request.headers)
     query_params = dict(request.query_params)
@@ -73,44 +84,72 @@ async def ask(request: Request) -> JSONResponse:
     return JSONResponse(result)
 
 
-@app.post("/rpc", response_class=JSONResponse, include_in_schema=False)
-async def rpc(request: Request):
-    sender = request.client.host
+@app.post("/rpc/reply/{request_id}", response_class=JSONResponse, include_in_schema=False)
+async def rpc_reply(request_id: str, request: Request):
+    sending_host = request.client.host
+    print(f"Received request from {sending_host}")
     body = await request.body()
     headers = dict(request.headers)
     query_params = dict(request.query_params)
-    print("query_params", query_params)
 
-    timeout = 60
+    timeout = 1
+    if "timeout" in query_params:
+        timeout = float(query_params["timeout"])
+        
+    rpc_url: SyftBoxURL = syftbox_url_from_params(query_params)
+    path: Path = rpc_url.to_local_path(datasites_path=client.datasites)
+    import pdb; pdb.set_trace()
+    # request_path: Path = 
+    # request = SyftRequest.load(request_path)
+    # response: SyftResponse = rpc.reply_to(request, client, body="Pong !!!")
+
+
+@app.post("/rpc", response_class=JSONResponse, include_in_schema=False)
+async def rpc_send(request: Request):
+    sending_host = request.client.host
+    print(f"Received request from {sending_host}")
+    body = await request.body()
+    headers = dict(request.headers)
+    query_params = dict(request.query_params)
+
+    timeout = 1
     if "timeout" in query_params:
         timeout = float(query_params["timeout"])
 
-    # Generate a unique key for the request
-    request_key = generate_request_key(query_params, body, headers, sender)
-    blocking = get_blocking(request)
-    logger.info(f"INCOMING REQUEST blocking {blocking}: {request_key}")
-
-    # Check if this key exists in the futures dict
-    if request_key in futures:
-        logger.info(f"Getting stored future: {request_key}")
-        stored_future = futures[request_key]["future"]  # Access future from the dict
-        try:
-            response = stored_future.wait(timeout=timeout - 1.1)
-            del futures[request_key]  # Cleanup once resolved
-            return create_response(response)
-        except TimeoutError:
-            logger.info(f"Timeout for stored future: {request_key}")
-            return Response(
-                content=b"",
-                headers={"Retry-After": "1", "X-Request-Key": request_key},
-                status_code=504,
-            )
-
-    # Handle new request
-    response = make_request(
-        query_params, body, headers, sender, blocking, timeout, request_key
+    rpc_url: SyftBoxURL = syftbox_url_from_params(query_params)
+    future: SyftFuture = rpc.send(
+        client=client,
+        method=query_params.get("method", "GET"),
+        url=rpc_url,
+        headers=headers,
+        body=body,
+        expiry_secs=120,
     )
-    return response
+    blocking = get_blocking(request)
+    if blocking:
+        try:
+            # This will block until response is received or timeout occurs
+            response: SyftResponse = future.wait(timeout=timeout)
+            json_response: JSONResponse = syft_to_json_response(response)
+            return json_response 
+        except SyftTimeoutError as e:
+            logger.error(f"Timeout: {e}")
+            return JSONResponse(
+                {"status": "timeout", "message": str(e)}, 
+                status_code=408
+            )
+        except Exception as e:
+            logger.error(f"Error: {e}")
+            return JSONResponse(
+                {"status": "error", "message": str(e)},
+                status_code=500
+            )
+    else:
+        return JSONResponse({
+            "status": "pending",
+            "future_id": str(future.ulid),
+            "poll_url": f"/rpc/status/{future.ulid}"
+        })
 
 
 @app.get(

@@ -8,8 +8,7 @@ url_path = "~/SyftBoxStage/datasites/tauquir@openmined.org/public/rpc"
 
 
 def wait_for_response(future, client):
-    path_to_file = future.url.to_local_path(client.workspace.datasites)
-    response_file = path_to_file / f"{future.ulid}.response"
+    response_file = future.response_path
     while True:
         if response_file.exists():
             print("Response received at: ", time.time())
