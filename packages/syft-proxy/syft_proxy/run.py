@@ -58,7 +58,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan)
 
 
-@app.post("/ask", include_in_schema=False)
+@app.post("/chat", include_in_schema=False)
 async def ask(request: Request) -> JSONResponse:
     body = await request.json()
     headers = dict(request.headers)
@@ -66,21 +66,10 @@ async def ask(request: Request) -> JSONResponse:
     client_ip = request.client.host
     # we need to forward the message to the LLM and get back the Future?
     result = {
-        "response": f"Got the message: {body['content']} from IP: {client_ip}",
-        "files": [
-            {
-                "name": "nuclear_weapons.pdf",
-                "size": "12,458 KB",
-                "modified": "2024-01-15 14:23:45",
-                "type": "PDF"
-            },
-            {
-                "name": "national_secrets.xlsx",
-                "size": "8,234 KB",
-                "modified": "2024-01-10 09:15:30",
-                "type": "XLSX"
-            },
-    ]}
+        "response": f"Got the message: {body['content']} from IP: {client_ip}. Will forward to LLM.",
+        "headers": headers,
+        "query_params": query_params,
+    }
     return JSONResponse(result)
 
 
@@ -167,27 +156,12 @@ async def rpc_status(request_key: str, request: Request):
         )
 
 
-# accepts normal HTTP
-@app.get("/rpc/{full_path:path}")
-async def rpc(full_path: str, request: Request):
-    sender = request.client.host
-    body = await request.body()
-    headers = dict(request.headers)
-    query_params = dict(request.query_params)
-
-    # turns into SyftBox RPC message
-    headers["x-forwarded-for"] = sender
-    headers["x-forwarded-proto"] = "http"
-    # rpc = RPCRequest()
-    syftbox_url = syftbox_url_from_full_path(full_path)
-    print(">>> syftbox_url_from_full_path", syftbox_url)
-    
-    # calls .get
-    # future_response = rpc.send(syftbox_url, body=body, headers=headers, method="get")
-    
-    # returns future
-    # return future_response.wait(timeout=timeout - 1.1)
-    return "SyftFuture is waiting for you!"
+@app.get(
+    "/rpc/list", response_class=JSONResponse, include_in_schema=False
+)
+async def rpc_list(request: Request):
+    futures = []
+    return JSONResponse(futures)
 
 
 def main() -> None:

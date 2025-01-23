@@ -100,7 +100,7 @@ check_request_status("abc123")
 
 
 // todos:
-//  1. how to write js sdk
+//  1. how to write a good js sdk
 //  2. learn jsdoc typing (important)
 //  3. not putting in global scope but window scope (important)
 //  4. for SDK, always take objects as input

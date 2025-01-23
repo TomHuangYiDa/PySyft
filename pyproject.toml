@@ -29,7 +29,7 @@ syft-requests = { workspace = true }
 syft-files = { workspace = true }
 
 [tool.uv.workspace]
-members = ["packages/*"]
+members = ["packages/*", "syft_proxy2"]
 exclude = ["packages/syft-js-sdk"]
 
 [tool.ruff.lint]
