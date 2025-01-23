@@ -100,7 +100,6 @@ async def rpc_reply(request_id: str, request: Request):
         
     rpc_url: SyftBoxURL = syftbox_url_from_params(query_params)
     path: Path = rpc_url.to_local_path(datasites_path=client.datasites)
-    import pdb; pdb.set_trace()
     # request_path: Path = 
     # request = SyftRequest.load(request_path)
     # response: SyftResponse = rpc.reply_to(request, client, body="Pong !!!")
@@ -108,20 +107,23 @@ async def rpc_reply(request_id: str, request: Request):
 
 @app.post("/rpc", response_class=JSONResponse, include_in_schema=False)
 async def rpc_send(request: Request):
+# async def rpc_send(request: Request):
+    # import pdb; pdb.set_trace()
     sending_host = request.client.host
     print(f"Received request from {sending_host}")
-    body = await request.body()
-    headers = dict(request.headers)
-    query_params = dict(request.query_params)
+    
+    # Get the raw JSON body
+    json_data = await request.json()
+    url = json_data.get('url')
+    sender = json_data.get('sender')
+    headers = json_data.get('headers', {})
+    method = json_data.get('method', 'GET')
+    body = json_data.get('body', '')
 
-    timeout = 1
-    if "timeout" in query_params:
-        timeout = float(query_params["timeout"])
-
-    rpc_url: SyftBoxURL = syftbox_url_from_params(query_params)
+    rpc_url: SyftBoxURL = SyftBoxURL(url)
     future: SyftFuture = rpc.send(
         client=client,
-        method=query_params.get("method", "GET"),
+        method=method,
         url=rpc_url,
         headers=headers,
         body=body,
@@ -131,7 +133,7 @@ async def rpc_send(request: Request):
     if blocking:
         try:
             # This will block until response is received or timeout occurs
-            response: SyftResponse = future.wait(timeout=timeout)
+            response: SyftResponse = future.wait(timeout=1)
             json_response: JSONResponse = syft_to_json_response(response)
             return json_response 
         except SyftTimeoutError as e:

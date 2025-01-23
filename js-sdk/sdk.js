@@ -7,124 +7,45 @@ const config = {
 };
 
 
-// Some example data
-const humanMessage = {
-  content: "can you list the files inside the folder 'super_secret_stuff' in Shubham's datasite",
-};
+class SyftSDK {
+    constructor(baseUrl = config.proxyUrl) {
+        this.baseUrl = baseUrl;
+    }
 
-const rpcMessage = {
-};
-
-// Send human messages to the server
-async function send_message(message) {
-  try {
-      const response = await fetch(`${config.proxyUrl}/ask`, {
-          method: 'POST',
-          headers: config.headers,
-          body: JSON.stringify(message)
-        }
-      )
-      if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
+    async rpc(url, headers = {}, body = '', options = {}) {
+      const syftUrlPattern = /^syft:\/\/([a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+)(\/.*)?$/;
+      if (!syftUrlPattern.test(url)) {
+          throw new Error('Invalid SyftBoxURL format. Must be syft://email@domain[/path]');
       }
-      const data = await response.json();
-      return data;
-  } catch (error) {
-      console.error('Error sending user data:', error);
-      throw error;
-  }
-}
+  
+    const payload = {
+        url,
+        headers,
+        body: body ? Buffer.from(body).toString('hex') : null,
+    };
 
+    try {
+        const response = await fetch(`${this.baseUrl}/rpc`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                ...options.headers
+            },
+            body: JSON.stringify(payload)
+        });
 
-// send rpc requests to the server
-async function send_rpc(rpcMessage) {
-  const params = {
-    method: 'get',
-    datasite: 'khoa@openmined.org',
-    path: 'public/apps/chat'
-  }
-  // const queryString = new URLSearchParams(params).toString();
-  // const url = `${config.proxyUrl}/rpc?${queryString}`;
-  const url = `${config.proxyUrl}/rpc` + '/' + params.datasite + '/' + params.path;
-  console.log('sending url:', url)
-
-  try {
-    const response = await fetch(url, {
-      method: 'GET',
-      headers: config.headers,
-      // body: JSON.stringify(rpcMessage)
-    });
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        response = await response.json();
+        console.log('response:', response);
+        return response;
+    } catch (error) {
+        console.error('RPC request failed:', error);
+        throw error;
     }
-    const data = await response.json();
-    return data;
-  } catch (error) {
-    console.error('Error sending user data:', error);
-    throw error;
   }
+
 }
 
-async function check_request_status(requestKey) {
-  try {
-    const url = `${config.proxyUrl}/rpc/status/${requestKey}`
-    console.log('sending url:', url)
-    const response = await fetch(url, {
-      method: 'GET',
-      headers: config.headers,
-    });
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-    const data = await response.json();
-    console.log('checking request status:', data);
-  } catch (error) {
-    console.error('Error checking request status:', error);
-    throw error;
-  }
-}
-
-
-send_message(humanMessage)
-  .then(data => console.log('Got response from server:', data))  // Then use the JSON data
-  .catch(error => console.error('Error:', error));
-
-send_rpc(rpcMessage)
-.then(data => console.log('Got response from server:', data))  // Then use the JSON data
-.catch(error => console.error('Error:', error));
-
-check_request_status("abc123")
-  .then(data => console.log('Got response from server:', data))  // Then use the JSON data
-  .catch(error => console.error('Error:', error));
-
-
-// class SyftSDK {
-//   constructor(config) {
-//     this.config = config;
-//   }
-
-//   async send_message(message) {
-//     try {
-//         const response = await fetch(`${this.config.proxyUrl}/ask`, {
-//             method: 'POST',
-//             headers: this.config.headers,
-//             body: JSON.stringify(message)
-//           }
-//         )
-//         if (!response.ok) {
-//             throw new Error(`HTTP error! status: ${response.status}`);
-//         }
-//         const data = await response.json();
-//         return data;
-//     } catch (error) {
-//         console.error('Error sending user data:', error);
-//         throw error;
-//     }
-//   }
-
-//   // async send_rpc(rpcMessage) {
-//   //   const params = {
-//   //     method: 'get',
-//   //     datasite: 'khoa@openmined.org',
-
-// }
+export { SyftSDK };

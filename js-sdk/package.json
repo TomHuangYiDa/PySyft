@@ -1,0 +1,19 @@
+{
+  "name": "js-sdk",
+  "version": "1.0.0",
+  "description": "1. Install deps: `uv venv` and `uv sync`  2. Run the FastAPI HTTP Proxy server: `uv run packages/syft-proxy/syft_proxy/run.py` 3. Run the `sdk.js`: `node src/sdk.js`",
+  "main": "main.js",
+  "type": "module",
+  "directories": {
+    "example": "examples"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "ulid": "^2.3.0"
+  }
+}
