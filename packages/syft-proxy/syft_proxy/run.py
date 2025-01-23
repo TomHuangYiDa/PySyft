@@ -86,6 +86,8 @@ async def chat(request: Request) -> JSONResponse:
 
 @app.post("/rpc/reply/{request_id}", response_class=JSONResponse, include_in_schema=False)
 async def rpc_reply(request_id: str, request: Request):
+    # this is to manually test out the reply functionality
+    # since replies will always be generated in syft-events - so no need to have an endpoint for that
     sending_host = request.client.host
     print(f"Received request from {sending_host}")
     body = await request.body()
