@@ -2,6 +2,7 @@ import logging
 import time
 from datetime import datetime, timedelta, timezone
 from enum import IntEnum, StrEnum
+from pathlib import Path
 from typing import ClassVar, Optional, TypeAlias
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -19,7 +20,7 @@ Headers: TypeAlias = dict[str, str]
 
 
 # Constants
-DEFAULT_MESSAGE_EXPIRY: float = 60.0 * 5  # 5 minutes
+DEFAULT_MESSAGE_EXPIRY: float = 60.0 * 60.0 * 24.0 * 3  # 3 days in seconds
 
 
 class SyftMethod(StrEnum):
@@ -60,8 +61,9 @@ class Base(BaseModel):
         json_encoders={
             ULID: str,
             datetime: lambda dt: dt.isoformat(),
-            bytes: lambda b: b.hex(),
         },
+        ser_json_bytes="hex",
+        val_json_bytes="hex",
     )
 
     def dumps(self) -> str:
@@ -209,20 +211,21 @@ class SyftFuture(Base):
     DEFAULT_POLL_INTERVAL: ClassVar[float] = 0.1
 
     ulid: ULID
+    url: SyftBoxURL
     local_path: PathLike
 
     @property
-    def request_path(self) -> PathLike:
+    def request_path(self) -> Path:
         """Path to the request file."""
         return to_path(self.local_path) / f"{self.ulid}.request"
 
     @property
-    def response_path(self) -> PathLike:
+    def response_path(self) -> Path:
         """Path to the response file."""
         return to_path(self.local_path) / f"{self.ulid}.response"
 
     @property
-    def rejected_path(self) -> PathLike:
+    def rejected_path(self) -> Path:
         """Path to the rejected request marker file."""
         return self.request_path.with_suffix(f"{self.request_path.suffix}.rejected")
 
@@ -279,30 +282,38 @@ class SyftFuture(Base):
         Returns:
             The response if available, None if still pending.
         """
-        # TODO: SyftResponse requires sender and url, figure out how to get them.
-
         # Check for rejection first
         if self.is_rejected:
             return SyftResponse(
                 status_code=SyftStatus.SYFT_403_FORBIDDEN,
-                url="syft://system@openmined.org/dummy",
-                sender="system@openmined.org",
+                url=self.url,
+                sender="SYSTEM",
             )
 
         # Check for existing response
         if self.response_path.exists():
             return self._handle_existing_response()
 
-        # Check for expired request
-        if self.request_path.exists():
-            request = SyftRequest.load(self.request_path)
-            if request.is_expired:
-                return SyftResponse(
-                    status_code=SyftStatus.SYFT_419_EXPIRED,
-                    url=request.url,
-                    sender="system@openmined.org",
-                )
+        # If both request and response are missing, the request has expired
+        # and they got cleaned up by the server.
+        if not self.request_path.exists():
+            return SyftResponse(
+                status_code=SyftStatus.SYFT_419_EXPIRED,
+                url=self.url,
+                sender="SYSTEM",
+            )
 
+        # Check for expired request
+        request = SyftRequest.load(self.request_path)
+        if request.is_expired:
+            return SyftResponse(
+                status_code=SyftStatus.SYFT_419_EXPIRED,
+                url=self.url,
+                sender="SYSTEM",
+            )
+
+        # Request is present and not expired, but response unavailable.
+        # This means we are still waiting for a response
         if not silent:
             logger.info("Response not ready, still waiting...")
         return None
@@ -322,7 +333,7 @@ class SyftFuture(Base):
             if response.is_expired:
                 return SyftResponse(
                     status_code=SyftStatus.SYFT_419_EXPIRED,
-                    url=response.url,
+                    url=self.url,
                     sender=response.sender,
                 )
             return response
@@ -331,6 +342,6 @@ class SyftFuture(Base):
             return SyftResponse(
                 status_code=SyftStatus.SYFT_500_SERVER_ERROR,
                 body=str(e).encode(),
-                url="syft://system@openmined.org/dummy",
-                sender="system@openmined.org",
+                url=self.url,
+                sender="SYSTEM",
             )

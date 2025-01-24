@@ -19,7 +19,7 @@ def process_request(request_path: Path, client: Client):
         return
     timedelta = datetime.datetime.now(datetime.UTC) - request.timestamp
     print(f"Request received at: {timedelta} ", request.body)
-    rpc.reply_to(request, client, body="Pong !!!")
+    rpc.reply_to(request, client, body=b"Pong !!!")
     request_path.unlink()
 
 
