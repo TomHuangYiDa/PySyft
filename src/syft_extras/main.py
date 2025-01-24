@@ -1,6 +1,5 @@
 import syft_core
 import syft_event
-import syft_proxy
 import syft_requests
 import syft_rpc
 import syft_files
