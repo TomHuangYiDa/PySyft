@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>SyftSDK Test</title>
+</head>
+<body>
+    <h1>SyftSDK Test</h1>
+    <div>
+        <button onclick="testRPC()">Test RPC Call</button>
+        <button onclick="showLocalStorage('output')">Show LocalStorage</button>
+        <button onclick="clearLocalStorage('output')">Clear Storage</button>
+    </div>
+    <div id="output"></div>
+
+    <!-- Import the SDK as a module -->
+    <script type="module">
+        import { SyftSDK, showLocalStorage, clearLocalStorage } from '../sdk.js';
+        
+        // Make SDK available globally for the button handlers
+        window.sdk = new SyftSDK();
+        
+        // Define global functions for button handlers
+        window.testRPC = async function() {
+            console.log("test rpc/");
+            try {
+                const response = await window.sdk.rpc(
+                    "syft://shubham@openmined.org/public/rpc",
+                    {
+                        'Content-Type': 'application/json',
+                        'User-Agent': 'MyApp/1.0'
+                    },
+                    "Ping!",
+                );
+                document.getElementById('output').innerHTML = 
+                    `<pre>RPC Response: ${JSON.stringify(response, null, 2)}</pre>`;
+            } catch (error) {
+                document.getElementById('output').innerHTML = 
+                    `<pre>Error: ${error.message}</pre>`;
+            }
+        }
+
+        window.showLocalStorage = showLocalStorage;
+        window.clearLocalStorage = clearLocalStorage;
+    </script>
+</body>
+</html>
