@@ -252,6 +252,23 @@ class SyftFuture(Base):
         """Check if the future has expired."""
         return datetime.now(timezone.utc) > self.expires
 
+    @staticmethod
+    def load_state(request_path: PathLike) -> Self:
+        try:
+            request = SyftRequest.load(request_path)
+        except FileNotFoundError:
+            raise SyftError("Request file not found")
+
+        message_hash = request.get_message_hash()
+        state_path = request_path.parent / f".{message_hash}.state"
+
+        try:
+            return SyftFuture.load(state_path)
+        except FileNotFoundError:
+            raise SyftError(
+                "Future object not found for the given request. Ensure the request has been sent."
+            )
+
     def wait(
         self,
         timeout: Optional[float] = None,
@@ -363,3 +380,29 @@ class SyftFuture(Base):
                 url=self.url,
                 sender="SYSTEM",
             )
+
+
+class SyftBulkFuture:
+    futures: list[SyftFuture]
+    DEFAULT_POLL_INTERVAL: ClassVar[float] = 0.1
+
+    def gather_completed(
+        self, timeout: int = 10, poll_interval: float = DEFAULT_POLL_INTERVAL
+    ) -> list[SyftResponse]:
+        if timeout is not None and timeout <= 0:
+            raise ValueError("Timeout must be greater than 0")
+        if poll_interval <= 0:
+            raise ValueError("Poll interval must be greater than 0")
+
+        pending = set(self.futures)
+        responses = []
+        deadline = time.monotonic() + timeout
+
+        while pending and time.monotonic() < deadline:
+            for future in list(pending):  # Create list to allow set modification
+                if response := future.resolve(silent=True):
+                    responses.append(response)
+                    pending.remove(future)
+            time.sleep(poll_interval)
+
+        return responses

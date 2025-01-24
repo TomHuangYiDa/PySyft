@@ -4,6 +4,7 @@ from syft_core.client_shim import Client
 from syft_core.url import SyftBoxURL
 
 from syft_rpc.protocol import (
+    SyftBulkFuture,
     SyftError,
     SyftFuture,
     SyftMethod,
@@ -20,6 +21,7 @@ def send(
     headers: dict[str, str] | None = None,
     body: str | bytes | None = None,
     expiry_secs: int = 10,
+    no_cache: bool = False,
 ) -> SyftFuture:
     """Send an asynchronous request to a Syft Box endpoint and return a future for tracking the response.
 
@@ -38,6 +40,7 @@ def send(
             or raw bytes. Defaults to None.
         expiry_secs: Number of seconds until the request expires. After this time,
             the request will not be processed. Defaults to 10 seconds.
+        no_cache: If True, ignore any cached future and make a fresh request.
 
     Returns:
         SyftFuture: A future object that can be used to track and retrieve the response.
@@ -66,7 +69,7 @@ def send(
     state_path = local_path / f".{message_hash}.state"
 
     # Check if we already have a cached future that hasn't expired
-    if state_path.exists():
+    if not no_cache and state_path.exists():
         future = SyftFuture.load(state_path)
         if not future.is_expired:
             return future
@@ -87,6 +90,33 @@ def send(
     )
     future.dump(state_path)
     return future
+
+
+def broadcast(
+    client: Client,
+    method: SyftMethod | str,
+    url: list[SyftBoxURL | str],
+    headers: dict[str, str] | None = None,
+    body: str | bytes | None = None,
+    expiry_secs: int = 10,
+    no_cache: bool = False,
+) -> SyftBulkFuture:
+    """Broadcast an asynchronous request to multiple Syft Box endpoints and return a bulk future."""
+    bulk_future = SyftBulkFuture(
+        futures=[
+            send(
+                client=client,
+                method=method,
+                url=endpoint,
+                headers=headers,
+                body=body,
+                expiry_secs=expiry_secs,
+                no_cache=no_cache,
+            )
+            for endpoint in url
+        ]
+    )
+    return bulk_future
 
 
 def reply_to(

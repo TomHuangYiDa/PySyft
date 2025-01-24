@@ -1,4 +1,5 @@
 from .rpc import (
+    broadcast,  # noqa: F401
     reply_to,  # noqa: F401
     send,  # noqa: F401
 )
