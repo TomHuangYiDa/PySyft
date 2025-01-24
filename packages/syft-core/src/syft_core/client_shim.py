@@ -11,9 +11,10 @@ from pathlib import Path
 from pydantic import EmailStr
 from typing_extensions import Optional, Self
 
-from .config import SyftClientConfig
-from .types import PathLike, to_path
-from .workspace import SyftWorkspace
+from syft_core.config import SyftClientConfig
+from syft_core.types import PathLike, to_path
+from syft_core.url import SyftBoxURL
+from syft_core.workspace import SyftWorkspace
 
 # this just makes it a bit clear what the default is for the api_data() method
 CURRENT_API_REQUEST_NAME = None
@@ -108,3 +109,6 @@ class Client:
 
         for path in paths:
             to_path(path).mkdir(parents=True, exist_ok=True)
+
+    def to_syft_url(self, path: PathLike) -> SyftBoxURL:
+        return SyftBoxURL.from_path(path, self.workspace)

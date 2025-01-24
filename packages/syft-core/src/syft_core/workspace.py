@@ -1,4 +1,4 @@
-from .types import PathLike, to_path
+from syft_core.types import PathLike, to_path
 
 
 class SyftWorkspace:
