@@ -1,6 +1,6 @@
 // Configuration object for API settings
 const config = {
-    proxyURL: 'http://localhost:9081',
+    proxyURL: 'http://localhost:9081',  // should be syftbox.localhost in production
     headers: {
         'Content-Type': 'application/json',
     }
@@ -24,14 +24,6 @@ class SyftSDK {
             console.warn(`localStorage is not available. Request ${futureId} will not be stored.`);
             return;
         }
-        // localStorage works with URL
-        // different website has different local storages
-        // if we have 10 apps open in browser, each app needs to have its own local storage
-        // meet Shubham to discuss RPC Future which is saved 
-        // HTTP proxy forwards the request to RPC
-        // one endpoint end to end 
-        // if the future is pending, keep it in the localStorage
-        // if the future is errored, 
         const futureRequests = JSON.parse(localStorage.getItem('futureRequests') || '{}');
         futureRequests[futureId] = requestPath;
         localStorage.setItem('futureRequests', JSON.stringify(futureRequests));
@@ -120,6 +112,9 @@ class SyftSDK {
 
     /**
      * Check the status of an RPC request
+     * If the future is pending, keep it in the pending list of localStorage to keep polling
+     * If the future is errored / resolved / rejected, save it somewhere to show the results and 
+     *   remove it from the pending list in localStorage
      * @param {string} request_id - The ID of the request to check
      * @throws {Error} When request_id is not a string or is empty
      */
