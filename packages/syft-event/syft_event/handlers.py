@@ -24,11 +24,6 @@ class RpcRequestHandler(PatternMatchingHandler):
         self.handler = handler
 
     def on_any_event(self, event: FileSystemEvent):
-        # try:
-        #     req = SyftRequest.load(event.src_path)
-        #     self.handler(req)
-        # except Exception as e:
-        #     print("Error loading request", e)
         self.handler(event)
 
 
