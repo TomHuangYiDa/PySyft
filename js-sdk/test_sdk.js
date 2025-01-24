@@ -14,4 +14,3 @@ const syftSDK = new SyftSDK();
 syftSDK.rpc_status(
     "01JJBA98HA2022VZMJP5PS3PWT",
 )
-

@@ -112,7 +112,7 @@ class SyftSDK {
 
     /**
      * Check the status of an RPC request
-     * If the future is pending, keep it in the pending list of localStorage to keep polling
+     * If the future is pending, keep it in the pending list of localStorage to keep polling (what's the interval?)
      * If the future is errored / resolved / rejected, save it somewhere to show the results and 
      *   remove it from the pending list in localStorage
      * @param {string} request_id - The ID of the request to check
