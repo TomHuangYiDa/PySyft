@@ -1,3 +1,4 @@
+from pathlib import Path
 from time import sleep
 
 from syft_core import Client
@@ -5,6 +6,8 @@ from watchdog.events import FileCreatedEvent, FileModifiedEvent, FileSystemEvent
 from watchdog.observers import Observer
 
 from syft_event.handlers import AnyPatternHandler, RpcRequestHandler
+
+DEFAULT_WATCH_EVENTS = [FileCreatedEvent, FileModifiedEvent]
 
 
 class SyftEvents:
@@ -44,12 +47,7 @@ class SyftEvents:
     def on_request(self, endpoint: str):
         """Handle requests at `{api_data}/rpc/{endpoint}`"""
 
-        if "*" in endpoint or "?" in endpoint:
-            raise ValueError("wildcards are not allowed in path")
-
-        # this path must exist so that watch can emit events
-        endpoint_path = self.app_rpc_dir / endpoint.lstrip("/").rstrip("/")
-        endpoint_path.mkdir(exist_ok=True, parents=True)
+        epath = self.__to_endpoint_path(endpoint)
 
         def decorater(func):
             def wrapper(event):
@@ -58,7 +56,7 @@ class SyftEvents:
             self.obs.schedule(
                 # use raw path for glob which will be convert to path/*.request
                 RpcRequestHandler(wrapper),
-                path=endpoint_path,
+                path=epath,
                 recursive=True,
                 event_filter=[FileCreatedEvent],
             )
@@ -66,27 +64,17 @@ class SyftEvents:
 
         return decorater
 
-    def on_file_change(
+    def watch(
         self,
         glob_path: str | list[str],
-        event_filter: list[type[FileSystemEvent]] | None = [FileModifiedEvent],
+        event_filter: list[type[FileSystemEvent]] = DEFAULT_WATCH_EVENTS,
     ):
         """Invoke the handler if any file changes in the glob path"""
 
         if not isinstance(glob_path, list):
             glob_path = [glob_path]
 
-        def format_globs(path: str):
-            # replace placeholders with actual values
-            path = path.format(
-                datasite=self.client.email,
-                api_data=self.client.api_data(self.app_name),
-            )
-            if not path.startswith("**/"):
-                path = f"**/{path}"
-            return path
-
-        globs = list(map(format_globs, glob_path))
+        globs = list(map(self.__format_glob, glob_path))
 
         def decorater(func):
             def wrapper(event):
@@ -102,6 +90,26 @@ class SyftEvents:
             return wrapper
 
         return decorater
+
+    def __to_endpoint_path(self, endpoint: str) -> Path:
+        if "*" in endpoint or "?" in endpoint:
+            raise ValueError("wildcards are not allowed in path")
+
+        # this path must exist so that watch can emit events
+        epath = self.app_rpc_dir / endpoint.lstrip("/").rstrip("/")
+        epath.mkdir(exist_ok=True, parents=True)
+        return epath
+
+    def __format_glob(self, path: str):
+        # replace placeholders with actual values
+        path = path.format(
+            email=self.client.email,
+            datasite=self.client.email,
+            api_data=self.client.api_data(self.app_name),
+        )
+        if not path.startswith("**/"):
+            path = f"**/{path}"
+        return path
 
 
 if __name__ == "__main__":
@@ -125,19 +133,19 @@ if __name__ == "__main__":
         print("any", event)
 
     # root path = ~/SyftBox/datasites/
-    @box.on_file_change("{datasite}/**/*.json")
+    @box.watch("{datasite}/**/*.json")
     def all_json_on_my_datasite(event):
-        print("json file", event)
+        print("{datasite} json file".format(datasite=box.client.email), event)
 
     # root path = ~/SyftBox/datasites/
-    @box.on_file_change("test@openined.org/*.json")
-    def all_jsons_in_some_datasite(event):
-        print("json file", event)
+    @box.watch("test@openined.org/*.json")
+    def jsons_in_some_datasite(event):
+        print("test@openmined,org json file", event)
 
     # root path = ~/SyftBox/datasites/
-    @box.on_file_change("**/*.json")
+    @box.watch("**/*.json")
     def all_jsons_everywhere(event):
-        print("json file", event)
+        print("all json file", event)
 
     print("Running rpc server on", box.app_rpc_dir)
     box.run_forever()
