@@ -60,8 +60,18 @@ def send(
         body=body.encode() if isinstance(body, str) else body,
         expires=datetime.now(timezone.utc) + timedelta(seconds=expiry_secs),
     )
-
     local_path = syft_request.url.to_local_path(client.workspace.datasites)
+
+    message_hash = syft_request.get_message_hash()
+    state_path = local_path / f".{message_hash}.state"
+
+    # Check if we already have a cached future that hasn't expired
+    if state_path.exists():
+        future = SyftFuture.load(state_path)
+        if not future.is_expired:
+            return future
+
+    # We need to make a fresh request and persist the future to a state
     file_path = local_path / f"{syft_request.ulid}.request"
     try:
         local_path.mkdir(parents=True, exist_ok=True)
@@ -70,8 +80,12 @@ def send(
         raise SyftError(f"Failed to write request to {file_path}: {e}")
 
     future = SyftFuture(
-        ulid=syft_request.ulid, url=syft_request.url, local_path=local_path
+        ulid=syft_request.ulid,
+        url=syft_request.url,
+        local_path=local_path,
+        expires=syft_request.expires,
     )
+    future.dump(state_path)
     return future
 
 

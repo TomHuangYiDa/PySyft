@@ -1,3 +1,4 @@
+import hashlib
 import logging
 import time
 from datetime import datetime, timedelta, timezone
@@ -21,6 +22,14 @@ Headers: TypeAlias = dict[str, str]
 
 # Constants
 DEFAULT_MESSAGE_EXPIRY: float = 60.0 * 60.0 * 24.0 * 3  # 3 days in seconds
+
+
+def validate_syftbox_url(url: SyftBoxURL | str) -> SyftBoxURL:
+    if isinstance(url, str):
+        return SyftBoxURL(url)
+    if isinstance(url, SyftBoxURL):
+        return url
+    raise ValueError(f"Invalid type for url: {type(url)}. Expected str or SyftBoxURL.")
 
 
 class SyftMethod(StrEnum):
@@ -62,8 +71,8 @@ class Base(BaseModel):
             ULID: str,
             datetime: lambda dt: dt.isoformat(),
         },
-        ser_json_bytes="hex",
-        val_json_bytes="hex",
+        ser_json_bytes="base64",
+        val_json_bytes="base64",
     )
 
     def dumps(self) -> str:
@@ -161,13 +170,11 @@ class SyftMessage(Base):
     @field_validator("url", mode="before")
     @classmethod
     def validate_url(cls, value) -> SyftBoxURL:
-        if isinstance(value, str):
-            return SyftBoxURL(value)
-        if isinstance(value, SyftBoxURL):
-            return value
-        raise ValueError(
-            f"Invalid type for url: {type(value)}. Expected str or SyftBoxURL."
-        )
+        return validate_syftbox_url(value)
+
+    def get_message_hash(self) -> str:
+        m = self.model_dump_json(include=["url", "method", "sender", "headers", "body"])
+        return hashlib.sha256(m.encode()).hexdigest()
 
 
 class SyftRequest(SyftMessage):
@@ -213,6 +220,12 @@ class SyftFuture(Base):
     ulid: ULID
     url: SyftBoxURL
     local_path: PathLike
+    expires: datetime
+
+    @field_validator("url", mode="before")
+    @classmethod
+    def validate_url(cls, value) -> SyftBoxURL:
+        return validate_syftbox_url(value)
 
     @property
     def request_path(self) -> Path:
@@ -233,6 +246,11 @@ class SyftFuture(Base):
     def is_rejected(self) -> bool:
         """Check if the request has been rejected."""
         return self.rejected_path.exists()
+
+    @property
+    def is_expired(self) -> bool:
+        """Check if the future has expired."""
+        return datetime.now(timezone.utc) > self.expires
 
     def wait(
         self,
