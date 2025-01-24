@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 from time import sleep
 from typing import Callable
@@ -7,6 +8,7 @@ from watchdog.events import FileCreatedEvent, FileModifiedEvent, FileSystemEvent
 from watchdog.observers import Observer
 
 from syft_event.handlers import AnyPatternHandler, RpcRequestHandler
+from syft_event.schema import generate_schema
 
 DEFAULT_WATCH_EVENTS = [FileCreatedEvent, FileModifiedEvent]
 
@@ -18,13 +20,24 @@ class SyftEvents:
         self.app_dir = self.client.api_data(self.app_name)
         self.app_rpc_dir = self.app_dir / "rpc"
         self.obs = Observer()
-        self.rpc = {}
+        self.rpc: dict[Path, Callable] = {}
 
     def start(self):
         self.app_dir.mkdir(exist_ok=True, parents=True)
         self.app_rpc_dir.mkdir(exist_ok=True, parents=True)
         self.process_pending_requests()
         self.obs.start()
+
+    def publish_schema(self):
+        schema = {}
+        for endpoint, handler in self.rpc.items():
+            handler = generate_schema(handler)
+            ep_name = endpoint.relative_to(self.app_rpc_dir)
+            ep_name = "/" + str(ep_name).replace("\\", "/")
+            schema[ep_name] = handler
+
+        schema_path = self.app_rpc_dir / "rpc.schema.json"
+        schema_path.write_text(json.dumps(schema, indent=2))
 
     def process_pending_requests(self):
         # process all pending requests
@@ -157,4 +170,25 @@ if __name__ == "__main__":
         print("watch **/*.json:", event)
 
     print("Running rpc server for", box.app_rpc_dir)
+    box.publish_schema()
     box.run_forever()
+
+
+# if __name__ == "__main__":
+#     box = SyftEvents("vector_store")
+
+#     # requests are always bound to the app
+#     # root path = {datasite}/api_data/{app_name}/rpc
+#     @box.on_request("/doc_query")
+#     def query(query: str) -> list[str]:
+#         """Return similar documents for a given query"""
+#         return []
+
+#     @box.on_request("/doc_similarity")
+#     def query_embedding(embedding: np.array) -> np.array:
+#         """Return similar documents for a given embedding"""
+#         return []
+
+#     print("Running rpc server for", box.app_rpc_dir)
+#     box.publish_schema()
+#     box.run_forever()
