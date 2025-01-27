@@ -3,12 +3,16 @@ from pathlib import Path
 from threading import Event
 from typing import Callable
 
+from pydantic import BaseModel
 from syft_core import Client
+from syft_rpc import rpc
+from syft_rpc.protocol import SyftRequest
 from watchdog.events import FileCreatedEvent, FileModifiedEvent, FileSystemEvent
 from watchdog.observers import Observer
 
 from syft_event.handlers import AnyPatternHandler, RpcRequestHandler
 from syft_event.schema import generate_schema
+from syft_event.types import Request
 
 DEFAULT_WATCH_EVENTS = [FileCreatedEvent, FileModifiedEvent]
 
@@ -105,16 +109,35 @@ class SyftEvents:
         return decorator
 
     def __handle_rpc(self, path: Path, func: Callable):
-        func(path)
-        path.with_suffix(".response").write_text("")
-
-        # try:
-        #     req = SyftRequest.load(event.src_path)
-        #     resp = handler(req)
-        #     # todo check for response types
-        # except Exception as e:
-        #     print("Error loading request", e)
-        pass
+        try:
+            req = SyftRequest.load(path)
+            # todo! what do we do here?
+            if req.is_expired:
+                return
+            evt_req = Request(
+                sender=req.sender,
+                url=req.url,
+                headers=req.headers,
+                body=req.body,
+            )
+            resp = func(evt_req)
+            if resp is None:
+                data = ""
+                content_type = "text/plain"
+            elif isinstance(resp, (dict, BaseModel)):
+                data = json.dumps(resp)
+                content_type = "application/json"
+            else:
+                data = resp
+                content_type = "application/octet-stream"
+            rpc.reply_to(
+                req,
+                body=data,
+                headers={"Content-Type": content_type},
+                client=self.client,
+            )
+        except Exception as e:
+            print("Error loading request", e)
 
     def __register_rpc(self, endpoint: Path, handler: Callable) -> Callable:
         def on_rpc_request(event: FileSystemEvent):

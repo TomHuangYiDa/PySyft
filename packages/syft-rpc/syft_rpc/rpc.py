@@ -14,12 +14,12 @@ from syft_rpc.protocol import (
 
 
 def send(
-    client: Client,
-    method: SyftMethod | str,
     url: SyftBoxURL | str,
     headers: dict[str, str] | None = None,
     body: str | bytes | None = None,
+    method: SyftMethod | str = SyftMethod.GET,
     expiry_secs: int = 10,
+    client: Client = None,
 ) -> SyftFuture:
     """Send an asynchronous request to a Syft Box endpoint and return a future for tracking the response.
 
@@ -52,6 +52,7 @@ def send(
         ... )
         >>> response = future.result()  # Wait for response
     """
+    client = client or Client.load()
     syft_request = SyftRequest(
         sender=client.email,
         method=method.upper() if isinstance(method, str) else method,
@@ -77,11 +78,11 @@ def send(
 
 def reply_to(
     request: SyftRequest,
-    client: Client,
     body: str | bytes | None = None,
     headers: dict[str, str] | None = None,
     status_code: SyftStatus = SyftStatus.SYFT_200_OK,
     expiry_secs: int = 10,
+    client: Client = None,
 ) -> SyftResponse:
     """Create and store a response to a Syft request.
 
@@ -113,6 +114,7 @@ def reply_to(
         ...     status_code=SyftStatus.SYFT_200_OK
         ... )
     """
+    client = client or Client.load()
     response = SyftResponse(
         ulid=request.ulid,
         sender=client.email,
