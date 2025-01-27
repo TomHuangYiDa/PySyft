@@ -1,12 +1,14 @@
 import time
 
+from syft_core import Client
 from syft_rpc import rpc
 
 
 def send_ping():
     start = time.time()
+    client = Client.load()
     future = rpc.send(
-        url="syft://yash@openmined.org/api_data/pingpong/rpc/ping",
+        url=f"syft://{client.email}/api_data/pingpong/rpc/ping",
         body="Ping !!!",
         expiry_secs=120,  #! discuss expiry_secs=120 & future.timeout = 300
     )
