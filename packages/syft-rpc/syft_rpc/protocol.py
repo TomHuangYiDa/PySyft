@@ -389,6 +389,20 @@ class SyftBulkFuture:
     def gather_completed(
         self, timeout: int = 10, poll_interval: float = DEFAULT_POLL_INTERVAL
     ) -> list[SyftResponse]:
+        """Wait for all futures to complete and return a list of responses.
+
+        Returns a list of responses in the order of the futures list. If a future
+        times out, it will be omitted from the list. If the timeout is reached before
+        all futures complete, the function will return the responses received so far.
+
+        Args:
+            timeout: Maximum time to wait in seconds.
+            poll_interval: Time in seconds between polling attempts.
+        Returns:
+            A list of response objects.
+        Raises:
+            ValueError: If timeout or poll_interval is negative.
+        """
         if timeout is not None and timeout <= 0:
             raise ValueError("Timeout must be greater than 0")
         if poll_interval <= 0:
@@ -406,3 +420,16 @@ class SyftBulkFuture:
             time.sleep(poll_interval)
 
         return responses
+
+    @property
+    def ulid(self) -> ULID:
+        """Generate a deterministic ULID from all future IDs.
+
+        Returns:
+            A single ULID derived from hashing all future IDs.
+        """
+        # Combine all ULIDs and hash them
+        combined = ",".join(str(f.ulid) for f in self.futures)
+        hash_bytes = hashlib.sha256(combined.encode()).digest()[:16]
+        # Use first 16 bytes of hash to create a new ULID
+        return ULID.from_bytes(hash_bytes)

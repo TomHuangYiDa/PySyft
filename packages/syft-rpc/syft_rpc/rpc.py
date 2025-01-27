@@ -101,7 +101,39 @@ def broadcast(
     expiry_secs: int = 10,
     no_cache: bool = False,
 ) -> SyftBulkFuture:
-    """Broadcast an asynchronous request to multiple Syft Box endpoints and return a bulk future."""
+    """Broadcast an asynchronous request to multiple Syft Box endpoints and return a bulk future.
+
+    This function creates a SyftRequest for each URL in the list,
+    writes them to the local filesystem under the client's workspace, and
+    returns a SyftBulkFuture object that can be used to track and retrieve multiple responses.
+
+    Args:
+        client: A Syft Client instance used to send the requests.
+        method: The HTTP method to use. Can be a SyftMethod enum or a string
+            (e.g., 'GET', 'POST').
+        url: List of destination URLs. Each can be a SyftBoxURL instance or a string in
+            the format 'syft://user@domain.com/path'.
+        headers: Optional dictionary of HTTP headers to include with the requests.
+            Defaults to None.
+        body: Optional request body. Can be either a string (will be encoded to bytes)
+            or raw bytes. Defaults to None.
+        expiry_secs: Number of seconds until the requests expire. After this time,
+            requests will not be processed. Defaults to 10 seconds.
+        no_cache: If True, ignore any cached futures and make fresh requests.
+
+    Returns:
+        SyftBulkFuture: A bulk future object that can be used to track and retrieve multiple responses.
+
+    Example:
+        >>> client = Client.load()
+        >>> future = broadcast(
+        ...     client=client,
+        ...     method="GET",
+        ...     url=["syft://user1@domain.com/public/rpc/", "syft://user2@domain.com/public/rpc/"],
+        ...     expiry_secs=300,
+        ... )
+        >>> responses = future.gather_completed()  # Wait for all responses
+    """
     bulk_future = SyftBulkFuture(
         futures=[
             send(
@@ -148,7 +180,7 @@ def reply_to(
         SyftResponse: The created response object containing all response details.
 
     Example:
-        >>> client = Client(email="service@domain.com")
+        >>> client = Client.load()
         >>> # Assuming we have a request
         >>> response = reply_to(
         ...     request=incoming_request,
