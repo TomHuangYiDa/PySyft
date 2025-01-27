@@ -1,3 +1,4 @@
+import hashlib
 import logging
 import time
 from datetime import datetime, timedelta, timezone
@@ -21,6 +22,14 @@ Headers: TypeAlias = dict[str, str]
 
 # Constants
 DEFAULT_MESSAGE_EXPIRY: float = 60.0 * 60.0 * 24.0 * 3  # 3 days in seconds
+
+
+def validate_syftbox_url(url: SyftBoxURL | str) -> SyftBoxURL:
+    if isinstance(url, str):
+        return SyftBoxURL(url)
+    if isinstance(url, SyftBoxURL):
+        return url
+    raise ValueError(f"Invalid type for url: {type(url)}. Expected str or SyftBoxURL.")
 
 
 class SyftMethod(StrEnum):
@@ -62,8 +71,8 @@ class Base(BaseModel):
             ULID: str,
             datetime: lambda dt: dt.isoformat(),
         },
-        ser_json_bytes="hex",
-        val_json_bytes="hex",
+        ser_json_bytes="base64",
+        val_json_bytes="base64",
     )
 
     def dumps(self) -> str:
@@ -161,13 +170,11 @@ class SyftMessage(Base):
     @field_validator("url", mode="before")
     @classmethod
     def validate_url(cls, value) -> SyftBoxURL:
-        if isinstance(value, str):
-            return SyftBoxURL(value)
-        if isinstance(value, SyftBoxURL):
-            return value
-        raise ValueError(
-            f"Invalid type for url: {type(value)}. Expected str or SyftBoxURL."
-        )
+        return validate_syftbox_url(value)
+
+    def get_message_hash(self) -> str:
+        m = self.model_dump_json(include=["url", "method", "sender", "headers", "body"])
+        return hashlib.sha256(m.encode()).hexdigest()
 
 
 class SyftRequest(SyftMessage):
@@ -213,6 +220,12 @@ class SyftFuture(Base):
     ulid: ULID
     url: SyftBoxURL
     local_path: PathLike
+    expires: datetime
+
+    @field_validator("url", mode="before")
+    @classmethod
+    def validate_url(cls, value) -> SyftBoxURL:
+        return validate_syftbox_url(value)
 
     @property
     def request_path(self) -> Path:
@@ -233,6 +246,28 @@ class SyftFuture(Base):
     def is_rejected(self) -> bool:
         """Check if the request has been rejected."""
         return self.rejected_path.exists()
+
+    @property
+    def is_expired(self) -> bool:
+        """Check if the future has expired."""
+        return datetime.now(timezone.utc) > self.expires
+
+    @staticmethod
+    def load_state(request_path: PathLike) -> Self:
+        try:
+            request = SyftRequest.load(request_path)
+        except FileNotFoundError:
+            raise SyftError("Request file not found")
+
+        message_hash = request.get_message_hash()
+        state_path = request_path.parent / f".{message_hash}.state"
+
+        try:
+            return SyftFuture.load(state_path)
+        except FileNotFoundError:
+            raise SyftError(
+                "Future object not found for the given request. Ensure the request has been sent."
+            )
 
     def wait(
         self,
@@ -345,3 +380,64 @@ class SyftFuture(Base):
                 url=self.url,
                 sender="SYSTEM",
             )
+
+    def __hash__(self):
+        return hash(self.ulid)
+
+    def __eq__(self, other):
+        if not isinstance(other, SyftFuture):
+            return False
+        return self.ulid == other.ulid
+
+
+class SyftBulkFuture(Base):
+    futures: list[SyftFuture]
+    DEFAULT_POLL_INTERVAL: ClassVar[float] = 0.1
+
+    def gather_completed(
+        self, timeout: int = 10, poll_interval: float = DEFAULT_POLL_INTERVAL
+    ) -> list[SyftResponse]:
+        """Wait for all futures to complete and return a list of responses.
+
+        Returns a list of responses in the order of the futures list. If a future
+        times out, it will be omitted from the list. If the timeout is reached before
+        all futures complete, the function will return the responses received so far.
+
+        Args:
+            timeout: Maximum time to wait in seconds.
+            poll_interval: Time in seconds between polling attempts.
+        Returns:
+            A list of response objects.
+        Raises:
+            ValueError: If timeout or poll_interval is negative.
+        """
+        if timeout is not None and timeout <= 0:
+            raise ValueError("Timeout must be greater than 0")
+        if poll_interval <= 0:
+            raise ValueError("Poll interval must be greater than 0")
+
+        pending = set(self.futures)
+        responses = []
+        deadline = time.monotonic() + timeout
+
+        while pending and time.monotonic() < deadline:
+            for future in list(pending):  # Create list to allow set modification
+                if response := future.resolve(silent=True):
+                    responses.append(response)
+                    pending.remove(future)
+            time.sleep(poll_interval)
+
+        return responses
+
+    @property
+    def ulid(self) -> ULID:
+        """Generate a deterministic ULID from all future IDs.
+
+        Returns:
+            A single ULID derived from hashing all future IDs.
+        """
+        # Combine all ULIDs and hash them
+        combined = ",".join(str(f.ulid) for f in self.futures)
+        hash_bytes = hashlib.sha256(combined.encode()).digest()[:16]
+        # Use first 16 bytes of hash to create a new ULID
+        return ULID.from_bytes(hash_bytes)
