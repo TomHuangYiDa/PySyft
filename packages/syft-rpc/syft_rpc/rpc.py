@@ -13,6 +13,8 @@ from syft_rpc.protocol import (
     SyftStatus,
 )
 
+DEFAULT_EXPIRY_SECS = 86400  # 1 day
+
 
 def send(
     url: SyftBoxURL | str,
@@ -20,8 +22,8 @@ def send(
     headers: dict[str, str] | None = None,
     method: SyftMethod | str = SyftMethod.GET,
     client: Client | None = None,
-    expiry_secs: int = 10,
-    no_cache: bool = False,
+    expiry_secs: int = DEFAULT_EXPIRY_SECS,
+    no_cache: bool = True,
 ) -> SyftFuture:
     """Send an asynchronous request to a Syft Box endpoint and return a future for tracking the response.
 
@@ -100,8 +102,8 @@ def broadcast(
     urls: list[SyftBoxURL | str],
     headers: dict[str, str] | None = None,
     body: str | bytes | None = None,
-    expiry_secs: int = 10,
-    no_cache: bool = False,
+    expiry_secs: int = DEFAULT_EXPIRY_SECS,
+    no_cache: bool = True,
     client: Client | None = None,
 ) -> SyftBulkFuture:
     """Broadcast an asynchronous request to multiple Syft Box endpoints and return a bulk future.
@@ -162,7 +164,7 @@ def reply_to(
     body: str | bytes | None = None,
     headers: dict[str, str] | None = None,
     status_code: SyftStatus = SyftStatus.SYFT_200_OK,
-    expiry_secs: int = 10,
+    expiry_secs: int = DEFAULT_EXPIRY_SECS,
     client: Client | None = None,
 ) -> SyftResponse:
     """Create and store a response to a Syft request.

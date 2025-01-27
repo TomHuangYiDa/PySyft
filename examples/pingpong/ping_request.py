@@ -12,7 +12,7 @@ def send_ping():
     )
     print(f"Request sent to {future.url}")
     response = future.wait(timeout=300)
-    print(response.body.decode())
+    print(response.body)
     end = time.time()
     print("Time taken: ", end - start)
 

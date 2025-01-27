@@ -6,13 +6,13 @@ from typing import Callable
 from pydantic import BaseModel
 from syft_core import Client
 from syft_rpc import rpc
-from syft_rpc.protocol import SyftRequest
+from syft_rpc.protocol import SyftRequest, SyftStatus
 from watchdog.events import FileCreatedEvent, FileModifiedEvent, FileSystemEvent
 from watchdog.observers import Observer
 
 from syft_event.handlers import AnyPatternHandler, RpcRequestHandler
 from syft_event.schema import generate_schema
-from syft_event.types import Request
+from syft_event.types import Request, Response
 
 DEFAULT_WATCH_EVENTS = [FileCreatedEvent, FileModifiedEvent]
 
@@ -120,20 +120,29 @@ class SyftEvents:
                 headers=req.headers,
                 body=req.body,
             )
+
             resp = func(evt_req)
+            resp_headers = {}
+            resp_data = None
+            resp_code = SyftStatus.SYFT_200_OK
             if resp is None:
-                data = ""
-                content_type = "text/plain"
+                resp_data = ""
+                resp_headers["Content-Type"] = "text/plain"
+            elif isinstance(resp, Response):
+                resp_data = resp.body
+                resp_code = resp.code
+                resp_headers = resp.headers
             elif isinstance(resp, (dict, BaseModel)):
-                data = json.dumps(resp)
-                content_type = "application/json"
+                resp_data = json.dumps(resp)
+                resp_headers["Content-Type"] = "application/json"
             else:
-                data = resp
-                content_type = "application/octet-stream"
+                resp_data = resp
+
             rpc.reply_to(
                 req,
-                body=data,
-                headers={"Content-Type": content_type},
+                body=resp_data,
+                headers=resp_headers,
+                code=resp_code,
                 client=self.client,
             )
         except Exception as e:

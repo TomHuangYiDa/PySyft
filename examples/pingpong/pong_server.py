@@ -7,7 +7,7 @@ box = SyftEvents("pingpong")
 @box.on_request("/ping")
 def pong(req: Request) -> str:
     print(f"PING: Got ping from {req.sender} - {req.body}")
-    return "pong"
+    return "PONG !!!"
 
 
 if __name__ == "__main__":

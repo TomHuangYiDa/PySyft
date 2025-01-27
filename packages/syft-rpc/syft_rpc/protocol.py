@@ -215,7 +215,7 @@ class SyftFuture(Base):
         DEFAULT_POLL_INTERVAL: Default time between polling attempts in seconds.
     """
 
-    DEFAULT_POLL_INTERVAL: ClassVar[float] = 0.1
+    DEFAULT_POLL_INTERVAL: ClassVar[float] = 0.5
 
     ulid: ULID
     url: SyftBoxURL
@@ -365,12 +365,9 @@ class SyftFuture(Base):
         """
         try:
             response = SyftResponse.load(self.response_path)
+            # preserve results, but change status code to 419
             if response.is_expired:
-                return SyftResponse(
-                    status_code=SyftStatus.SYFT_419_EXPIRED,
-                    url=self.url,
-                    sender=response.sender,
-                )
+                response.status_code = SyftStatus.SYFT_419_EXPIRED
             return response
         except (PydanticValidationError, ValueError, UnicodeDecodeError) as e:
             logger.error(f"Error loading response: {str(e)}")
