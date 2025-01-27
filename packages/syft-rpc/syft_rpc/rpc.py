@@ -15,10 +15,10 @@ from syft_rpc.protocol import (
 
 
 def send(
-    method: SyftMethod | str,
     url: SyftBoxURL | str,
-    headers: dict[str, str] | None = None,
     body: str | bytes | None = None,
+    headers: dict[str, str] | None = None,
+    method: SyftMethod | str = SyftMethod.GET,
     client: Client | None = None,
     expiry_secs: int = 10,
     no_cache: bool = False,
