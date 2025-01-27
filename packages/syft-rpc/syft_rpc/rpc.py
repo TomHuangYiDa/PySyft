@@ -15,11 +15,11 @@ from syft_rpc.protocol import (
 
 
 def send(
-    client: Client,
     method: SyftMethod | str,
     url: SyftBoxURL | str,
     headers: dict[str, str] | None = None,
     body: str | bytes | None = None,
+    client: Client | None = None,
     expiry_secs: int = 10,
     no_cache: bool = False,
 ) -> SyftFuture:
@@ -29,7 +29,6 @@ def send(
     and returns a SyftFuture object that can be used to track and retrieve the response.
 
     Args:
-        client: A Syft Client instance used to send the request.
         method: The HTTP method to use. Can be a SyftMethod enum or a string
             (e.g., 'GET', 'POST').
         url: The destination URL. Can be a SyftBoxURL instance or a string in the
@@ -38,6 +37,8 @@ def send(
             Defaults to None.
         body: Optional request body. Can be either a string (will be encoded to bytes)
             or raw bytes. Defaults to None.
+        client: A Syft Client instance used to send the request. If not provided,
+            the default client will be loaded.
         expiry_secs: Number of seconds until the request expires. After this time,
             the request will not be processed. Defaults to 10 seconds.
         no_cache: If True, ignore any cached future and make a fresh request.
@@ -46,15 +47,17 @@ def send(
         SyftFuture: A future object that can be used to track and retrieve the response.
 
     Example:
-        >>> client = Client.load()
         >>> future = send(
-        ...     client=client,
         ...     method="GET",
         ...     url="syft://data@domain.com/dataset1",
         ...     expiry_secs=30
         ... )
         >>> response = future.result()  # Wait for response
     """
+
+    # If client is not provided, load the default client
+    client = Client.load() if client is None else client
+
     syft_request = SyftRequest(
         sender=client.email,
         method=method.upper() if isinstance(method, str) else method,
@@ -93,11 +96,11 @@ def send(
 
 
 def broadcast(
-    client: Client,
     method: SyftMethod | str,
     url: list[SyftBoxURL | str],
     headers: dict[str, str] | None = None,
     body: str | bytes | None = None,
+    client: Client | None = None,
     expiry_secs: int = 10,
     no_cache: bool = False,
 ) -> SyftBulkFuture:
@@ -108,7 +111,6 @@ def broadcast(
     returns a SyftBulkFuture object that can be used to track and retrieve multiple responses.
 
     Args:
-        client: A Syft Client instance used to send the requests.
         method: The HTTP method to use. Can be a SyftMethod enum or a string
             (e.g., 'GET', 'POST').
         url: List of destination URLs. Each can be a SyftBoxURL instance or a string in
@@ -117,6 +119,8 @@ def broadcast(
             Defaults to None.
         body: Optional request body. Can be either a string (will be encoded to bytes)
             or raw bytes. Defaults to None.
+        client: A Syft Client instance used to send the requests. If not provided,
+            the default client will be loaded.
         expiry_secs: Number of seconds until the requests expire. After this time,
             requests will not be processed. Defaults to 10 seconds.
         no_cache: If True, ignore any cached futures and make fresh requests.
@@ -125,23 +129,25 @@ def broadcast(
         SyftBulkFuture: A bulk future object that can be used to track and retrieve multiple responses.
 
     Example:
-        >>> client = Client.load()
         >>> future = broadcast(
-        ...     client=client,
         ...     method="GET",
         ...     url=["syft://user1@domain.com/public/rpc/", "syft://user2@domain.com/public/rpc/"],
         ...     expiry_secs=300,
         ... )
         >>> responses = future.gather_completed()  # Wait for all responses
     """
+
+    # If client is not provided, load the default client
+    client = Client.load() if client is None else client
+
     bulk_future = SyftBulkFuture(
         futures=[
             send(
-                client=client,
                 method=method,
                 url=endpoint,
                 headers=headers,
                 body=body,
+                client=client,
                 expiry_secs=expiry_secs,
                 no_cache=no_cache,
             )
@@ -153,9 +159,9 @@ def broadcast(
 
 def reply_to(
     request: SyftRequest,
-    client: Client,
     body: str | bytes | None = None,
     headers: dict[str, str] | None = None,
+    client: Client | None = None,
     status_code: SyftStatus = SyftStatus.SYFT_200_OK,
     expiry_secs: int = 10,
 ) -> SyftResponse:
@@ -171,6 +177,8 @@ def reply_to(
             or raw bytes. Defaults to None.
         headers: Optional dictionary of HTTP headers to include with the response.
             Defaults to None.
+        client: A Syft Client instance used to send the response. If not provided,
+            the default client will be loaded.
         status_code: HTTP status code for the response. Should be a SyftStatus enum value.
             Defaults to SyftStatus.SYFT_200_OK.
         expiry_secs: Number of seconds until the response expires. After this time,
@@ -180,15 +188,17 @@ def reply_to(
         SyftResponse: The created response object containing all response details.
 
     Example:
-        >>> client = Client.load()
         >>> # Assuming we have a request
         >>> response = reply_to(
         ...     request=incoming_request,
-        ...     client=client,
         ...     body="Request processed successfully",
         ...     status_code=SyftStatus.SYFT_200_OK
         ... )
     """
+
+    # If client is not provided, load the default client
+    client = Client.load() if client is None else client
+
     response = SyftResponse(
         ulid=request.ulid,
         sender=client.email,
