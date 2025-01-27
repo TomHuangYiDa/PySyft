@@ -1,6 +1,6 @@
 import json
 from pathlib import Path
-from time import sleep
+from threading import Event
 from typing import Callable
 
 from syft_core import Client
@@ -21,14 +21,18 @@ class SyftEvents:
         self.app_rpc_dir = self.app_dir / "rpc"
         self.obs = Observer()
         self.rpc: dict[Path, Callable] = {}
+        self._stop_event = Event()
 
-    def start(self):
+    def start(self) -> None:
         self.app_dir.mkdir(exist_ok=True, parents=True)
         self.app_rpc_dir.mkdir(exist_ok=True, parents=True)
-        self.process_pending_requests()
+        try:
+            self.process_pending_requests()
+        except Exception as e:
+            print("Error processing pending requests", e)
         self.obs.start()
 
-    def publish_schema(self):
+    def publish_schema(self) -> None:
         schema = {}
         for endpoint, handler in self.rpc.items():
             handler = generate_schema(handler)
@@ -39,7 +43,7 @@ class SyftEvents:
         schema_path = self.app_rpc_dir / "rpc.schema.json"
         schema_path.write_text(json.dumps(schema, indent=2))
 
-    def process_pending_requests(self):
+    def process_pending_requests(self) -> None:
         # process all pending requests
         for path in self.app_rpc_dir.glob("**/*.request"):
             if path.with_suffix(".response").exists():
@@ -48,23 +52,30 @@ class SyftEvents:
                 handler = self.rpc[path.parent]
                 self.__handle_rpc(path, handler)
 
-    def run_forever(self):
+    def run_forever(self) -> None:
         self.start()
-        while True:
-            sleep(5)
+        try:
+            while not self._stop_event.is_set():
+                self._stop_event.wait(timeout=5)
+        except KeyboardInterrupt:
+            pass
+        finally:
+            self.stop()
 
-    def stop(self):
+    def stop(self) -> None:
+        self._stop_event.set()
         self.obs.stop()
+        self.obs.join()
 
-    def on_request(self, endpoint: str):
+    def on_request(self, endpoint: str) -> Callable:
         """Bind function to RPC requests at an endpoint"""
 
-        epath = self.__to_endpoint_path(endpoint)
+        def decorator(func):
+            epath = self.__to_endpoint_path(endpoint)
+            self.__register_rpc(epath, func)
+            return func
 
-        def decorater(func):
-            return self.__register_rpc(epath, func)
-
-        return decorater
+        return decorator
 
     def watch(
         self,
@@ -76,9 +87,9 @@ class SyftEvents:
         if not isinstance(glob_path, list):
             glob_path = [glob_path]
 
-        globs = list(map(self.__format_glob, glob_path))
+        globs = [self.__format_glob(path) for path in glob_path]
 
-        def decorater(func):
+        def decorator(func):
             def wrapper(event):
                 return func(event)
 
@@ -91,7 +102,7 @@ class SyftEvents:
             )
             return wrapper
 
-        return decorater
+        return decorator
 
     def __handle_rpc(self, path: Path, func: Callable):
         func(path)
@@ -105,7 +116,7 @@ class SyftEvents:
         #     print("Error loading request", e)
         pass
 
-    def __register_rpc(self, endpoint: Path, handler: Callable):
+    def __register_rpc(self, endpoint: Path, handler: Callable) -> Callable:
         def on_rpc_request(event: FileSystemEvent):
             return self.__handle_rpc(Path(event.src_path), handler)
 
@@ -127,7 +138,7 @@ class SyftEvents:
         epath.mkdir(exist_ok=True, parents=True)
         return epath
 
-    def __format_glob(self, path: str):
+    def __format_glob(self, path: str) -> str:
         # replace placeholders with actual values
         path = path.format(
             email=self.client.email,
@@ -152,7 +163,7 @@ if __name__ == "__main__":
     # root path = {datasite}/api_data/{app_name}/rpc
     @box.on_request("/another")
     def another_request(req):
-        print("rcp /another: ", req)
+        print("rpc /another: ", req)
 
     # root path = ~/SyftBox/datasites/
     @box.watch("{datasite}/**/*.json")
