@@ -381,8 +381,16 @@ class SyftFuture(Base):
                 sender="SYSTEM",
             )
 
+    def __hash__(self):
+        return hash(self.ulid)
 
-class SyftBulkFuture:
+    def __eq__(self, other):
+        if not isinstance(other, SyftFuture):
+            return False
+        return self.ulid == other.ulid
+
+
+class SyftBulkFuture(Base):
     futures: list[SyftFuture]
     DEFAULT_POLL_INTERVAL: ClassVar[float] = 0.1
 
