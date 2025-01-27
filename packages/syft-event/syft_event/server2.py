@@ -142,7 +142,7 @@ class SyftEvents:
                 req,
                 body=resp_data,
                 headers=resp_headers,
-                code=resp_code,
+                status_code=resp_code,
                 client=self.client,
             )
         except Exception as e:
