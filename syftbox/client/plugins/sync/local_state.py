@@ -57,7 +57,9 @@ class LocalState(BaseModel):
                 action=action.action_type,
             )
 
-    def insert_synced_file(self, path: Path, state: Optional[FileMetadata], action: "SyncActionType") -> None:
+    def insert_synced_file(
+        self, path: Path, state: Optional[FileMetadata], action: "SyncActionType", save: bool = True
+    ) -> None:
         if not isinstance(path, Path):
             raise ValueError(f"path must be a Path object, got {path}")
         if not self.path.is_file():
@@ -79,7 +81,8 @@ class LocalState(BaseModel):
             action=action,
             save=False,
         )
-        self.save()
+        if save:
+            self.save()
 
     def insert_status_info(
         self,
