@@ -78,9 +78,9 @@ def client(monkeypatch, tmp_path):
 
     run_migrations(settings)
     with TestClient(app) as client:
+        client.headers[HEADER_SYFTBOX_VERSION] = __version__
         access_token = get_access_token(client, TEST_DATASITE_NAME)
         client.headers["Authorization"] = f"Bearer {access_token}"
-        client.headers[HEADER_SYFTBOX_VERSION] = __version__
         yield client
 
 
@@ -118,7 +118,7 @@ def client_without_perms(monkeypatch, tmp_path):
 
     run_migrations(settings)
     with TestClient(app) as client:
+        client.headers[HEADER_SYFTBOX_VERSION] = __version__
         access_token = get_access_token(client, TEST_DATASITE_NAME)
         client.headers["Authorization"] = f"Bearer {access_token}"
-        client.headers[HEADER_SYFTBOX_VERSION] = __version__
         yield client
