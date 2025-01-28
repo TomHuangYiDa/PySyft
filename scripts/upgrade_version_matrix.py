@@ -11,7 +11,7 @@ args = parser.parse_args()
 print(args.upgrade_type)
 print(args.breaking_changes)
 
-with open("../syftbox/version_matrix.json") as json_file:
+with open("../syftbox/server2client_version.json") as json_file:
     version_matrix = json.load(json_file)
 
 versions = list(version_matrix.keys())
@@ -45,7 +45,7 @@ elif args.upgrade_type == "minor":
 elif args.upgrade_type == "major":
     raise NotImplementedError
 
-with open("../syftbox/version_matrix.json", "w") as json_file:
+with open("../syftbox/server2client_version.json", "w") as json_file:
     # json.dump(version_matrix, json_file, indent=4)
     json_file.write("{\n")
     json_file.write(

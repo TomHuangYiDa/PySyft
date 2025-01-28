@@ -5,7 +5,7 @@ from typing import Dict, List
 
 def get_version_dict() -> Dict[str, List[str]]:
     print(dirname(dirname(__file__)))
-    with open(dirname(dirname(__file__)) + "/version_matrix.json") as json_file:
+    with open(dirname(dirname(__file__)) + "/server2client_version.json") as json_file:
         version_matrix = json.load(json_file)
     return version_matrix
 
