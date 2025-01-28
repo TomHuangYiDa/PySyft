@@ -13,7 +13,7 @@ from syft_rpc.protocol import (
     SyftStatus,
 )
 
-DEFAULT_EXPIRY_SECS = 86400  # 1 day
+DEFAULT_EXPIRY_SECS = 60 * 60 * 24  # 24 hours
 
 
 def send(
@@ -73,11 +73,10 @@ def send(
     message_hash = syft_request.get_message_hash()
     state_path = local_path / f".{message_hash}.state"
 
-    # Check if we already have a cached future that hasn't expired
+    # Check if we already have a cached future
     if not no_cache and state_path.exists():
         future = SyftFuture.load(state_path)
-        if not future.is_expired:
-            return future
+        return future
 
     # We need to make a fresh request and persist the future to a state
     file_path = local_path / f"{syft_request.ulid}.request"
