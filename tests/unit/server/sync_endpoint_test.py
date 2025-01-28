@@ -8,11 +8,9 @@ import yaml
 from fastapi.testclient import TestClient
 from py_fast_rsync import signature
 
-from syftbox import __version__
 from syftbox.client.exceptions import SyftServerError
 from syftbox.client.server_client import SyncClient
 from syftbox.lib.constants import PERM_FILE
-from syftbox.lib.http import HEADER_SYFTBOX_VERSION
 from syftbox.server.models.sync_models import ApplyDiffResponse, DiffResponse, FileMetadata
 from tests.unit.server.conftest import TEST_DATASITE_NAME, TEST_FILE
 
@@ -27,7 +25,6 @@ def test_get_diff_2(client: TestClient):
             "path": f"{TEST_DATASITE_NAME}/{TEST_FILE}",
             "signature": sig_b85,
         },
-        headers={HEADER_SYFTBOX_VERSION: __version__},
     )
 
     response.raise_for_status()
@@ -56,7 +53,6 @@ def test_syft_client_push_flow(client: TestClient):
     response = client.post(
         "/sync/get_metadata",
         json={"path": f"{TEST_DATASITE_NAME}/{TEST_FILE}"},
-        headers={HEADER_SYFTBOX_VERSION: __version__},
     )
 
     response.raise_for_status()
@@ -76,7 +72,6 @@ def test_syft_client_push_flow(client: TestClient):
             "diff": delta_b85,
             "expected_hash": expected_hash,
         },
-        headers={HEADER_SYFTBOX_VERSION: __version__},
     )
 
     response.raise_for_status()
@@ -232,7 +227,7 @@ def test_update_permfile_failure(sync_client: SyncClient):
 
 
 def test_list_datasites(client: TestClient):
-    response = client.post("/sync/datasites", headers={HEADER_SYFTBOX_VERSION: __version__})
+    response = client.post("/sync/datasites")
 
     response.raise_for_status()
 
@@ -255,7 +250,7 @@ def test_download_snapshot(sync_client: SyncClient, tmpdir: Path):
 
 
 def test_whoami(client: TestClient):
-    response = client.post("/auth/whoami", headers={HEADER_SYFTBOX_VERSION: __version__})
+    response = client.post("/auth/whoami")
     response.raise_for_status()
     assert response.json() == {"email": TEST_DATASITE_NAME}
 
@@ -265,7 +260,6 @@ def test_large_file_failure(client: TestClient):
     response = client.post(
         "/sync/create",
         files={"file": ("large.txt", large_data, "text/plain")},
-        headers={HEADER_SYFTBOX_VERSION: __version__},
     )
 
     assert response.status_code == 413

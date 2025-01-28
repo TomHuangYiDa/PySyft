@@ -82,6 +82,7 @@ def client(monkeypatch, tmp_path):
     with TestClient(app) as client:
         access_token = get_access_token(client, TEST_DATASITE_NAME)
         client.headers["Authorization"] = f"Bearer {access_token}"
+        client.headers[HEADER_SYFTBOX_VERSION] = __version__
         yield client
 
 
