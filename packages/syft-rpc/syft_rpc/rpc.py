@@ -163,7 +163,6 @@ def reply_to(
     body: str | bytes | None = None,
     headers: dict[str, str] | None = None,
     status_code: SyftStatus = SyftStatus.SYFT_200_OK,
-    expiry_secs: int = DEFAULT_EXPIRY_SECS,
     client: Client | None = None,
 ) -> SyftResponse:
     """Create and store a response to a Syft request.
@@ -207,7 +206,7 @@ def reply_to(
         url=request.url,
         headers=headers or {},
         body=body.encode() if isinstance(body, str) else body,
-        expires=datetime.now(timezone.utc) + timedelta(seconds=expiry_secs),
+        expires=request.expires,
         status_code=status_code,
     )
 
