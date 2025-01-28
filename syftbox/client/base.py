@@ -93,9 +93,6 @@ class ClientBase:
             raise SyftPermissionError(f"No permission to access this resource: {response.text}")
         elif response.status_code != 200:
             raise SyftServerError(f"[{endpoint}] Server returned {response.status_code}: {response.text}")
-        print(endpoint)
-        print(response.headers)
-        print(response.status_code)
         server_version = response.headers.get(HEADER_SYFTBOX_VERSION)
 
         version_range = get_range_for_version(server_version)

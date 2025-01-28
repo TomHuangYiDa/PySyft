@@ -7,7 +7,9 @@ import msgpack
 from pydantic import BaseModel
 from tqdm import tqdm
 
+from syftbox import __version__
 from syftbox.client.base import ClientBase
+from syftbox.lib.http import HEADER_SYFTBOX_VERSION
 from syftbox.server.models.sync_models import ApplyDiffResponse, DiffResponse, FileMetadata, RelativePath
 
 # TODO move shared models to lib/models
@@ -31,12 +33,12 @@ class SyftBoxClient(ClientBase):
         self.sync = SyncClient(conn)
 
     def register(self, email: str) -> str:
-        response = self.conn.post("/register", json={"email": email})
+        response = self.conn.post("/register", json={"email": email}, headers={HEADER_SYFTBOX_VERSION: __version__})
         self.raise_for_status(response)
         return response.json().get("token")
 
     def info(self) -> dict:
-        response = self.conn.get("/info")
+        response = self.conn.get("/info", headers={HEADER_SYFTBOX_VERSION: __version__})
         self.raise_for_status(response)
         return response.json()
 
@@ -47,20 +49,20 @@ class SyftBoxClient(ClientBase):
             **kwargs,
         }
 
-        response = self.conn.post("/log_event", json=event_data)
+        response = self.conn.post("/log_event", json=event_data, headers={HEADER_SYFTBOX_VERSION: __version__})
         self.raise_for_status(response)
 
 
 class AuthClient(ClientBase):
     def whoami(self) -> Any:
-        response = self.conn.post("/auth/whoami")
+        response = self.conn.post("/auth/whoami", headers={HEADER_SYFTBOX_VERSION: __version__})
         self.raise_for_status(response)
         return response.json()
 
 
 class SyncClient(ClientBase):
     def get_datasite_states(self) -> dict[str, list[FileMetadata]]:
-        response = self.conn.post("/sync/datasite_states")
+        response = self.conn.post("/sync/datasite_states", headers={HEADER_SYFTBOX_VERSION: __version__})
         self.raise_for_status(response)
         data = response.json()
 
@@ -72,8 +74,7 @@ class SyncClient(ClientBase):
 
     def get_remote_state(self, relative_path: Path) -> list[FileMetadata]:
         response = self.conn.post(
-            "/sync/dir_state",
-            params={"dir": relative_path.as_posix()},
+            "/sync/dir_state", params={"dir": relative_path.as_posix()}, headers={HEADER_SYFTBOX_VERSION: __version__}
         )
         self.raise_for_status(response)
         data = response.json()
@@ -81,8 +82,7 @@ class SyncClient(ClientBase):
 
     def get_metadata(self, path: Path) -> FileMetadata:
         response = self.conn.post(
-            "/sync/get_metadata",
-            json={"path": path.as_posix()},
+            "/sync/get_metadata", json={"path": path.as_posix()}, headers={HEADER_SYFTBOX_VERSION: __version__}
         )
         self.raise_for_status(response)
         return FileMetadata(**response.json())
@@ -106,6 +106,7 @@ class SyncClient(ClientBase):
                 "path": relative_path.as_posix(),
                 "signature": signature,
             },
+            headers={HEADER_SYFTBOX_VERSION: __version__},
         )
 
         self.raise_for_status(response)
@@ -132,6 +133,7 @@ class SyncClient(ClientBase):
                 "diff": diff,
                 "expected_hash": expected_hash,
             },
+            headers={HEADER_SYFTBOX_VERSION: __version__},
         )
 
         self.raise_for_status(response)
@@ -139,8 +141,7 @@ class SyncClient(ClientBase):
 
     def delete(self, relative_path: Path) -> None:
         response = self.conn.post(
-            "/sync/delete",
-            json={"path": relative_path.as_posix()},
+            "/sync/delete", json={"path": relative_path.as_posix()}, headers={HEADER_SYFTBOX_VERSION: __version__}
         )
         self.raise_for_status(response)
 
@@ -148,13 +149,13 @@ class SyncClient(ClientBase):
         response = self.conn.post(
             "/sync/create",
             files={"file": (relative_path.as_posix(), data, "text/plain")},
+            headers={HEADER_SYFTBOX_VERSION: __version__},
         )
         self.raise_for_status(response)
 
     def download(self, relative_path: Path) -> bytes:
         response = self.conn.post(
-            "/sync/download",
-            json={"path": relative_path.as_posix()},
+            "/sync/download", json={"path": relative_path.as_posix()}, headers={HEADER_SYFTBOX_VERSION: __version__}
         )
         self.raise_for_status(response)
         return response.content
@@ -173,6 +174,7 @@ class SyncClient(ClientBase):
             "POST",
             "/sync/download_bulk",
             json={"paths": relative_str_paths},
+            headers={HEADER_SYFTBOX_VERSION: __version__},
         ) as response:
             response.raise_for_status()
 

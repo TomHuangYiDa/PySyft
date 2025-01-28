@@ -1,11 +1,11 @@
-import json
 import argparse
-from packaging.version import Version
+import json
 
+from packaging.version import Version
 
 parser = argparse.ArgumentParser("upgrade_version_matrix")
 parser.add_argument("upgrade_type", choices=["major", "minor", "patch"])
-parser.add_argument("--breaking_changes", action='store_true')
+parser.add_argument("--breaking_changes", action="store_true")
 
 args = parser.parse_args()
 print(args.upgrade_type)
@@ -13,15 +13,17 @@ print(args.breaking_changes)
 
 with open("../syftbox/version_matrix.json") as json_file:
     version_matrix = json.load(json_file)
-    
+
 versions = list(version_matrix.keys())
 versions.sort(key=Version)
 last_version = versions[-1]
-version_numbers = last_version.split('.')
+version_numbers = last_version.split(".")
 
 if args.upgrade_type == "patch":
     if args.breaking_changes:
-        raise Exception("Patch upgrades imply no breaking changes. If you have breaking changes please consider a minor version upgrade")
+        raise Exception(
+            "Patch upgrades imply no breaking changes. If you have breaking changes please consider a minor version upgrade"
+        )
     version_numbers[2] = str(int(version_numbers[2]) + 1)
     new_version = ".".join(version_numbers)
     # new_version = last_version
@@ -31,7 +33,6 @@ elif args.upgrade_type == "minor":
     version_numbers[2] = "0"
     new_version = ".".join(version_numbers)
     if args.breaking_changes:
-        
         version_matrix[new_version] = [new_version, ""]
         for version in versions:
             version_range = version_matrix[version]
@@ -44,8 +45,15 @@ elif args.upgrade_type == "minor":
 elif args.upgrade_type == "major":
     raise NotImplementedError
 
-with open("../syftbox/version_matrix.json", 'w') as json_file:
+with open("../syftbox/version_matrix.json", "w") as json_file:
     # json.dump(version_matrix, json_file, indent=4)
     json_file.write("{\n")
-    json_file.write(",\n".join([f"""\t"{key}": ["{version_range[0]}", "{version_range[1]}"]""" for key, version_range in version_matrix.items()]))
+    json_file.write(
+        ",\n".join(
+            [
+                f"""\t"{key}": ["{version_range[0]}", "{version_range[1]}"]"""
+                for key, version_range in version_matrix.items()
+            ]
+        )
+    )
     json_file.write("\n}\n")
