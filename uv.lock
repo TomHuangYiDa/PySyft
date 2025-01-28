@@ -13,7 +13,6 @@ members = [
     "syft-event",
     "syft-extras",
     "syft-files",
-    "syft-proxy",
     "syft-requests",
     "syft-rpc",
 ]
@@ -488,7 +487,6 @@ dependencies = [
     { name = "syft-core" },
     { name = "syft-event" },
     { name = "syft-files" },
-    { name = "syft-proxy" },
     { name = "syft-requests" },
     { name = "syft-rpc" },
 ]
@@ -503,7 +501,6 @@ requires-dist = [
     { name = "syft-core", editable = "packages/syft-core" },
     { name = "syft-event", editable = "packages/syft-event" },
     { name = "syft-files", editable = "packages/syft-files" },
-    { name = "syft-proxy", editable = "packages/syft-proxy" },
     { name = "syft-requests", editable = "packages/syft-requests" },
     { name = "syft-rpc", editable = "packages/syft-rpc" },
 ]
@@ -515,25 +512,6 @@ dev = [{ name = "ruff", specifier = ">=0.9.3" }]
 name = "syft-files"
 version = "0.1.0"
 source = { editable = "packages/syft-files" }
-
-[[package]]
-name = "syft-proxy"
-version = "0.1.0"
-source = { editable = "packages/syft-proxy" }
-dependencies = [
-    { name = "fastapi" },
-    { name = "syft-core" },
-    { name = "syft-event" },
-    { name = "syft-rpc" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "fastapi", specifier = ">=0.115.5" },
-    { name = "syft-core", editable = "packages/syft-core" },
-    { name = "syft-event", editable = "packages/syft-event" },
-    { name = "syft-rpc", editable = "packages/syft-rpc" },
-]
 
 [[package]]
 name = "syft-requests"
