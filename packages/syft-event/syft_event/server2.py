@@ -49,10 +49,10 @@ class SyftEvents:
     def publish_schema(self) -> None:
         schema = {}
         for endpoint, handler in self.rpc.items():
-            handler = generate_schema(handler)
+            handler_schema = generate_schema(handler)
             ep_name = endpoint.relative_to(self.app_rpc_dir)
             ep_name = "/" + str(ep_name).replace("\\", "/")
-            schema[ep_name] = handler
+            schema[ep_name] = handler_schema
 
         schema_path = self.app_rpc_dir / "rpc.schema.json"
         schema_path.write_text(json.dumps(schema, indent=2))
@@ -142,11 +142,12 @@ class SyftEvents:
                 resp_data = resp.body
                 resp_code = resp.code
                 resp_headers = resp.headers
-            elif isinstance(resp, (dict, BaseModel)):
-                resp_data = json.dumps(resp)
+            elif isinstance(resp, BaseModel):
+                resp_data = resp.model_dump_json()
                 resp_headers["Content-Type"] = "application/json"
             else:
-                resp_data = resp
+                resp_data = json.dumps(resp)
+                resp_headers["Content-Type"] = "application/json"
 
             rpc.reply_to(
                 req,

@@ -48,6 +48,7 @@ class SyftStatus(IntEnum):
 
     SYFT_200_OK = 200
     SYFT_403_FORBIDDEN = 403
+    SYFT_404_NOT_FOUND = 404
     SYFT_419_EXPIRED = 419
     SYFT_500_SERVER_ERROR = 500
 
@@ -240,7 +241,7 @@ class SyftFuture(Base):
     @property
     def rejected_path(self) -> Path:
         """Path to the rejected request marker file."""
-        return self.request_path.with_suffix(f"{self.request_path.suffix}.rejected")
+        return self.request_path.with_suffix(f".syftrejected{self.request_path.suffix}")
 
     @property
     def is_rejected(self) -> bool:
@@ -333,7 +334,7 @@ class SyftFuture(Base):
         # and they got cleaned up by the server.
         if not self.request_path.exists():
             return SyftResponse(
-                status_code=SyftStatus.SYFT_419_EXPIRED,
+                status_code=SyftStatus.SYFT_404_NOT_FOUND,
                 url=self.url,
                 sender="SYSTEM",
             )

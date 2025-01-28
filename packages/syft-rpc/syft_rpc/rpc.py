@@ -16,6 +16,14 @@ from syft_rpc.protocol import (
 DEFAULT_EXPIRY_SECS = 60 * 60 * 24  # 24 hours
 
 
+def make_url(datasite: str, app_name: str, endpoint: str) -> SyftBoxURL:
+    """Create a Syft Box URL from a datasite, app name, and RPC endpoint."""
+
+    return SyftBoxURL(
+        f"syft://{datasite}/api_data/{app_name}/rpc/" + endpoint.lstrip("/")
+    )
+
+
 def send(
     url: SyftBoxURL | str,
     body: str | bytes | None = None,
