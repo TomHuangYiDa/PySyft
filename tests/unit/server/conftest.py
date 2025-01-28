@@ -28,14 +28,12 @@ PERMFILE_DICT = [
 
 
 def get_access_token(client: TestClient, email: str) -> str:
-    response = client.post(
-        "/auth/request_email_token", json={"email": email}, headers={HEADER_SYFTBOX_VERSION: __version__}
-    )
+    response = client.post("/auth/request_email_token", json={"email": email})
     email_token = response.json()["email_token"]
     print(response.json())
     response = client.post(
         "/auth/validate_email_token",
-        headers={"Authorization": f"Bearer {email_token}", HEADER_SYFTBOX_VERSION: __version__},
+        headers={"Authorization": f"Bearer {email_token}"},
         params={"email": email},
     )
 
@@ -122,4 +120,5 @@ def client_without_perms(monkeypatch, tmp_path):
     with TestClient(app) as client:
         access_token = get_access_token(client, TEST_DATASITE_NAME)
         client.headers["Authorization"] = f"Bearer {access_token}"
+        client.headers[HEADER_SYFTBOX_VERSION] = __version__
         yield client
