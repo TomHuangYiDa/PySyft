@@ -15,6 +15,14 @@ from syft_event.schema import generate_schema
 from syft_event.types import Request, Response
 
 DEFAULT_WATCH_EVENTS = [FileCreatedEvent, FileModifiedEvent]
+PERMS = """
+- path: '**'
+  permissions:
+  - admin
+  - read
+  - write
+  user: '*'
+"""
 
 
 class SyftEvents:
@@ -30,6 +38,8 @@ class SyftEvents:
     def start(self) -> None:
         self.app_dir.mkdir(exist_ok=True, parents=True)
         self.app_rpc_dir.mkdir(exist_ok=True, parents=True)
+        perms = self.app_rpc_dir / "syftperm.yaml"
+        perms.write_text(PERMS)
         try:
             self.process_pending_requests()
         except Exception as e:
