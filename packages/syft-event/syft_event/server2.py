@@ -131,12 +131,33 @@ class SyftEvents:
 
     def __handle_rpc(self, path: Path, func: Callable):
         try:
-            req = SyftRequest.load(path)
+            # may happen =)
+            if not path.exists():
+                return
+            try:
+                req = SyftRequest.load(path)
+            except Exception as e:
+                logger.error(f"Error loading request {path}", e)
+                rpc.write_response(
+                    path,
+                    body=f"Error loading request: {repr(e)}",
+                    status_code=SyftStatus.SYFT_400_BAD_REQUEST,
+                    client=self.client,
+                )
+                return
+
             if req.is_expired:
                 logger.debug(f"Request expired: {req}")
+                rpc.reply_to(
+                    req,
+                    body="Request expired",
+                    status_code=SyftStatus.SYFT_419_EXPIRED,
+                    client=self.client,
+                )
                 return
 
             evt_req = Request(
+                id=str(req.id),
                 sender=req.sender,
                 url=req.url,
                 headers=req.headers,
@@ -174,7 +195,6 @@ class SyftEvents:
 
     def __register_rpc(self, endpoint: Path, handler: Callable) -> Callable:
         def rpc_callback(event: FileSystemEvent):
-            logger.debug(f"RPC Request: {event.src_path}")
             return self.__handle_rpc(Path(event.src_path), handler)
 
         self.obs.schedule(

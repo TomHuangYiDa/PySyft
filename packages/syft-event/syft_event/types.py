@@ -3,6 +3,7 @@ from typing_extensions import Any, Mapping
 
 
 class Request(BaseModel):
+    id: str
     sender: str
     url: str
     headers: dict = Field(default_factory=dict)

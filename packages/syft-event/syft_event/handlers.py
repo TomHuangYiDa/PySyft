@@ -1,3 +1,4 @@
+from loguru import logger
 from pathspec import PathSpec
 from pathspec.patterns import GitWildMatchPattern
 from watchdog.events import FileSystemEvent, FileSystemEventHandler
@@ -24,6 +25,7 @@ class RpcRequestHandler(PatternMatchingHandler):
         self.handler = handler
 
     def on_any_event(self, event: FileSystemEvent):
+        logger.debug(f"Received event: {event}")
         self.handler(event)
 
 

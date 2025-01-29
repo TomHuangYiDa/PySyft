@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+from pathlib import Path
 
 from syft_core.client_shim import Client
 from syft_core.url import SyftBoxURL
@@ -238,3 +239,26 @@ def reply_to(
     response.dump(file_path)
 
     return response
+
+
+def write_response(
+    request_path: str | Path,
+    body: str | bytes | None = None,
+    headers: dict[str, str] | None = None,
+    status_code: SyftStatus = SyftStatus.SYFT_200_OK,
+    client: Client | None = None,
+):
+    """Write a response to a request file on the local filesystem.
+    Useful when request could not be parsed."""
+
+    _id = request_path.stem
+    response = SyftResponse(
+        id=_id,
+        sender=client.email,
+        method="GET",
+        url=client.to_syft_url(request_path.parent),
+        headers=headers or {},
+        body=body.encode() if isinstance(body, str) else body,
+        status_code=status_code,
+    )
+    response.dump(request_path.with_suffix(".response"))

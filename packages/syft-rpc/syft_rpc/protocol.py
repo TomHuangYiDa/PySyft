@@ -47,6 +47,7 @@ class SyftStatus(IntEnum):
     """Standard HTTP-like status codes for Syft responses."""
 
     SYFT_200_OK = 200
+    SYFT_400_BAD_REQUEST = 400
     SYFT_403_FORBIDDEN = 403
     SYFT_404_NOT_FOUND = 404
     SYFT_419_EXPIRED = 419
