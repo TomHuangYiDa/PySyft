@@ -54,24 +54,24 @@ class RequestSizeLimitMiddleware(BaseHTTPMiddleware):
 
 class VersionCheckMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
-        logger.info(request.headers)
-        client_version = request.headers.get(HEADER_SYFTBOX_VERSION)
-        if not client_version:
-            return Response(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                content="Client version not provided. Please include the 'Version' header.",
-            )
+        user_agent = request.headers.get("User-Agent")
+        if user_agent.startswith("SyftBox"):
+            client_version = request.headers.get(HEADER_SYFTBOX_VERSION)
 
-        version_range = get_range_for_version(client_version)
-        lower_bound_version = version_range[0]
-        # upper_bound_version = version_range[1]
-        print(client_version, lower_bound_version)
+            if not client_version:
+                return Response(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    content="Client version not provided. Please include the 'Version' header.",
+                )
 
-        if version.parse(client_version) < version.parse(lower_bound_version):
-            return Response(
-                status_code=status.HTTP_426_UPGRADE_REQUIRED,
-                content=f"Client version is too old. Minimum version required is {lower_bound_version}",
-            )
+            version_range = get_range_for_version(client_version)
+            lower_bound_version = version_range[0]
+
+            if version.parse(client_version) < version.parse(lower_bound_version):
+                return Response(
+                    status_code=status.HTTP_426_UPGRADE_REQUIRED,
+                    content=f"Client version is too old. Minimum version required is {lower_bound_version}",
+                )
 
         response = await call_next(request)
         response.headers[HEADER_SYFTBOX_VERSION] = __version__
