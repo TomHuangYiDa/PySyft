@@ -158,8 +158,8 @@ bump-version level="patch" breaking_changes="false":
     uv lock
 
     # commit the changes
-    # git commit -am "Bump version $CURRENT_VERSION -> $NEW_VERSION"
-    # git tag -a $NEW_VERSION -m "Release $NEW_VERSION"
+    git commit -am "Bump version $CURRENT_VERSION -> $NEW_VERSION"
+    git tag -a $NEW_VERSION -m "Release $NEW_VERSION"
 
 # ---------------------------------------------------------------------------------------------------------------------
 
