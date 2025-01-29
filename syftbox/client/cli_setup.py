@@ -171,21 +171,6 @@ def verify_installation(conf: SyftClientConfig, client: httpx.Client) -> None:
             time.sleep(2)
             response = client.get("/info")
         response.raise_for_status()
-        # server_info = response.json()
-        # server_version = server_info["version"]
-        # local_version = __version__
-
-        # if server_version == local_version:
-        #     return
-
-        # should_continue = Confirm.ask(
-        #     f"\n[yellow]Server version ({server_version}) does not match your client version ({local_version}).\n"
-        #     f"[bold](recommended)[/bold] To update, run:\n\n"
-        #     f"[bold]curl -LsSf https://syftbox.openmined.org/install.sh | sh[/bold][/yellow]\n\n"
-        #     f"Continue without updating?"
-        # )
-        # if not should_continue:
-        #     raise typer.Exit()
 
     except (httpx.HTTPError, KeyError):
         should_continue = Confirm.ask(

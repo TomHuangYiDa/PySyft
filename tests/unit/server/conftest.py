@@ -30,15 +30,12 @@ PERMFILE_DICT = [
 def get_access_token(client: TestClient, email: str) -> str:
     response = client.post("/auth/request_email_token", json={"email": email})
     email_token = response.json()["email_token"]
-    print(response.json())
     response = client.post(
         "/auth/validate_email_token",
         headers={"Authorization": f"Bearer {email_token}"},
         params={"email": email},
     )
 
-    print(response.status_code)
-    print(response.content)
     if response.status_code != 200:
         raise ValueError(f"Failed to get access token, {response.text}")
     return response.json()["access_token"]
@@ -49,9 +46,7 @@ def client(monkeypatch, tmp_path):
     """Every client gets their own snapshot folder at `tmp_path`"""
     snapshot_folder = tmp_path / "snapshot"
     settings = ServerSettings.from_data_folder(snapshot_folder)
-    print(settings.auth_enabled)
     settings.auth_enabled = False
-    print(settings.auth_enabled)
     monkeypatch.setenv("SYFTBOX_DATA_FOLDER", str(settings.data_folder))
     monkeypatch.setenv("SYFTBOX_SNAPSHOT_FOLDER", str(settings.snapshot_folder))
     monkeypatch.setenv("SYFTBOX_USER_FILE_PATH", str(settings.user_file_path))
@@ -94,9 +89,7 @@ def client_without_perms(monkeypatch, tmp_path):
     """Every client gets their own snapshot folder at `tmp_path`"""
     settings = ServerSettings.from_data_folder(tmp_path)
     settings.otel_enabled = False
-    print(settings.auth_enabled)
     settings.auth_enabled = False
-    print(settings.auth_enabled)
 
     monkeypatch.setenv("SYFTBOX_DATA_FOLDER", str(settings.data_folder))
     monkeypatch.setenv("SYFTBOX_SNAPSHOT_FOLDER", str(settings.snapshot_folder))

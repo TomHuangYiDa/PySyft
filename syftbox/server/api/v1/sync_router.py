@@ -103,7 +103,6 @@ def get_metadata(
     file_store: FileStore = Depends(get_file_store),
     email: str = Depends(get_current_user),
 ) -> FileMetadata:
-    logger.debug("????")
     try:
         metadata = file_store.get_metadata(req.path, email)
         return metadata
