@@ -150,7 +150,7 @@ class SyftMessage(Base):
     sender: str
     url: SyftBoxURL
 
-    ulid: ULID = Field(default_factory=ULID)
+    id: ULID = Field(default_factory=ULID)
     body: Optional[bytes] = None
     headers: Headers = Field(default_factory=dict)
     created: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
@@ -174,11 +174,13 @@ class SyftMessage(Base):
     def validate_url(cls, value) -> SyftBoxURL:
         return validate_syftbox_url(value)
 
-    def get_message_hash(self) -> str:
-        return self.__msg_hash().hexdigest()
+    def get_message_id(self) -> ULID:
+        """Generate a deterministic ULID from the message contents."""
+        return ULID.from_bytes(self.__msg_hash().digest()[:16])
 
-    def get_message_hash_bytes(self) -> bytes:
-        return self.__msg_hash().digest()
+    def get_message_hash(self) -> str:
+        """Generate a hash of the message contents."""
+        return self.__msg_hash().hexdigest()
 
     def __msg_hash(self):
         m = self.model_dump_json(include=["url", "method", "sender", "headers", "body"])
@@ -222,14 +224,14 @@ class SyftFuture(Base):
     """Represents an asynchronous Syft RPC operation.
 
     Attributes:
-        ulid: Identifier of the corresponding request and response.
+        id: Identifier of the corresponding request and response.
         local_path: Path where request and response files are stored.
         DEFAULT_POLL_INTERVAL: Default time between polling attempts in seconds.
     """
 
     DEFAULT_POLL_INTERVAL: ClassVar[float] = 0.5
 
-    ulid: ULID
+    id: ULID
     url: SyftBoxURL
     local_path: PathLike
     expires: datetime
@@ -242,12 +244,12 @@ class SyftFuture(Base):
     @property
     def request_path(self) -> Path:
         """Path to the request file."""
-        return to_path(self.local_path) / f"{self.ulid}.request"
+        return to_path(self.local_path) / f"{self.id}.request"
 
     @property
     def response_path(self) -> Path:
         """Path to the response file."""
-        return to_path(self.local_path) / f"{self.ulid}.response"
+        return to_path(self.local_path) / f"{self.id}.response"
 
     @property
     def rejected_path(self) -> Path:
@@ -350,7 +352,7 @@ class SyftFuture(Base):
             return SyftResponse(
                 status_code=SyftStatus.SYFT_404_NOT_FOUND,
                 url=self.url,
-                body=f"Request with {self.ulid} not found",
+                body=f"Request with {self.id} not found",
                 sender="SYSTEM",
             )
 
@@ -360,7 +362,7 @@ class SyftFuture(Base):
             #! cleanup both request & response
             return SyftResponse(
                 status_code=SyftStatus.SYFT_419_EXPIRED,
-                body=f"Request with {self.ulid} expired on {self.expires}",
+                body=f"Request with {self.id} expired on {self.expires}",
                 url=self.url,
                 sender="SYSTEM",
             )
@@ -399,12 +401,12 @@ class SyftFuture(Base):
             )
 
     def __hash__(self):
-        return hash(self.ulid)
+        return hash(self.id)
 
     def __eq__(self, other):
         if not isinstance(other, SyftFuture):
             return False
-        return self.ulid == other.ulid
+        return self.id == other.id
 
 
 class SyftBulkFuture(Base):
@@ -449,14 +451,14 @@ class SyftBulkFuture(Base):
         return self.responses
 
     @property
-    def ulid(self) -> ULID:
+    def id(self) -> ULID:
         """Generate a deterministic ULID from all future IDs.
 
         Returns:
             A single ULID derived from hashing all future IDs.
         """
         # Combine all ULIDs and hash them
-        combined = ",".join(str(f.ulid) for f in self.futures)
+        combined = ",".join(str(f.id) for f in self.futures)
         hash_bytes = hashlib.sha256(combined.encode()).digest()[:16]
         # Use first 16 bytes of hash to create a new ULID
         return ULID.from_bytes(hash_bytes)

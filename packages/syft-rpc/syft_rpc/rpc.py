@@ -84,10 +84,10 @@ def send(
     # caching is enabled, generate a new request
     if cache:
         # generate a predictable id from message components
-        id = ULID.from_bytes(syft_request.get_message_hash_bytes()[:16])
-        syft_request.ulid = id
+        id = syft_request.get_message_id()
+        syft_request.id = id
 
-    req_path = local_path / f"{syft_request.ulid}.request"
+    req_path = local_path / f"{syft_request.id}.request"
 
     # Handle cached request scenario
     if cache and req_path.exists():
@@ -97,7 +97,7 @@ def send(
             req_path.unlink()
         else:
             return SyftFuture(
-                ulid=cached_request.ulid,
+                id=cached_request.id,
                 url=cached_request.url,
                 local_path=local_path,
                 expires=cached_request.expires,
@@ -112,7 +112,7 @@ def send(
             raise SyftError(f"Request persistence failed: {req_path} - {e}")
 
     return SyftFuture(
-        ulid=syft_request.ulid,
+        id=syft_request.id,
         url=syft_request.url,
         local_path=local_path,
         expires=syft_request.expires,
@@ -223,7 +223,7 @@ def reply_to(
     client = Client.load() if client is None else client
 
     response = SyftResponse(
-        ulid=request.ulid,
+        id=request.id,
         sender=client.email,
         method=request.method,
         url=request.url,
@@ -234,7 +234,7 @@ def reply_to(
     )
 
     local_path = response.url.to_local_path(client.workspace.datasites)
-    file_path = local_path / f"{response.ulid}.response"
+    file_path = local_path / f"{response.id}.response"
     local_path.mkdir(parents=True, exist_ok=True)
     response.dump(file_path)
 

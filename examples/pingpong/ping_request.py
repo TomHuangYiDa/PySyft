@@ -13,9 +13,9 @@ def send_ping():
         expiry="5m",
         cache=True,
     )
-    print(f"Request sent to {future.url}")
+    print(f"Request {future.id} sent to {future.url}")
     response = future.wait(timeout=300)
-    print(response.body)
+    print("Response: ", response.body)
     end = time.time()
     print("Time taken: ", end - start)
 
