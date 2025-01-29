@@ -152,7 +152,7 @@ bump-version level="patch" breaking_changes="false":
     cd scripts
     BREAKING_CHANGES=""
     if [[ '{{ breaking_changes }}' == true ]]; then BREAKING_CHANGES="--breaking_changes"; fi
-    uv run scripts/upgrade_version_matrix.py {{ level }} $BREAKING_CHANGES
+    uv run upgrade_version_matrix.py {{ level }} $BREAKING_CHANGES
     cd ..
     # update uv.lock file to reflect new package version
     uv lock
