@@ -2,7 +2,6 @@ from datetime import datetime, timezone
 
 from syft_core.client_shim import Client
 from syft_core.url import SyftBoxURL
-from ulid import ULID
 
 from syft_rpc.protocol import (
     SyftBulkFuture,

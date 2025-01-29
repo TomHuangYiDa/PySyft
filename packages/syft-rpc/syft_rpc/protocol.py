@@ -21,7 +21,7 @@ Headers: TypeAlias = dict[str, str]
 
 
 # Constants
-DEFAULT_MESSAGE_EXPIRY: float = 60.0 * 60.0 * 24.0 * 3  # 3 days in seconds
+DEFAULT_MESSAGE_EXPIRY: int = 60 * 60 * 24  # 1 days in seconds
 
 
 def validate_syftbox_url(url: SyftBoxURL | str) -> SyftBoxURL:
@@ -310,7 +310,7 @@ class SyftFuture(Base):
 
         while time.monotonic() < deadline:
             try:
-                response = self.resolve(silent=True)
+                response = self.resolve()
                 if response is not None:
                     return response
                 time.sleep(poll_interval)
@@ -322,7 +322,7 @@ class SyftFuture(Base):
             f"Timeout reached after waiting {timeout} seconds for response"
         )
 
-    def resolve(self, silent: bool = False) -> Optional[SyftResponse]:
+    def resolve(self) -> Optional[SyftResponse]:
         """Attempt to resolve the future to a response.
 
         Args:
@@ -333,7 +333,8 @@ class SyftFuture(Base):
         """
         # Check for rejection first
         if self.is_rejected:
-            #! todo clean- syftrejected is never sync'd up
+            self.request_path.unlink(missing_ok=True)
+            self.rejected_path.unlink(missing_ok=True)
             return SyftResponse(
                 status_code=SyftStatus.SYFT_403_FORBIDDEN,
                 body=b"Request was rejected by the SyftBox cache server due to permissions issue",
@@ -359,18 +360,14 @@ class SyftFuture(Base):
         # Check for expired request
         request = SyftRequest.load(self.request_path)
         if request.is_expired:
-            #! cleanup both request & response
+            self.request_path.unlink(missing_ok=True)
+            self.response_path.unlink(missing_ok=True)
             return SyftResponse(
                 status_code=SyftStatus.SYFT_419_EXPIRED,
                 body=f"Request with {self.id} expired on {self.expires}",
                 url=self.url,
                 sender="SYSTEM",
             )
-
-        # Request is present and not expired, but response unavailable.
-        # This means we are still waiting for a response
-        if not silent:
-            logger.info("Response not ready, still waiting...")
 
         # No response yet
         return None
@@ -399,6 +396,9 @@ class SyftFuture(Base):
                 url=self.url,
                 sender="SYSTEM",
             )
+        finally:
+            self.request_path.unlink(missing_ok=True)
+            self.response_path.unlink(missing_ok=True)
 
     def __hash__(self):
         return hash(self.id)
