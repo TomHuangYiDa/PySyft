@@ -179,6 +179,18 @@ class SyftMessage(Base):
         return hashlib.sha256(m.encode()).hexdigest()
 
 
+class SyftError(Exception):
+    """Base exception for Syft-related errors."""
+
+    pass
+
+
+class SyftTimeoutError(SyftError):
+    """Raised when a request times out."""
+
+    pass
+
+
 class SyftRequest(SyftMessage):
     """Request message in the Syft protocol."""
 
@@ -195,17 +207,9 @@ class SyftResponse(SyftMessage):
         """Check if the response indicates success."""
         return self.status_code.is_success
 
-
-class SyftError(Exception):
-    """Base exception for Syft-related errors."""
-
-    pass
-
-
-class SyftTimeoutError(SyftError):
-    """Raised when a request times out."""
-
-    pass
+    def raise_for_status(self) -> SyftError:
+        if self.status_code.is_error:
+            raise SyftError(f"Request failed with status code {self.status_code}")
 
 
 class SyftFuture(Base):
@@ -397,9 +401,12 @@ class SyftFuture(Base):
 class SyftBulkFuture(Base):
     futures: list[SyftFuture]
     DEFAULT_POLL_INTERVAL: ClassVar[float] = 0.1
+    responses: list[SyftResponse] = []
 
     def gather_completed(
-        self, timeout: int = 10, poll_interval: float = DEFAULT_POLL_INTERVAL
+        self,
+        timeout: Optional[float] = None,
+        poll_interval: float = DEFAULT_POLL_INTERVAL,
     ) -> list[SyftResponse]:
         """Wait for all futures to complete and return a list of responses.
 
@@ -421,17 +428,16 @@ class SyftBulkFuture(Base):
             raise ValueError("Poll interval must be greater than 0")
 
         pending = set(self.futures)
-        responses = []
-        deadline = time.monotonic() + timeout
+        deadline = time.monotonic() + (timeout or float("inf"))
 
         while pending and time.monotonic() < deadline:
             for future in list(pending):  # Create list to allow set modification
                 if response := future.resolve(silent=True):
-                    responses.append(response)
+                    self.responses.append(response)
                     pending.remove(future)
             time.sleep(poll_interval)
 
-        return responses
+        return self.responses
 
     @property
     def ulid(self) -> ULID:
@@ -445,3 +451,13 @@ class SyftBulkFuture(Base):
         hash_bytes = hashlib.sha256(combined.encode()).digest()[:16]
         # Use first 16 bytes of hash to create a new ULID
         return ULID.from_bytes(hash_bytes)
+
+    @property
+    def failures(self) -> list[SyftResponse]:
+        """Return a list of failed responses."""
+        return [r for r in self.responses if not r.is_success]
+
+    @property
+    def successes(self) -> list[SyftResponse]:
+        """Return a list of successful responses."""
+        return [r for r in self.responses if r.is_success]
