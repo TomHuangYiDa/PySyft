@@ -98,9 +98,9 @@ def send(
         else:
             return SyftFuture(
                 id=cached_request.id,
-                url=cached_request.url,
-                local_path=local_path,
+                path=local_path,
                 expires=cached_request.expires,
+                request=cached_request,
             )
 
     # Create new request file if needed
@@ -113,9 +113,9 @@ def send(
 
     return SyftFuture(
         id=syft_request.id,
-        url=syft_request.url,
-        local_path=local_path,
+        path=local_path,
         expires=syft_request.expires,
+        request=syft_request,
     )
 
 

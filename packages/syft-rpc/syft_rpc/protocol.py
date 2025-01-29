@@ -6,7 +6,7 @@ from enum import IntEnum, StrEnum
 from pathlib import Path
 from typing import ClassVar, Optional, TypeAlias
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, field_validator
 from pydantic import ValidationError as PydanticValidationError
 from syft_core.types import PathLike, to_path
 from syft_core.url import SyftBoxURL
@@ -22,6 +22,7 @@ Headers: TypeAlias = dict[str, str]
 
 # Constants
 DEFAULT_MESSAGE_EXPIRY: int = 60 * 60 * 24  # 1 days in seconds
+DEFAULT_POLL_INTERVAL: float = 0.1
 
 
 def validate_syftbox_url(url: SyftBoxURL | str) -> SyftBoxURL:
@@ -148,17 +149,29 @@ class SyftMessage(Base):
 
     VERSION: ClassVar[int] = 1
 
-    sender: str
-    url: SyftBoxURL
-
     id: ULID = Field(default_factory=ULID)
+    """Unique identifier of the message."""
+
+    sender: str
+    """The sender of the message."""
+
+    url: SyftBoxURL
+    """The URL of the message."""
+
     body: Optional[bytes] = None
+    """The body of the message in bytes."""
+
     headers: Headers = Field(default_factory=dict)
+    """Additional headers for the message."""
+
     created: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    """Timestamp when the message was created."""
+
     expires: datetime = Field(
         default_factory=lambda: datetime.now(timezone.utc)
         + timedelta(seconds=DEFAULT_MESSAGE_EXPIRY)
     )
+    """Timestamp when the message expires."""
 
     @property
     def age(self) -> float:
@@ -222,35 +235,38 @@ class SyftResponse(SyftMessage):
 
 
 class SyftFuture(Base):
-    """Represents an asynchronous Syft RPC operation.
+    """Represents an asynchronous Syft RPC operation on a file system transport.
 
     Attributes:
         id: Identifier of the corresponding request and response.
-        local_path: Path where request and response files are stored.
-        DEFAULT_POLL_INTERVAL: Default time between polling attempts in seconds.
+        path: Path where request and response files are stored.
+        expires: Timestamp when the request expires.
     """
 
-    DEFAULT_POLL_INTERVAL: ClassVar[float] = 0.5
-
     id: ULID
-    url: SyftBoxURL
-    local_path: PathLike
-    expires: datetime
+    """Identifier of the corresponding request and response."""
 
-    @field_validator("url", mode="before")
-    @classmethod
-    def validate_url(cls, value) -> SyftBoxURL:
-        return validate_syftbox_url(value)
+    path: Path
+    """Path where request and response files are stored"""
+
+    expires: datetime
+    """Timestamp when the request expires"""
+
+    _request: Optional[SyftRequest] = PrivateAttr(init=True)
+
+    def __init__(self, **data):
+        super().__init__(**data)
+        self._request = data.get("request")
 
     @property
     def request_path(self) -> Path:
         """Path to the request file."""
-        return to_path(self.local_path) / f"{self.id}.request"
+        return to_path(self.path) / f"{self.id}.request"
 
     @property
     def response_path(self) -> Path:
         """Path to the response file."""
-        return to_path(self.local_path) / f"{self.id}.response"
+        return to_path(self.path) / f"{self.id}.response"
 
     @property
     def rejected_path(self) -> Path:
@@ -267,22 +283,13 @@ class SyftFuture(Base):
         """Check if the future has expired."""
         return datetime.now(timezone.utc) > self.expires
 
-    @staticmethod
-    def load_state(request_path: PathLike) -> Self:
-        try:
-            request = SyftRequest.load(request_path)
-        except FileNotFoundError:
-            raise SyftError("Request file not found")
+    @property
+    def request(self) -> SyftRequest:
+        """Get the underlying request object."""
 
-        message_hash = request.get_message_hash()
-        state_path = request_path.parent / f".{message_hash}.state"
-
-        try:
-            return SyftFuture.load(state_path)
-        except FileNotFoundError:
-            raise SyftError(
-                "Future object not found for the given request. Ensure the request has been sent."
-            )
+        if not self._request:
+            self._request = SyftRequest.load(self.request_path)
+        return self._request
 
     def wait(
         self,
@@ -412,7 +419,6 @@ class SyftFuture(Base):
 
 class SyftBulkFuture(Base):
     futures: list[SyftFuture]
-    DEFAULT_POLL_INTERVAL: ClassVar[float] = 0.1
     responses: list[SyftResponse] = []
 
     def gather_completed(
