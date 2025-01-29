@@ -53,7 +53,6 @@ def save_future(future: SyftFuture, client: Client = None) -> str:
     conn.execute(__Q_INSERT_FUTURE, data)
     conn.commit()
 
-    cleanup_expired_futures(client)
     return data["id"]
 
 
@@ -67,7 +66,6 @@ def get_future(future_id: str | ULID, client: Client = None) -> Optional[SyftFut
     if not row:
         return None
 
-    cleanup_expired_futures(client)
     return SyftFuture(**dict(row))
 
 

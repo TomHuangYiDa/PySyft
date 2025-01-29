@@ -120,8 +120,8 @@ def send(
 
 
 def broadcast(
-    method: SyftMethod | str,
     urls: list[SyftBoxURL | str],
+    method: SyftMethod | str = SyftMethod.GET,
     headers: dict[str, str] | None = None,
     body: str | bytes | None = None,
     expiry: str = DEFAULT_EXPIRY,
