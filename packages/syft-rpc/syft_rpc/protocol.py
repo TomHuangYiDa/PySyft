@@ -175,8 +175,14 @@ class SyftMessage(Base):
         return validate_syftbox_url(value)
 
     def get_message_hash(self) -> str:
+        return self.__msg_hash().hexdigest()
+
+    def get_message_hash_bytes(self) -> bytes:
+        return self.__msg_hash().digest()
+
+    def __msg_hash(self):
         m = self.model_dump_json(include=["url", "method", "sender", "headers", "body"])
-        return hashlib.sha256(m.encode()).hexdigest()
+        return hashlib.sha256(m.encode())
 
 
 class SyftError(Exception):
@@ -325,6 +331,7 @@ class SyftFuture(Base):
         """
         # Check for rejection first
         if self.is_rejected:
+            #! todo clean- syftrejected is never sync'd up
             return SyftResponse(
                 status_code=SyftStatus.SYFT_403_FORBIDDEN,
                 body=b"Request was rejected by the SyftBox cache server due to permissions issue",
@@ -339,6 +346,7 @@ class SyftFuture(Base):
         # If both request and response are missing, the request has expired
         # and they got cleaned up by the server.
         if not self.request_path.exists():
+            #! todo what's the possibility that a .req doesn't exist but a .resp does?
             return SyftResponse(
                 status_code=SyftStatus.SYFT_404_NOT_FOUND,
                 url=self.url,
@@ -349,6 +357,7 @@ class SyftFuture(Base):
         # Check for expired request
         request = SyftRequest.load(self.request_path)
         if request.is_expired:
+            #! cleanup both request & response
             return SyftResponse(
                 status_code=SyftStatus.SYFT_419_EXPIRED,
                 body=f"Request with {self.ulid} expired on {self.expires}",

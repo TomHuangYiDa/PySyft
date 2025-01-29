@@ -10,7 +10,8 @@ def send_ping():
     future = rpc.send(
         url=f"syft://{client.email}/api_data/pingpong/rpc/ping",
         body="Ping !!!",
-        expiry_secs=120,  #! discuss expiry_secs=120 & future.timeout = 300
+        expiry="5m",
+        cache=True,
     )
     print(f"Request sent to {future.url}")
     response = future.wait(timeout=300)
