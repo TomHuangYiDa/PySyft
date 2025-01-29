@@ -112,3 +112,6 @@ class Client:
 
     def to_syft_url(self, path: PathLike) -> SyftBoxURL:
         return SyftBoxURL.from_path(path, self.workspace)
+
+    def __hash__(self) -> int:
+        return hash(self.config.data_dir)

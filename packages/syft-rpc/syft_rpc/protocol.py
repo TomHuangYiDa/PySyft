@@ -147,21 +147,22 @@ class SyftMessage(Base):
 
     VERSION: ClassVar[int] = 1
 
+    sender: str
+    url: SyftBoxURL
+
     ulid: ULID = Field(default_factory=ULID)
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    body: Optional[bytes] = None
+    headers: Headers = Field(default_factory=dict)
+    created: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     expires: datetime = Field(
         default_factory=lambda: datetime.now(timezone.utc)
         + timedelta(seconds=DEFAULT_MESSAGE_EXPIRY)
     )
-    sender: str
-    url: SyftBoxURL
-    headers: Headers = Field(default_factory=dict)
-    body: Optional[bytes] = None
 
     @property
     def age(self) -> float:
         """Return the age of the message in seconds."""
-        return (datetime.now(timezone.utc) - self.timestamp).total_seconds()
+        return (datetime.now(timezone.utc) - self.created).total_seconds()
 
     @property
     def is_expired(self) -> bool:
@@ -322,6 +323,7 @@ class SyftFuture(Base):
         if self.is_rejected:
             return SyftResponse(
                 status_code=SyftStatus.SYFT_403_FORBIDDEN,
+                body=b"Request was rejected by the SyftBox cache server due to permissions issue",
                 url=self.url,
                 sender="SYSTEM",
             )
@@ -336,6 +338,7 @@ class SyftFuture(Base):
             return SyftResponse(
                 status_code=SyftStatus.SYFT_404_NOT_FOUND,
                 url=self.url,
+                body=f"Request with {self.ulid} not found",
                 sender="SYSTEM",
             )
 
@@ -344,6 +347,7 @@ class SyftFuture(Base):
         if request.is_expired:
             return SyftResponse(
                 status_code=SyftStatus.SYFT_419_EXPIRED,
+                body=f"Request with {self.ulid} expired on {self.expires}",
                 url=self.url,
                 sender="SYSTEM",
             )
@@ -352,6 +356,8 @@ class SyftFuture(Base):
         # This means we are still waiting for a response
         if not silent:
             logger.info("Response not ready, still waiting...")
+
+        # No response yet
         return None
 
     def _handle_existing_response(self) -> SyftResponse:

@@ -3,6 +3,7 @@ from pathlib import Path
 from threading import Event
 from typing import Callable
 
+from loguru import logger
 from pydantic import BaseModel
 from syft_core import Client
 from syft_rpc import rpc
@@ -16,11 +17,15 @@ from syft_event.types import Request, Response
 
 DEFAULT_WATCH_EVENTS = [FileCreatedEvent, FileModifiedEvent]
 PERMS = """
-- path: '**'
+- path: '**/*.request'
   permissions:
-  - admin
-  - read
-  - write
+    - read
+    - write
+  user: '*'
+- path: '**/*.response'
+  permissions:
+    - read
+    - write
   user: '*'
 """
 
@@ -32,7 +37,7 @@ class SyftEvents:
         self.app_dir = self.client.api_data(self.app_name)
         self.app_rpc_dir = self.app_dir / "rpc"
         self.obs = Observer()
-        self.rpc: dict[Path, Callable] = {}
+        self.__rpc: dict[Path, Callable] = {}
         self._stop_event = Event()
 
     def start(self) -> None:
@@ -44,11 +49,12 @@ class SyftEvents:
             self.process_pending_requests()
         except Exception as e:
             print("Error processing pending requests", e)
+            raise
         self.obs.start()
 
     def publish_schema(self) -> None:
         schema = {}
-        for endpoint, handler in self.rpc.items():
+        for endpoint, handler in self.__rpc.items():
             handler_schema = generate_schema(handler)
             ep_name = endpoint.relative_to(self.app_rpc_dir)
             ep_name = "/" + str(ep_name).replace("\\", "/")
@@ -56,17 +62,20 @@ class SyftEvents:
 
         schema_path = self.app_rpc_dir / "rpc.schema.json"
         schema_path.write_text(json.dumps(schema, indent=2))
+        logger.info(f"Published schema to {schema_path}")
 
     def process_pending_requests(self) -> None:
         # process all pending requests
         for path in self.app_rpc_dir.glob("**/*.request"):
             if path.with_suffix(".response").exists():
                 continue
-            if path.parent in self.rpc:
-                handler = self.rpc[path.parent]
+            if path.parent in self.__rpc:
+                handler = self.__rpc[path.parent]
+                logger.debug(f"Processing pending request {path.name}")
                 self.__handle_rpc(path, handler)
 
     def run_forever(self) -> None:
+        logger.info(f"Started watching for files. RPC Directory = {self.app_rpc_dir}")
         self.start()
         try:
             while not self._stop_event.is_set():
@@ -84,12 +93,13 @@ class SyftEvents:
     def on_request(self, endpoint: str) -> Callable:
         """Bind function to RPC requests at an endpoint"""
 
-        def decorator(func):
+        def register_rpc(func):
             epath = self.__to_endpoint_path(endpoint)
             self.__register_rpc(epath, func)
+            logger.info(f"Register RPC: {endpoint}")
             return func
 
-        return decorator
+        return register_rpc
 
     def watch(
         self,
@@ -103,27 +113,29 @@ class SyftEvents:
 
         globs = [self.__format_glob(path) for path in glob_path]
 
-        def decorator(func):
-            def wrapper(event):
+        def register_watch(func):
+            def watch_cb(event):
                 return func(event)
 
             self.obs.schedule(
                 # use raw path for glob which will be convert to path/*.request
-                AnyPatternHandler(globs, wrapper),
+                AnyPatternHandler(globs, watch_cb),
                 path=self.client.datasites,
                 recursive=True,
                 event_filter=event_filter,
             )
-            return wrapper
+            logger.info(f"Register Watch: {globs}")
+            return watch_cb
 
-        return decorator
+        return register_watch
 
     def __handle_rpc(self, path: Path, func: Callable):
         try:
             req = SyftRequest.load(path)
-            # todo! what do we do here?
             if req.is_expired:
+                logger.debug(f"Request expired: {req}")
                 return
+
             evt_req = Request(
                 sender=req.sender,
                 url=req.url,
@@ -157,20 +169,23 @@ class SyftEvents:
                 client=self.client,
             )
         except Exception as e:
-            print("Error loading request", e)
+            logger.error(f"Error handling request {path}: {e}")
+            raise
 
     def __register_rpc(self, endpoint: Path, handler: Callable) -> Callable:
-        def on_rpc_request(event: FileSystemEvent):
+        def rpc_callback(event: FileSystemEvent):
+            logger.debug(f"RPC Request: {event.src_path}")
             return self.__handle_rpc(Path(event.src_path), handler)
 
         self.obs.schedule(
-            RpcRequestHandler(on_rpc_request),
+            RpcRequestHandler(rpc_callback),
             path=endpoint,
             recursive=True,
             event_filter=[FileCreatedEvent],
         )
-        self.rpc[endpoint] = handler
-        return on_rpc_request
+        # this is used for processing pending requests + generating schema
+        self.__rpc[endpoint] = handler
+        return rpc_callback
 
     def __to_endpoint_path(self, endpoint: str) -> Path:
         if "*" in endpoint or "?" in endpoint:

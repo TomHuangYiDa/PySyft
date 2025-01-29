@@ -9,7 +9,7 @@ dependencies = [
     "pathspec>=0.12.1",
     "pydantic>=2.10.4",
     "watchdog>=6.0.0",
-    "numpy>=2.0.2",
+    "loguru>=0.7.3",
 ]
 
 [build-system]
