@@ -7,10 +7,9 @@ requires-python = ">=3.9"
 dependencies = [
     "syft-rpc",
     "pathspec>=0.12.1",
-    "pydantic>=2.9.2",
-    "watchdog>=5.0.3",
-    "syftbox>=0.2.10",
-    "typing-extensions>=4.12.2",
+    "pydantic>=2.10.4",
+    "watchdog>=6.0.0",
+    "loguru>=0.7.3",
 ]
 
 [build-system]

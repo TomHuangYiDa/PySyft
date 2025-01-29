@@ -1,4 +1,5 @@
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
+from pathlib import Path
 
 from syft_core.client_shim import Client
 from syft_core.url import SyftBoxURL
@@ -12,16 +13,27 @@ from syft_rpc.protocol import (
     SyftResponse,
     SyftStatus,
 )
+from syft_rpc.util import parse_duration
+
+DEFAULT_EXPIRY = "24h"
+
+
+def make_url(datasite: str, app_name: str, endpoint: str) -> SyftBoxURL:
+    """Create a Syft Box URL from a datasite, app name, and RPC endpoint."""
+
+    return SyftBoxURL(
+        f"syft://{datasite}/api_data/{app_name}/rpc/" + endpoint.lstrip("/")
+    )
 
 
 def send(
-    method: SyftMethod | str,
     url: SyftBoxURL | str,
-    headers: dict[str, str] | None = None,
     body: str | bytes | None = None,
+    headers: dict[str, str] | None = None,
+    method: SyftMethod | str = SyftMethod.GET,
+    expiry: str = DEFAULT_EXPIRY,
+    cache: bool = False,
     client: Client | None = None,
-    expiry_secs: int = 10,
-    no_cache: bool = False,
 ) -> SyftFuture:
     """Send an asynchronous request to a Syft Box endpoint and return a future for tracking the response.
 
@@ -39,9 +51,9 @@ def send(
             or raw bytes. Defaults to None.
         client: A Syft Client instance used to send the request. If not provided,
             the default client will be loaded.
-        expiry_secs: Number of seconds until the request expires. After this time,
-            the request will not be processed. Defaults to 10 seconds.
-        no_cache: If True, ignore any cached future and make a fresh request.
+        expiry: Duration string specifying how long the request is valid for.
+            Defaults to '24h' (24 hours).
+        cache: If True, cache the request on the local filesystem for future use.
 
     Returns:
         SyftFuture: A future object that can be used to track and retrieve the response.
@@ -64,35 +76,47 @@ def send(
         url=url if isinstance(url, SyftBoxURL) else SyftBoxURL(url),
         headers=headers or {},
         body=body.encode() if isinstance(body, str) else body,
-        expires=datetime.now(timezone.utc) + timedelta(seconds=expiry_secs),
+        expires=datetime.now(timezone.utc) + parse_duration(expiry),
     )
     local_path = syft_request.url.to_local_path(client.workspace.datasites)
+    local_path.mkdir(parents=True, exist_ok=True)
 
-    message_hash = syft_request.get_message_hash()
-    state_path = local_path / f".{message_hash}.state"
+    # caching is enabled, generate a new request
+    if cache:
+        # generate a predictable id from message components
+        id = syft_request.get_message_id()
+        syft_request.id = id
 
-    # Check if we already have a cached future that hasn't expired
-    if not no_cache and state_path.exists():
-        future = SyftFuture.load(state_path)
-        if not future.is_expired:
-            return future
+    req_path = local_path / f"{syft_request.id}.request"
 
-    # We need to make a fresh request and persist the future to a state
-    file_path = local_path / f"{syft_request.ulid}.request"
-    try:
-        local_path.mkdir(parents=True, exist_ok=True)
-        syft_request.dump(file_path)
-    except Exception as e:
-        raise SyftError(f"Failed to write request to {file_path}: {e}")
+    # Handle cached request scenario
+    if cache and req_path.exists():
+        cached_request = SyftRequest.load(req_path)
+        if cached_request.is_expired:
+            print(f"Cached request expired, removing: {req_path}")
+            req_path.unlink()
+        else:
+            return SyftFuture(
+                id=cached_request.id,
+                url=cached_request.url,
+                local_path=local_path,
+                expires=cached_request.expires,
+            )
 
-    future = SyftFuture(
-        ulid=syft_request.ulid,
+    # Create new request file if needed
+    if not req_path.exists():
+        print(f"Creating a new request at: {req_path}")
+        try:
+            syft_request.dump(req_path)
+        except OSError as e:
+            raise SyftError(f"Request persistence failed: {req_path} - {e}")
+
+    return SyftFuture(
+        id=syft_request.id,
         url=syft_request.url,
         local_path=local_path,
         expires=syft_request.expires,
     )
-    future.dump(state_path)
-    return future
 
 
 def broadcast(
@@ -100,9 +124,9 @@ def broadcast(
     urls: list[SyftBoxURL | str],
     headers: dict[str, str] | None = None,
     body: str | bytes | None = None,
+    expiry: str = DEFAULT_EXPIRY,
+    cache: bool = False,
     client: Client | None = None,
-    expiry_secs: int = 10,
-    no_cache: bool = False,
 ) -> SyftBulkFuture:
     """Broadcast an asynchronous request to multiple Syft Box endpoints and return a bulk future.
 
@@ -121,9 +145,9 @@ def broadcast(
             or raw bytes. Defaults to None.
         client: A Syft Client instance used to send the requests. If not provided,
             the default client will be loaded.
-        expiry_secs: Number of seconds until the requests expire. After this time,
-            requests will not be processed. Defaults to 10 seconds.
-        no_cache: If True, ignore any cached futures and make fresh requests.
+        expiry: Duration string specifying how long the request is valid for.
+            Defaults to '24h' (24 hours).
+        cache: If True, cache the request on the local filesystem for future use.
 
     Returns:
         SyftBulkFuture: A bulk future object that can be used to track and retrieve multiple responses.
@@ -148,8 +172,8 @@ def broadcast(
                 headers=headers,
                 body=body,
                 client=client,
-                expiry_secs=expiry_secs,
-                no_cache=no_cache,
+                expiry=expiry,
+                cache=cache,
             )
             for url in urls
         ]
@@ -161,9 +185,8 @@ def reply_to(
     request: SyftRequest,
     body: str | bytes | None = None,
     headers: dict[str, str] | None = None,
-    client: Client | None = None,
     status_code: SyftStatus = SyftStatus.SYFT_200_OK,
-    expiry_secs: int = 10,
+    client: Client | None = None,
 ) -> SyftResponse:
     """Create and store a response to a Syft request.
 
@@ -200,30 +223,42 @@ def reply_to(
     client = Client.load() if client is None else client
 
     response = SyftResponse(
-        ulid=request.ulid,
+        id=request.id,
         sender=client.email,
         method=request.method,
         url=request.url,
         headers=headers or {},
         body=body.encode() if isinstance(body, str) else body,
-        expires=datetime.now(timezone.utc) + timedelta(seconds=expiry_secs),
+        expires=request.expires,
         status_code=status_code,
     )
 
     local_path = response.url.to_local_path(client.workspace.datasites)
-    file_path = local_path / f"{response.ulid}.response"
+    file_path = local_path / f"{response.id}.response"
     local_path.mkdir(parents=True, exist_ok=True)
     response.dump(file_path)
 
     return response
 
 
-if __name__ == "__main__":
-    client = Client.load()
-    future = send(
-        client=client,
-        method="get",
-        url="syft://tauquir@openmined.org/public/rpc/",
-        body="ping",
+def write_response(
+    request_path: str | Path,
+    body: str | bytes | None = None,
+    headers: dict[str, str] | None = None,
+    status_code: SyftStatus = SyftStatus.SYFT_200_OK,
+    client: Client | None = None,
+):
+    """Write a response to a request file on the local filesystem.
+    Useful when request could not be parsed."""
+
+    _id = request_path.stem
+    response = SyftResponse(
+        id=_id,
+        sender=client.email,
+        method="GET",
+        url=client.to_syft_url(request_path.parent),
+        headers=headers or {},
+        body=body.encode() if isinstance(body, str) else body,
+        status_code=status_code,
     )
-    print(future)
+    response.dump(request_path.with_suffix(".response"))

@@ -21,7 +21,7 @@ Headers: TypeAlias = dict[str, str]
 
 
 # Constants
-DEFAULT_MESSAGE_EXPIRY: float = 60.0 * 60.0 * 24.0 * 3  # 3 days in seconds
+DEFAULT_MESSAGE_EXPIRY: int = 60 * 60 * 24  # 1 days in seconds
 
 
 def validate_syftbox_url(url: SyftBoxURL | str) -> SyftBoxURL:
@@ -47,7 +47,9 @@ class SyftStatus(IntEnum):
     """Standard HTTP-like status codes for Syft responses."""
 
     SYFT_200_OK = 200
+    SYFT_400_BAD_REQUEST = 400
     SYFT_403_FORBIDDEN = 403
+    SYFT_404_NOT_FOUND = 404
     SYFT_419_EXPIRED = 419
     SYFT_500_SERVER_ERROR = 500
 
@@ -146,21 +148,22 @@ class SyftMessage(Base):
 
     VERSION: ClassVar[int] = 1
 
-    ulid: ULID = Field(default_factory=ULID)
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    sender: str
+    url: SyftBoxURL
+
+    id: ULID = Field(default_factory=ULID)
+    body: Optional[bytes] = None
+    headers: Headers = Field(default_factory=dict)
+    created: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     expires: datetime = Field(
         default_factory=lambda: datetime.now(timezone.utc)
         + timedelta(seconds=DEFAULT_MESSAGE_EXPIRY)
     )
-    sender: str
-    url: SyftBoxURL
-    headers: Headers = Field(default_factory=dict)
-    body: Optional[bytes] = None
 
     @property
     def age(self) -> float:
         """Return the age of the message in seconds."""
-        return (datetime.now(timezone.utc) - self.timestamp).total_seconds()
+        return (datetime.now(timezone.utc) - self.created).total_seconds()
 
     @property
     def is_expired(self) -> bool:
@@ -172,9 +175,29 @@ class SyftMessage(Base):
     def validate_url(cls, value) -> SyftBoxURL:
         return validate_syftbox_url(value)
 
+    def get_message_id(self) -> ULID:
+        """Generate a deterministic ULID from the message contents."""
+        return ULID.from_bytes(self.__msg_hash().digest()[:16])
+
     def get_message_hash(self) -> str:
+        """Generate a hash of the message contents."""
+        return self.__msg_hash().hexdigest()
+
+    def __msg_hash(self):
         m = self.model_dump_json(include=["url", "method", "sender", "headers", "body"])
-        return hashlib.sha256(m.encode()).hexdigest()
+        return hashlib.sha256(m.encode())
+
+
+class SyftError(Exception):
+    """Base exception for Syft-related errors."""
+
+    pass
+
+
+class SyftTimeoutError(SyftError):
+    """Raised when a request times out."""
+
+    pass
 
 
 class SyftRequest(SyftMessage):
@@ -193,31 +216,23 @@ class SyftResponse(SyftMessage):
         """Check if the response indicates success."""
         return self.status_code.is_success
 
-
-class SyftError(Exception):
-    """Base exception for Syft-related errors."""
-
-    pass
-
-
-class SyftTimeoutError(SyftError):
-    """Raised when a request times out."""
-
-    pass
+    def raise_for_status(self) -> SyftError:
+        if self.status_code.is_error:
+            raise SyftError(f"Request failed with status code {self.status_code}")
 
 
 class SyftFuture(Base):
     """Represents an asynchronous Syft RPC operation.
 
     Attributes:
-        ulid: Identifier of the corresponding request and response.
+        id: Identifier of the corresponding request and response.
         local_path: Path where request and response files are stored.
         DEFAULT_POLL_INTERVAL: Default time between polling attempts in seconds.
     """
 
-    DEFAULT_POLL_INTERVAL: ClassVar[float] = 0.1
+    DEFAULT_POLL_INTERVAL: ClassVar[float] = 0.5
 
-    ulid: ULID
+    id: ULID
     url: SyftBoxURL
     local_path: PathLike
     expires: datetime
@@ -230,17 +245,17 @@ class SyftFuture(Base):
     @property
     def request_path(self) -> Path:
         """Path to the request file."""
-        return to_path(self.local_path) / f"{self.ulid}.request"
+        return to_path(self.local_path) / f"{self.id}.request"
 
     @property
     def response_path(self) -> Path:
         """Path to the response file."""
-        return to_path(self.local_path) / f"{self.ulid}.response"
+        return to_path(self.local_path) / f"{self.id}.response"
 
     @property
     def rejected_path(self) -> Path:
         """Path to the rejected request marker file."""
-        return self.request_path.with_suffix(f"{self.request_path.suffix}.rejected")
+        return self.request_path.with_suffix(f".syftrejected{self.request_path.suffix}")
 
     @property
     def is_rejected(self) -> bool:
@@ -296,7 +311,7 @@ class SyftFuture(Base):
 
         while time.monotonic() < deadline:
             try:
-                response = self.resolve(silent=True)
+                response = self.resolve()
                 if response is not None:
                     return response
                 time.sleep(poll_interval)
@@ -308,7 +323,7 @@ class SyftFuture(Base):
             f"Timeout reached after waiting {timeout} seconds for response"
         )
 
-    def resolve(self, silent: bool = False) -> Optional[SyftResponse]:
+    def resolve(self) -> Optional[SyftResponse]:
         """Attempt to resolve the future to a response.
 
         Args:
@@ -319,8 +334,11 @@ class SyftFuture(Base):
         """
         # Check for rejection first
         if self.is_rejected:
+            self.request_path.unlink(missing_ok=True)
+            self.rejected_path.unlink(missing_ok=True)
             return SyftResponse(
                 status_code=SyftStatus.SYFT_403_FORBIDDEN,
+                body=b"Request was rejected by the SyftBox cache server due to permissions issue",
                 url=self.url,
                 sender="SYSTEM",
             )
@@ -332,25 +350,27 @@ class SyftFuture(Base):
         # If both request and response are missing, the request has expired
         # and they got cleaned up by the server.
         if not self.request_path.exists():
+            #! todo what's the possibility that a .req doesn't exist but a .resp does?
             return SyftResponse(
-                status_code=SyftStatus.SYFT_419_EXPIRED,
+                status_code=SyftStatus.SYFT_404_NOT_FOUND,
                 url=self.url,
+                body=f"Request with {self.id} not found",
                 sender="SYSTEM",
             )
 
         # Check for expired request
         request = SyftRequest.load(self.request_path)
         if request.is_expired:
+            self.request_path.unlink(missing_ok=True)
+            self.response_path.unlink(missing_ok=True)
             return SyftResponse(
                 status_code=SyftStatus.SYFT_419_EXPIRED,
+                body=f"Request with {self.id} expired on {self.expires}",
                 url=self.url,
                 sender="SYSTEM",
             )
 
-        # Request is present and not expired, but response unavailable.
-        # This means we are still waiting for a response
-        if not silent:
-            logger.info("Response not ready, still waiting...")
+        # No response yet
         return None
 
     def _handle_existing_response(self) -> SyftResponse:
@@ -365,12 +385,9 @@ class SyftFuture(Base):
         """
         try:
             response = SyftResponse.load(self.response_path)
+            # preserve results, but change status code to 419
             if response.is_expired:
-                return SyftResponse(
-                    status_code=SyftStatus.SYFT_419_EXPIRED,
-                    url=self.url,
-                    sender=response.sender,
-                )
+                response.status_code = SyftStatus.SYFT_419_EXPIRED
             return response
         except (PydanticValidationError, ValueError, UnicodeDecodeError) as e:
             logger.error(f"Error loading response: {str(e)}")
@@ -380,22 +397,28 @@ class SyftFuture(Base):
                 url=self.url,
                 sender="SYSTEM",
             )
+        finally:
+            self.request_path.unlink(missing_ok=True)
+            self.response_path.unlink(missing_ok=True)
 
     def __hash__(self):
-        return hash(self.ulid)
+        return hash(self.id)
 
     def __eq__(self, other):
         if not isinstance(other, SyftFuture):
             return False
-        return self.ulid == other.ulid
+        return self.id == other.id
 
 
 class SyftBulkFuture(Base):
     futures: list[SyftFuture]
     DEFAULT_POLL_INTERVAL: ClassVar[float] = 0.1
+    responses: list[SyftResponse] = []
 
     def gather_completed(
-        self, timeout: int = 10, poll_interval: float = DEFAULT_POLL_INTERVAL
+        self,
+        timeout: Optional[float] = None,
+        poll_interval: float = DEFAULT_POLL_INTERVAL,
     ) -> list[SyftResponse]:
         """Wait for all futures to complete and return a list of responses.
 
@@ -417,27 +440,36 @@ class SyftBulkFuture(Base):
             raise ValueError("Poll interval must be greater than 0")
 
         pending = set(self.futures)
-        responses = []
-        deadline = time.monotonic() + timeout
+        deadline = time.monotonic() + (timeout or float("inf"))
 
         while pending and time.monotonic() < deadline:
             for future in list(pending):  # Create list to allow set modification
                 if response := future.resolve(silent=True):
-                    responses.append(response)
+                    self.responses.append(response)
                     pending.remove(future)
             time.sleep(poll_interval)
 
-        return responses
+        return self.responses
 
     @property
-    def ulid(self) -> ULID:
+    def id(self) -> ULID:
         """Generate a deterministic ULID from all future IDs.
 
         Returns:
             A single ULID derived from hashing all future IDs.
         """
         # Combine all ULIDs and hash them
-        combined = ",".join(str(f.ulid) for f in self.futures)
+        combined = ",".join(str(f.id) for f in self.futures)
         hash_bytes = hashlib.sha256(combined.encode()).digest()[:16]
         # Use first 16 bytes of hash to create a new ULID
         return ULID.from_bytes(hash_bytes)
+
+    @property
+    def failures(self) -> list[SyftResponse]:
+        """Return a list of failed responses."""
+        return [r for r in self.responses if not r.is_success]
+
+    @property
+    def successes(self) -> list[SyftResponse]:
+        """Return a list of successful responses."""
+        return [r for r in self.responses if r.is_success]
