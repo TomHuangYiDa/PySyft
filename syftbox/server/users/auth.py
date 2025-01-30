@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+from typing import Any
 
 import jwt
 from fastapi import Depends, HTTPException, Security
@@ -45,24 +46,26 @@ def _generate_jwt(server_settings: ServerSettings, data: dict) -> str:
 
 
 def generate_access_token(server_settings: ServerSettings, email: str) -> str:
-    data = {
+    iat: datetime = datetime.now(tz=timezone.utc)
+    data: dict[str, Any] = {
         "email": email,
         "type": ACCESS_TOKEN,
-        "iat": datetime.now(tz=timezone.utc),
+        "iat": iat,
     }
     if server_settings.jwt_access_token_exp:
-        data["exp"] = data["iat"] + server_settings.jwt_access_token_exp
+        data["exp"] = iat + server_settings.jwt_access_token_exp
     return _generate_jwt(server_settings, data)
 
 
 def generate_email_token(server_settings: ServerSettings, email: str) -> str:
-    data = {
+    iat: datetime = datetime.now(tz=timezone.utc)
+    data: dict[str, Any] = {
         "email": email,
         "type": EMAIL_TOKEN,
-        "iat": datetime.now(tz=timezone.utc),
+        "iat": iat,
     }
     if server_settings.jwt_email_token_exp:
-        data["exp"] = data["iat"] + server_settings.jwt_email_token_exp
+        data["exp"] = iat + server_settings.jwt_email_token_exp
     return _generate_jwt(server_settings, data)
 
 

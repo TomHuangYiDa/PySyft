@@ -7,7 +7,7 @@ from loguru import logger
 from pydantic import BaseModel, Field
 from typing_extensions import Self, Type
 
-from syftbox.client.base import SyftClientInterface
+from syftbox.client.base import SyftBoxContextInterface
 from syftbox.client.plugins.sync.exceptions import SyncEnvironmentError
 from syftbox.client.plugins.sync.sync_action import SyncAction
 from syftbox.client.plugins.sync.types import SyncActionType, SyncStatus
@@ -32,8 +32,8 @@ class LocalState(BaseModel):
     status_info: dict[Path, SyncStatusInfo] = {}
 
     @classmethod
-    def for_client(cls: Type[Self], client: SyftClientInterface) -> Self:
-        return cls(path=client.workspace.plugins / LOCAL_STATE_FILENAME)
+    def for_context(cls: Type[Self], context: SyftBoxContextInterface) -> Self:
+        return cls(path=context.workspace.plugins / LOCAL_STATE_FILENAME)
 
     def insert_completed_action(self, action: SyncAction) -> None:
         """Insert action result into local state."""
@@ -57,7 +57,9 @@ class LocalState(BaseModel):
                 action=action.action_type,
             )
 
-    def insert_synced_file(self, path: Path, state: FileMetadata, action: "SyncActionType") -> None:
+    def insert_synced_file(
+        self, path: Path, state: Optional[FileMetadata], action: "SyncActionType", save: bool = True
+    ) -> None:
         if not isinstance(path, Path):
             raise ValueError(f"path must be a Path object, got {path}")
         if not self.path.is_file():
@@ -79,7 +81,8 @@ class LocalState(BaseModel):
             action=action,
             save=False,
         )
-        self.save()
+        if save:
+            self.save()
 
     def insert_status_info(
         self,
@@ -88,21 +91,21 @@ class LocalState(BaseModel):
         message: Optional[str] = None,
         action: Optional["SyncActionType"] = None,
         save: bool = True,
-    ):
+    ) -> None:
         if not isinstance(path, Path):
             raise ValueError(f"path must be a Path object, got {path}")
         self.status_info[path] = SyncStatusInfo(path=path, status=status, message=message, action=action)
         if save:
             self.save()
 
-    def save(self):
+    def save(self) -> None:
         try:
             with threading.Lock():
                 self.path.write_text(self.model_dump_json())
         except Exception as e:
             logger.exception(f"Failed to save {self.path}: {e}")
 
-    def load(self):
+    def load(self) -> None:
         with threading.Lock():
             if self.path.exists():
                 data = self.path.read_text()

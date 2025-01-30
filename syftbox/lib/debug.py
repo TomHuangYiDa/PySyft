@@ -3,7 +3,7 @@ import platform
 import shutil
 import sys
 from pathlib import PurePath
-from typing import Any, Optional
+from typing import Any, Optional, Union
 from venv import logger
 
 import psutil
@@ -17,8 +17,8 @@ from syftbox.lib.types import PathLike
 from syftbox.lib.workspace import SyftWorkspace
 
 
-def debug_report(config_path: Optional[PathLike] = None) -> str:
-    client_config = None
+def debug_report(config_path: Optional[PathLike] = None) -> dict:
+    client_config: Optional[Union[SyftClientConfig, dict]] = None
     apps = []
     app_dir = None
     try:

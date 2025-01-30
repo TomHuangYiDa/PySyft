@@ -12,6 +12,11 @@ on:
           - minor
           - major
 
+      breaking_changes:
+        description: Use this if minor release and not compatible with previous versions
+        type: boolean
+        default: false
+
       run_tests:
         description: Run pre-release tests
         type: boolean
@@ -65,7 +70,7 @@ jobs:
           python-version: "3.12"
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v4
+        uses: astral-sh/setup-uv@v5
         with:
           version: "0.4.25"
 
@@ -82,7 +87,7 @@ jobs:
 
       - name: Bump the Version
         run: |
-          just bump-version ${{ inputs.bump_type }}
+          just bump-version ${{ inputs.bump_type }} ${{ inputs.breaking_changes }}
 
       - name: Build syftbox
         run: |

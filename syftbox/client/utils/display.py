@@ -6,8 +6,8 @@ from rich.tree import Tree
 from syftbox.lib.constants import PERM_FILE
 
 
-def display_file_tree(root_dir: Path):
-    def add_dir(tree: Tree, path: Path):
+def display_file_tree(root_dir: Path) -> None:
+    def add_dir(tree: Tree, path: Path) -> None:
         for child in path.iterdir():
             if child.is_dir():
                 sub_tree = tree.add(f"📁 {child.name}")

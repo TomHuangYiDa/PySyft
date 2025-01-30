@@ -40,16 +40,22 @@ run-server port="5001" gunicorn_args="":
     #!/bin/bash
     set -eou pipefail
 
-    export SYFTBOX_DATA_FOLDER=.server/data
+    export SYFTBOX_DATA_FOLDER=${SYFTBOX_DATA_FOLDER:-.server/data}
     uv run syftbox server migrate
     uv run gunicorn syftbox.server.server:app -k uvicorn.workers.UvicornWorker --bind 127.0.0.1:{{ port }} --reload {{ gunicorn_args }}
+
+migrate:
+    #!/bin/bash
+    set -eou pipefail
+
+    uv run syftbox server migrate
 
 [group('server')]
 run-server-uvicorn port="5001" uvicorn_args="":
     #!/bin/bash
     set -eou pipefail
 
-    export SYFTBOX_DATA_FOLDER=.server/data
+    export SYFTBOX_DATA_FOLDER=${SYFTBOX_DATA_FOLDER:-.server/data}
     uv run syftbox server migrate
     uv run uvicorn syftbox.server.server:app --host 127.0.0.1 --port {{ port }} --reload --reload-dir ./syftbox {{ uvicorn_args }}
 
@@ -123,7 +129,7 @@ install:
 
 # Bump version, commit and tag
 [group('build')]
-bump-version level="patch":
+bump-version level="patch" breaking_changes="false":
     #!/bin/bash
     # We need to uv.lock before we can commit the whole thing in the repo.
     # DO not bump the version on the uv.lock file, else other packages with same version might get updated
@@ -142,6 +148,12 @@ bump-version level="patch":
     # first bump version
     uv run bump2version {{ level }}
 
+    # upgrade version compatibility matrix
+    cd scripts
+    BREAKING_CHANGES=""
+    if [[ '{{ breaking_changes }}' == true ]]; then BREAKING_CHANGES="--breaking_changes"; fi
+    uv run upgrade_version_matrix.py {{ level }} $BREAKING_CHANGES
+    cd ..
     # update uv.lock file to reflect new package version
     uv lock
 

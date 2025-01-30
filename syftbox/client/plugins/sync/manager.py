@@ -4,35 +4,34 @@ from typing import Optional
 
 from loguru import logger
 
-from syftbox.client.base import SyftClientInterface
+from syftbox.client.base import SyftBoxContextInterface
 from syftbox.client.exceptions import SyftAuthenticationError
 from syftbox.client.plugins.sync.consumer import SyncConsumer
 from syftbox.client.plugins.sync.exceptions import FatalSyncError, SyncEnvironmentError
 from syftbox.client.plugins.sync.local_state import LocalState
 from syftbox.client.plugins.sync.producer import SyncProducer
 from syftbox.client.plugins.sync.queue import SyncQueue, SyncQueueItem
-from syftbox.client.plugins.sync.sync_client import SyncClient
 from syftbox.client.plugins.sync.types import FileChangeInfo
 
 
 class SyncManager:
-    def __init__(self, client: SyftClientInterface, health_check_interval: int = 300):
-        self.sync_client = SyncClient(client)
-        self.local_state = LocalState.for_client(client)
+    def __init__(self, context: SyftBoxContextInterface, health_check_interval: int = 300):
+        self.context = context
         self.queue = SyncQueue()
-        self.producer = SyncProducer(client=self.sync_client, queue=self.queue, local_state=self.local_state)
-        self.consumer = SyncConsumer(client=self.sync_client, queue=self.queue, local_state=self.local_state)
+        self.local_state = LocalState.for_context(context)
+        self.producer = SyncProducer(context=self.context, queue=self.queue, local_state=self.local_state)
+        self.consumer = SyncConsumer(context=self.context, queue=self.queue, local_state=self.local_state)
 
         self.sync_interval = 1  # seconds
         self.thread: Optional[Thread] = None
         self.is_stop_requested = False
         self.sync_run_once = False
-        self.last_health_check = 0
-        self.health_check_interval = health_check_interval
+        self.last_health_check = 0.0
+        self.health_check_interval = float(health_check_interval)
 
         self.setup()
 
-    def setup(self):
+    def setup(self) -> None:
         try:
             self.local_state.load()
         except Exception as e:
@@ -41,13 +40,13 @@ class SyncManager:
     def is_alive(self) -> bool:
         return self.thread is not None and self.thread.is_alive()
 
-    def stop(self, blocking: bool = False):
+    def stop(self, blocking: bool = False) -> None:
         self.is_stop_requested = True
-        if blocking:
+        if blocking and self.thread is not None:
             self.thread.join()
 
-    def start(self):
-        def _start(manager: SyncManager):
+    def start(self) -> None:
+        def _start(manager: SyncManager) -> None:
             while not manager.is_stop_requested:
                 try:
                     if manager._should_perform_health_check():
@@ -72,7 +71,7 @@ class SyncManager:
     def _should_perform_health_check(self) -> bool:
         return time.time() - self.last_health_check > self.health_check_interval
 
-    def check_server_status(self):
+    def check_server_status(self) -> None:
         """
         check if the server is still available for syncing,
         if the user cannot authenticate, the sync will stop.
@@ -81,7 +80,7 @@ class SyncManager:
             FatalSyncError: If the server is not available.
         """
         try:
-            _ = self.sync_client.whoami()
+            _ = self.context.client.auth.whoami()
             logger.debug("Health check succeeded, server is available.")
             self.last_health_check = time.time()
         except SyftAuthenticationError as e:
@@ -90,7 +89,7 @@ class SyncManager:
         except Exception as e:
             logger.error(f"Health check failed: {e}. Retrying in {self.health_check_interval} seconds.")
 
-    def run_single_thread(self):
+    def run_single_thread(self) -> None:
         datasite_states = self.producer.get_datasite_states()
         logger.debug(f"Syncing {len(datasite_states)} datasites")
 

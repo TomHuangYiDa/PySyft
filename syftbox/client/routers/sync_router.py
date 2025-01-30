@@ -1,8 +1,9 @@
+from pathlib import Path
 from typing import List, Optional
 
 import wcmatch.glob
 from fastapi import APIRouter, Depends, HTTPException
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from jinja2 import Environment, FileSystemLoader
 
 from syftbox.client.exceptions import SyftPluginException
@@ -16,6 +17,8 @@ jinja_env = Environment(loader=FileSystemLoader("syftbox/assets/templates"))
 
 
 def get_sync_manager(context: APIContext) -> SyncManager:
+    if context.plugins is None:
+        raise HTTPException(status_code=500, detail="Plugin manager not initialized")
     try:
         return context.plugins.sync_manager
     except SyftPluginException as e:
@@ -51,7 +54,7 @@ def get_all_status_info(sync_manager: SyncManager) -> List[SyncStatusInfo]:
 
 def deduplicate_status_info(status_info_list: List[SyncStatusInfo]) -> List[SyncStatusInfo]:
     """Deduplicate status info by path, keeping the entry with latest timestamp"""
-    path_to_info = {}
+    path_to_info: dict[Path, SyncStatusInfo] = {}
     for info in status_info_list:
         existing_info = path_to_info.get(info.path)
         if not existing_info or info.timestamp > existing_info.timestamp:
@@ -88,21 +91,39 @@ def filter_by_path_glob(items: List[SyncStatusInfo], pattern: Optional[str]) -> 
     return result
 
 
+def apply_limit_offset(items: List[SyncStatusInfo], limit: Optional[int], offset: int) -> List[SyncStatusInfo]:
+    if offset:
+        items = items[offset:]
+    if limit:
+        items = items[:limit]
+    return items
+
+
+@router.get("/health")
+def health_check(sync_manager: SyncManager = Depends(get_sync_manager)) -> JSONResponse:
+    if not sync_manager.is_alive():
+        raise HTTPException(status_code=503, detail="Sync service unavailable")
+    return JSONResponse(content={"status": "ok"})
+
+
 @router.get("/state")
 def get_status_info(
     order_by: str = "timestamp",
     order: str = "desc",
     path_glob: Optional[str] = None,
     sync_manager: SyncManager = Depends(get_sync_manager),
+    limit: Optional[int] = None,
+    offset: int = 0,
 ) -> List[SyncStatusInfo]:
     all_items = get_all_status_info(sync_manager)
     items_deduplicated = deduplicate_status_info(all_items)
     items_filtered = filter_by_path_glob(items_deduplicated, path_glob)
     items_sorted = sort_status_info(items_filtered, order_by, order)
-    return items_sorted
+    items_paginated = apply_limit_offset(items_sorted, limit, offset)
+    return items_paginated
 
 
 @router.get("/")
-def sync_dashboard(context: APIContext):
+def sync_dashboard(context: APIContext) -> HTMLResponse:
     template = jinja_env.get_template("sync_dashboard.jinja2")
     return HTMLResponse(template.render(base_url=context.config.client_url))

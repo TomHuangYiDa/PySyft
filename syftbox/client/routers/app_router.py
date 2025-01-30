@@ -4,17 +4,19 @@ import subprocess
 from pathlib import Path
 
 import yaml
+from aiofiles import open as aopen
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from typing_extensions import List
 
 from syftbox.client.routers.common import APIContext
+from syftbox.lib.types import PathLike
 
 router = APIRouter()
 
 
-def parse_frontmatter(file_path):
+def parse_frontmatter(file_path: Path) -> dict:
     """
     Parses frontmatter YAML from a README.md file and returns it as a Python dictionary.
 
@@ -51,7 +53,7 @@ class AppDetails(BaseModel):
     path: str
 
 
-def get_all_apps(apps_dir: str) -> List[AppDetails]:
+def get_all_apps(apps_dir: PathLike) -> List[AppDetails]:
     """
     Get all apps in the given directory.
 
@@ -81,7 +83,7 @@ def get_all_apps(apps_dir: str) -> List[AppDetails]:
 
 
 @router.get("/")
-async def index(ctx: APIContext):
+async def index(ctx: APIContext) -> JSONResponse:
     apps_dir = ctx.workspace.apps
     apps = get_all_apps(apps_dir)
 
@@ -89,7 +91,7 @@ async def index(ctx: APIContext):
 
 
 @router.get("/status/{app_name}")
-async def app_details(ctx: APIContext, app_name: str):
+async def app_details(ctx: APIContext, app_name: str) -> JSONResponse:
     apps_dir = ctx.workspace.apps
     apps = get_all_apps(apps_dir)
     for app in apps:
@@ -104,7 +106,7 @@ class InstallRequest(BaseModel):
 
 
 @router.post("/install")
-async def install_app(request: InstallRequest):
+async def install_app(request: InstallRequest) -> JSONResponse:
     command = ["syftbox", "app", "install", request.source, "--called-by", "api"]
     try:
         # Run the command and capture output
@@ -126,7 +128,7 @@ async def install_app(request: InstallRequest):
 
 
 @router.post("/command/{app_name}")
-async def app_command(ctx: APIContext, app_name: str, request: dict):
+async def app_command(ctx: APIContext, app_name: str, request: dict) -> JSONResponse:
     apps_dir = ctx.workspace.apps
     apps = get_all_apps(apps_dir)
 
@@ -138,10 +140,10 @@ async def app_command(ctx: APIContext, app_name: str, request: dict):
             command = f"uv run {app.path}/command.py {json_arg}"  # Complete command as a single string
             print("command", command)
 
-            # Define the environment variable
-            env = {
-                **os.environ,
-                "SYFTBOX_CLIENT_CONFIG_PATH": ctx.config.path,
+            # Create env dict with explicit string types
+            env: dict[str, str] = {
+                **{k: str(v) for k, v in os.environ.items()},
+                "SYFTBOX_CLIENT_CONFIG_PATH": str(ctx.config.path),
             }
 
             try:
@@ -164,26 +166,36 @@ async def app_command(ctx: APIContext, app_name: str, request: dict):
 
 
 @router.get("/logs/{app_name}")
-async def app_logs(ctx: APIContext, app_name: str):
+async def app_logs(
+    ctx: APIContext,
+    app_name: str,
+    limit: int = 256,
+    offset: int = 0,
+) -> JSONResponse:
     apps_dir = ctx.workspace.apps
-    all_apps = get_all_apps(apps_dir)
-    app_details = None
-    for app in all_apps:
-        if app_name == app.name:
-            app_details = app
-
-    # Raise 404 if app not found
-    if app_details is None:
+    app_dir = Path(apps_dir) / app_name
+    if not app_dir.is_dir():
         raise HTTPException(status_code=404, detail="App not found")
 
-    logs = []
+    logs: List[str] = []
+    log_file = app_dir / "logs" / f"{app_name}.log"
+    try:
+        if log_file.is_file():
+            async with aopen(log_file, "r") as file:
+                logs = await file.readlines()
 
-    # Read the log file if it exists
-    app_path = Path(app_details.path)
+        # Calculate pagination indices
+        total_logs = len(logs)
+        start_idx = max(0, total_logs - offset - limit)
+        end_idx = total_logs - offset if offset > 0 else total_logs
+        logs = logs[start_idx:end_idx]
 
-    log_file = app_path / "logs" / f"{app_name}.log"
-    if log_file.exists():
-        with open(log_file, "r") as file:
-            logs = file.readlines()
-
-    return JSONResponse(content={"logs": logs})
+        return JSONResponse(
+            content={
+                "logs": logs,
+                "total": total_logs,
+                "source": str(log_file),
+            }
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to retrieve logs: {str(e)}")

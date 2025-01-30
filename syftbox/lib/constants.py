@@ -25,3 +25,6 @@ PERM_FILE = "syftperm.yaml"
 REJECTED_FILE_SUFFIX = ".syftrejected"
 
 SENDGRID_API_URL = "https://api.sendgrid.com/v3/mail/send"
+
+# Default benchmark runs
+DEFAULT_BENCHMARK_RUNS = 5

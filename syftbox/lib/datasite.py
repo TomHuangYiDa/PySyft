@@ -9,7 +9,7 @@ from syftbox.lib.permissions import SyftPermission
 PUBLIC_DIR = "public"
 
 
-def create_datasite(context: SyftBoxContext):
+def create_datasite(context: SyftBoxContext) -> None:
     # Create workspace/datasites/.syftignore
     create_default_ignore_file(context.workspace.datasites)
 

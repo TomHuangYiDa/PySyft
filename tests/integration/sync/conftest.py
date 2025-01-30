@@ -6,10 +6,13 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from syftbox.client.base import Plugins, SyftClientInterface
-from syftbox.client.client2 import SyftClientContext
+from syftbox import __version__
+from syftbox.client.base import PluginManagerInterface, SyftBoxContextInterface
+from syftbox.client.core import SyftBoxContext
+from syftbox.client.server_client import SyftBoxClient
 from syftbox.lib.client_config import SyftClientConfig
 from syftbox.lib.datasite import create_datasite
+from syftbox.lib.http import HEADER_SYFTBOX_VERSION
 from syftbox.lib.workspace import SyftWorkspace
 from syftbox.server.migrations import run_migrations
 from syftbox.server.server import app as server_app
@@ -22,13 +25,14 @@ def authenticate_testclient(client: TestClient, email: str) -> None:
     access_token = get_access_token(client, email)
     client.headers["email"] = email
     client.headers["Authorization"] = f"Bearer {access_token}"
+    client.headers[HEADER_SYFTBOX_VERSION] = __version__
 
 
-class MockPluginManager(Plugins):
+class MockPluginManager(PluginManagerInterface):
     pass
 
 
-def setup_datasite(tmp_path: Path, server_client: TestClient, email: str) -> SyftClientInterface:
+def setup_datasite(tmp_path: Path, server_client: TestClient, email: str) -> SyftBoxContextInterface:
     data_dir = tmp_path / email
     config = SyftClientConfig(
         path=data_dir / "config.json",
@@ -40,10 +44,10 @@ def setup_datasite(tmp_path: Path, server_client: TestClient, email: str) -> Syf
     config.save()
     ws = SyftWorkspace(config.data_dir)
     ws.mkdirs()
-    context = SyftClientContext(
+    context = SyftBoxContext(
         config,
         ws,
-        server_client,
+        SyftBoxClient(conn=server_client),
         MockPluginManager(),
     )
     create_datasite(context)
@@ -70,20 +74,23 @@ def server_app_with_lifespan(tmp_path: Path) -> FastAPI:
 
 
 @pytest.fixture()
-def datasite_1(tmp_path: Path, server_app_with_lifespan: FastAPI) -> SyftClientInterface:
+def datasite_1(tmp_path: Path, server_app_with_lifespan: FastAPI) -> SyftBoxContextInterface:
     email = "user_1@openmined.org"
     with TestClient(server_app_with_lifespan) as client:
+        client.headers[HEADER_SYFTBOX_VERSION] = __version__
         return setup_datasite(tmp_path, client, email)
 
 
 @pytest.fixture()
-def datasite_2(tmp_path: Path, server_app_with_lifespan: FastAPI) -> SyftClientInterface:
+def datasite_2(tmp_path: Path, server_app_with_lifespan: FastAPI) -> SyftBoxContextInterface:
     email = "user_2@openmined.org"
     with TestClient(server_app_with_lifespan) as client:
+        client.headers[HEADER_SYFTBOX_VERSION] = __version__
         return setup_datasite(tmp_path, client, email)
 
 
 @pytest.fixture(scope="function")
 def server_client(server_app_with_lifespan: FastAPI) -> Generator[TestClient, None, None]:
     with TestClient(server_app_with_lifespan) as client:
+        client.headers[HEADER_SYFTBOX_VERSION] = __version__
         yield client

@@ -19,6 +19,10 @@ class SyftServerError(SyftBoxException):
     pass
 
 
+class SyftServerTooOld(SyftBoxException):
+    pass
+
+
 class SyftAuthenticationError(SyftServerError):
     default_message = "Authentication failed, please log in again."
 
@@ -28,4 +32,8 @@ class SyftAuthenticationError(SyftServerError):
 
 
 class SyftNotFound(SyftServerError):
+    pass
+
+
+class SyftPermissionError(SyftServerError):
     pass

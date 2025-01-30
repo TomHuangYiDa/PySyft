@@ -4,16 +4,18 @@ SyftBox CLI - Setup scripts
 
 import json
 import shutil
+import time
 from pathlib import Path
 
 import httpx
 import typer
 from rich import print as rprint
 from rich.prompt import Confirm, Prompt
+from typing_extensions import Optional
 
 from syftbox import __version__
 from syftbox.client.auth import authenticate_user
-from syftbox.client.client2 import METADATA_FILENAME
+from syftbox.client.core import METADATA_FILENAME
 from syftbox.lib.client_config import SyftClientConfig
 from syftbox.lib.constants import DEFAULT_DATA_DIR
 from syftbox.lib.exceptions import ClientConfigException
@@ -46,7 +48,7 @@ def prompt_delete_old_data_dir(data_dir: Path) -> bool:
     return Confirm.ask(msg)
 
 
-def get_migration_decision(data_dir: Path):
+def get_migration_decision(data_dir: Path) -> bool:
     migrate_datasite = False
     if data_dir.exists():
         if is_empty(data_dir):
@@ -84,7 +86,7 @@ def setup_config_interactive(
     """Setup the client configuration interactively. Called from CLI"""
 
     config_path = config_path.expanduser().resolve()
-    conf: SyftClientConfig = None
+    conf: Optional[SyftClientConfig] = None
     if data_dir:
         data_dir = data_dir.expanduser().resolve()
 
@@ -162,23 +164,13 @@ def prompt_email() -> str:
 
 def verify_installation(conf: SyftClientConfig, client: httpx.Client) -> None:
     try:
-        response = client.get("/info")
+        try:
+            response = client.get("/info")
+        except httpx.ConnectError:
+            # try one more time, server may be starting (dev mode)
+            time.sleep(2)
+            response = client.get("/info")
         response.raise_for_status()
-        server_info = response.json()
-        server_version = server_info["version"]
-        local_version = __version__
-
-        if server_version == local_version:
-            return
-
-        should_continue = Confirm.ask(
-            f"\n[yellow]Server version ({server_version}) does not match your client version ({local_version}).\n"
-            f"[bold](recommended)[/bold] To update, run:\n\n"
-            f"[bold]curl -LsSf https://syftbox.openmined.org/install.sh | sh[/bold][/yellow]\n\n"
-            f"Continue without updating?"
-        )
-        if not should_continue:
-            raise typer.Exit()
 
     except (httpx.HTTPError, KeyError):
         should_continue = Confirm.ask(

@@ -1,5 +1,6 @@
 import yaml
 from loguru import logger
+from packaging import version
 
 from syftbox import __version__
 from syftbox.lib.constants import PERM_FILE
@@ -11,7 +12,7 @@ from syftbox.server.server import create_folders
 from syftbox.server.settings import ServerSettings
 
 
-def run_migrations(settings: ServerSettings):
+def run_migrations(settings: ServerSettings) -> None:
     logger.info("Creating folders")
     create_folders(settings.folders)
     logger.info("Initializing DB")
@@ -20,7 +21,7 @@ def run_migrations(settings: ServerSettings):
 
 def init_db(settings: ServerSettings) -> None:
     # remove this after the upcoming release
-    if __version__ in ["0.2.11", "0.2.12"]:
+    if version.parse(__version__) > version.parse("0.2.10"):
         # Delete existing DB to avoid conflicts
         db_path = settings.file_db_path.absolute()
         if db_path.exists():
@@ -36,15 +37,15 @@ def init_db(settings: ServerSettings) -> None:
     con = get_db(settings.file_db_path.absolute())
     cur = con.cursor()
     for m in metadata:
-        db.save_file_metadata(cur, m)
+        db.save_file_metadata(con, m)
 
     # remove files that are not in the snapshot folder
-    all_metadata = db.get_all_metadata(cur)
+    all_metadata = db.get_all_metadata(con)
     for m in all_metadata:
         abs_path = settings.snapshot_folder / m.path
         if not abs_path.exists():
             logger.info(f"{m.path} not found in {settings.snapshot_folder}, deleting from db")
-            db.delete_file_metadata(cur, m.path.as_posix())
+            db.delete_file_metadata(con, m.path.as_posix())
 
     # fill the permission tables
     for file in settings.snapshot_folder.rglob(PERM_FILE):

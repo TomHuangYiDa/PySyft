@@ -2,14 +2,16 @@ import contextlib
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
+from starlette.responses import Response
+from typing_extensions import AsyncGenerator
 
-from syftbox.client.base import SyftClientInterface
+from syftbox.client.base import SyftBoxContextInterface
 from syftbox.client.routers import app_router, datasite_router, index_router, sync_router
 
 
 class NoCacheMiddleware(BaseHTTPMiddleware):
-    async def dispatch(self, request: Request, call_next):
+    async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
         response = await call_next(request)
         response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
         response.headers["Pragma"] = "no-cache"
@@ -18,11 +20,11 @@ class NoCacheMiddleware(BaseHTTPMiddleware):
 
 
 @contextlib.asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     yield
 
 
-def create_api(client: SyftClientInterface) -> FastAPI:
+def create_api(context: SyftBoxContextInterface) -> FastAPI:
     app = FastAPI(lifespan=lifespan)
 
     allow_origins = [
@@ -33,7 +35,7 @@ def create_api(client: SyftClientInterface) -> FastAPI:
         "http://localhost:8083",
         "https://syftbox.openmined.org",
     ]
-    port = client.config.client_url.port
+    port = context.config.client_url.port
     if port:
         # Allow origins for client localhost client API
         allow_origins.extend(
@@ -53,7 +55,7 @@ def create_api(client: SyftClientInterface) -> FastAPI:
         allow_headers=["*"],  # Allow all headers
     )
 
-    app.state.client = client
+    app.state.context = context
 
     # Include routers
     app.include_router(index_router.router, tags=["index"])

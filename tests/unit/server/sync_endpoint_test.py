@@ -1,7 +1,5 @@
 import base64
 import hashlib
-import zipfile
-from io import BytesIO
 from pathlib import Path
 
 import py_fast_rsync
@@ -11,9 +9,10 @@ from fastapi.testclient import TestClient
 from py_fast_rsync import signature
 
 from syftbox.client.exceptions import SyftServerError
-from syftbox.client.plugins.sync.sync_client import SyncClient
+from syftbox.client.server_client import SyncClient
+from syftbox.lib.constants import PERM_FILE
 from syftbox.server.models.sync_models import ApplyDiffResponse, DiffResponse, FileMetadata
-from tests.unit.server.conftest import PERM_FILE, TEST_DATASITE_NAME, TEST_FILE
+from tests.unit.server.conftest import TEST_DATASITE_NAME, TEST_FILE
 
 
 def test_get_diff_2(client: TestClient):
@@ -111,7 +110,7 @@ def test_apply_diff(sync_client: SyncClient):
     assert response.current_hash == expected_hash
 
     # check file was written correctly
-    snapshot_folder = sync_client.server_client.app_state["server_settings"].snapshot_folder
+    snapshot_folder = sync_client.conn.app_state["server_settings"].snapshot_folder
     snapshot_file_path = snapshot_folder / Path(TEST_DATASITE_NAME) / TEST_FILE
     remote_data = snapshot_file_path.read_bytes()
     assert local_data == remote_data
@@ -148,7 +147,7 @@ def test_get_diff(sync_client: SyncClient):
 def test_delete_file(sync_client: SyncClient):
     sync_client.delete(Path(TEST_DATASITE_NAME) / TEST_FILE)
 
-    snapshot_folder = sync_client.server_client.app_state["server_settings"].snapshot_folder
+    snapshot_folder = sync_client.conn.app_state["server_settings"].snapshot_folder
     path = Path(f"{snapshot_folder}/{TEST_DATASITE_NAME}/{TEST_FILE}")
     assert not path.exists()
 
@@ -157,7 +156,7 @@ def test_delete_file(sync_client: SyncClient):
 
 
 def test_create_file(sync_client: SyncClient):
-    snapshot_folder = sync_client.server_client.app_state["server_settings"].snapshot_folder
+    snapshot_folder = sync_client.conn.app_state["server_settings"].snapshot_folder
     new_fname = "new.txt"
     contents = b"Some content"
     path = Path(f"{snapshot_folder}/{TEST_DATASITE_NAME}/{new_fname}")
@@ -242,15 +241,26 @@ def test_get_all_datasite_states(sync_client: SyncClient):
     assert all(isinstance(m, FileMetadata) for m in metadatas)
 
 
-def test_download_snapshot(sync_client: SyncClient):
+def test_download_snapshot(sync_client: SyncClient, tmpdir: Path):
+    tmpdir = Path(tmpdir)
     metadata = sync_client.get_remote_state(Path(TEST_DATASITE_NAME))
     paths = [m.path for m in metadata]
-    data = sync_client.download_bulk(paths)
-    zip_file = zipfile.ZipFile(BytesIO(data))
-    assert len(zip_file.filelist) == 3
+    filelist = sync_client.download_files_streaming(paths, tmpdir)
+    assert len(filelist) == 3
 
 
 def test_whoami(client: TestClient):
     response = client.post("/auth/whoami")
     response.raise_for_status()
     assert response.json() == {"email": TEST_DATASITE_NAME}
+
+
+def test_large_file_failure(client: TestClient):
+    large_data = b"0" * 1024 * 1024 * 11  # 11MB
+    response = client.post(
+        "/sync/create",
+        files={"file": ("large.txt", large_data, "text/plain")},
+    )
+
+    assert response.status_code == 413
+    assert response.text == "Request Denied. Message size is greater than 10 MB"

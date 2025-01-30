@@ -1,16 +1,21 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 import httpx
+from packaging import version
 from typing_extensions import Protocol
 
+from syftbox import __version__
+from syftbox.client.exceptions import SyftAuthenticationError, SyftPermissionError, SyftServerError, SyftServerTooOld
 from syftbox.lib.client_config import SyftClientConfig
+from syftbox.lib.http import HEADER_SYFTBOX_USER, HEADER_SYFTBOX_VERSION, SYFTBOX_HEADERS
+from syftbox.lib.version_utils import get_range_for_version
 from syftbox.lib.workspace import SyftWorkspace
 
 
-class Plugins(Protocol):
+class PluginManagerInterface(Protocol):
     """All initialized plugins."""
 
     if TYPE_CHECKING:
@@ -28,7 +33,7 @@ class Plugins(Protocol):
         ...
 
 
-class SyftClientInterface(Protocol):
+class SyftBoxContextInterface(Protocol):
     """
     Protocol defining the essential attributes required by SyftClient plugins/components.
 
@@ -45,17 +50,20 @@ class SyftClientInterface(Protocol):
         server_client: HTTP client for server communication
     """
 
+    if TYPE_CHECKING:
+        from syftbox.client.server_client import SyftBoxClient
+
     config: SyftClientConfig
     """Configuration settings for the Syft client."""
 
     workspace: SyftWorkspace
     """Paths to different dirs in Syft"""
 
-    plugins: Plugins
+    plugins: Optional[PluginManagerInterface]
     """All initialized plugins."""
 
-    server_client: httpx.Client
-    """HTTP client for server communication."""
+    client: "SyftBoxClient"
+    """Client for communicating with the SyftBox server."""
 
     @property
     def email(self) -> str:
@@ -72,10 +80,46 @@ class SyftClientInterface(Protocol):
         """Path to the datasite directory for the current user."""
         ...  # pragma: no cover
 
-    def log_analytics_event(self, event_name: str, **kwargs) -> None:
-        """Log an analytics event to the server."""
-        ...  # pragma: no cover
 
-    def whoami(self) -> str:
-        """Get the email address of the current user from the server."""
-        ...  # pragma: no cover
+class ClientBase:
+    def __init__(self, conn: httpx.Client):
+        self.conn = conn
+
+    def raise_for_status(self, response: httpx.Response) -> None:
+        endpoint = response.request.url.path
+        if response.status_code == 401:
+            raise SyftAuthenticationError()
+        elif response.status_code == 403:
+            raise SyftPermissionError(f"No permission to access this resource: {response.text}")
+        elif response.status_code != 200:
+            raise SyftServerError(f"[{endpoint}] Server returned {response.status_code}: {response.text}")
+        server_version = response.headers.get(HEADER_SYFTBOX_VERSION)
+
+        version_range = get_range_for_version(server_version)
+        lower_bound_version = version_range[0]
+        upper_bound_version = version_range[1]
+
+        if len(upper_bound_version) > 0 and version.parse(upper_bound_version) < version.parse(__version__):
+            raise SyftServerTooOld(f"Server version is {server_version} and can only work with clients between \
+                                    {lower_bound_version} and {upper_bound_version}. Your client has version {__version__}.")
+
+    @staticmethod
+    def _make_headers(config: SyftClientConfig) -> dict:
+        headers = {
+            **SYFTBOX_HEADERS,
+            HEADER_SYFTBOX_USER: config.email,
+            "email": config.email,  # legacy
+        }
+        if config.access_token is not None:
+            headers["Authorization"] = f"Bearer {config.access_token}"
+
+        return headers
+
+    @classmethod
+    def from_config(cls, config: SyftClientConfig) -> "ClientBase":
+        conn = httpx.Client(
+            base_url=str(config.server_url),
+            follow_redirects=True,
+            headers=cls._make_headers(config),
+        )
+        return cls(conn)

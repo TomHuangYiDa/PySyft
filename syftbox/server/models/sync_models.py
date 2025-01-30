@@ -8,13 +8,13 @@ from typing import Annotated, Any, Optional
 from pydantic import AfterValidator, BaseModel, Field
 
 
-def should_be_relative(v):
+def should_be_relative(v: Path) -> Path:
     if v.is_absolute():
         raise ValueError("path must be relative")
     return v
 
 
-def should_be_absolute(v):
+def should_be_absolute(v: Path) -> Path:
     if not v.is_absolute():
         raise ValueError("path must be absolute")
     return v
@@ -118,7 +118,7 @@ class FileMetadata(BaseModel):
     def datasite_name(self) -> str:
         return self.path.parts[0]
 
-    def __eq__(self, value: Any):
+    def __eq__(self, value: Any) -> bool:
         if not isinstance(value, FileMetadata):
             return False
         return self.path == value.path and self.hash == value.hash

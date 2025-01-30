@@ -1,3 +1,5 @@
+from typing import Optional
+
 import httpx
 from jinja2 import Template
 from loguru import logger
@@ -128,7 +130,7 @@ reset_password_token_email_template = """
 """
 
 
-def send_token_email(server_settings, user_email: str, token: str):
+def send_token_email(server_settings: ServerSettings, user_email: str, token: str) -> None:
     template = Template(token_email_template)
     body = template.render(email=user_email, token=token)
     send_email(
@@ -146,13 +148,16 @@ def send_email(
     subject: str,
     body: str,
     mimetype: str = "text/html",
-):
+) -> Optional[dict]:
     payload = {
         "personalizations": [{"to": [{"email": receiver_email}]}],
         "from": {"email": SENDER_EMAIL},
         "subject": subject,
         "content": [{"type": mimetype, "value": body}],
     }
+
+    if server_settings.sendgrid_secret is None:
+        raise ValueError("Sendgrid secret is not configured")
 
     headers = {
         "Authorization": f"Bearer {server_settings.sendgrid_secret.get_secret_value()}",
@@ -166,3 +171,4 @@ def send_email(
         return {"success": True, "status_code": response.status_code}
     except httpx.HTTPError as e:
         logger.error(str(e))
+        return None

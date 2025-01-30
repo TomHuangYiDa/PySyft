@@ -10,7 +10,7 @@ class SendEmailRequest(BaseModel):
     subject: str
     html: str
 
-    def json_for_request(self):
+    def json_for_request(self) -> dict:
         return {
             "personalizations": [{"to": [{"email": self.to}]}],
             "from": {"email": FROM_EMAIL},
