@@ -87,7 +87,7 @@ jobs:
 
       - name: Bump the Version
         run: |
-          just bump-version ${{ inputs.bump_type }} ${{ breaking_changes }}
+          just bump-version ${{ inputs.bump_type }} ${{ inputs.breaking_changes }}
 
       - name: Build syftbox
         run: |
