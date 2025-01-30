@@ -65,13 +65,17 @@ class VersionCheckMiddleware(BaseHTTPMiddleware):
                 )
 
             version_range = get_range_for_version(client_version)
-            lower_bound_version = version_range[0]
 
-            if version.parse(client_version) < version.parse(lower_bound_version):
-                return Response(
-                    status_code=status.HTTP_426_UPGRADE_REQUIRED,
-                    content=f"Client version is too old. Minimum version required is {lower_bound_version}",
-                )
+            if isinstance(get_range_for_version, str):
+                logger.info(version_range)
+            else:
+                lower_bound_version = version_range[0]
+
+                if version.parse(client_version) < version.parse(lower_bound_version):
+                    return Response(
+                        status_code=status.HTTP_426_UPGRADE_REQUIRED,
+                        content=f"Client version is too old. Minimum version required is {lower_bound_version}",
+                    )
 
         response = await call_next(request)
         response.headers[HEADER_SYFTBOX_VERSION] = __version__

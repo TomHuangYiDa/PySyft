@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Optional
 
 import httpx
 from packaging import version
+from rich import print as rprint
 from typing_extensions import Protocol
 
 from syftbox import __version__
@@ -96,12 +97,15 @@ class ClientBase:
         server_version = response.headers.get(HEADER_SYFTBOX_VERSION)
 
         version_range = get_range_for_version(server_version)
-        lower_bound_version = version_range[0]
-        upper_bound_version = version_range[1]
+        if isinstance(version_range, str):
+            rprint(f"[bold yellow]{version_range}[/bold yellow]")
+        else:
+            lower_bound_version = version_range[0]
+            upper_bound_version = version_range[1]
 
-        if len(upper_bound_version) > 0 and version.parse(upper_bound_version) < version.parse(__version__):
-            raise SyftServerTooOld(f"Server version is {server_version} and can only work with clients between \
-                                    {lower_bound_version} and {upper_bound_version}. Your client has version {__version__}.")
+            if len(upper_bound_version) > 0 and version.parse(upper_bound_version) < version.parse(__version__):
+                raise SyftServerTooOld(f"Server version is {server_version} and can only work with clients between \
+                                        {lower_bound_version} and {upper_bound_version}. Your client has version {__version__}.")
 
     @staticmethod
     def _make_headers(config: SyftClientConfig) -> dict:
@@ -118,8 +122,6 @@ class ClientBase:
     @classmethod
     def from_config(cls, config: SyftClientConfig) -> "ClientBase":
         conn = httpx.Client(
-            base_url=str(config.server_url),
-            follow_redirects=True,
-            headers=cls._make_headers(config),
+            base_url=str(config.server_url), follow_redirects=True, headers=cls._make_headers(config), timeout=10
         )
         return cls(conn)
