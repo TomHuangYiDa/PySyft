@@ -66,7 +66,7 @@ class VersionCheckMiddleware(BaseHTTPMiddleware):
 
             version_range = get_range_for_version(client_version)
 
-            if isinstance(get_range_for_version, str):
+            if isinstance(version_range, str):
                 logger.info(version_range)
             else:
                 lower_bound_version = version_range[0]
