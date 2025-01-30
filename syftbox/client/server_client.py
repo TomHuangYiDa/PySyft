@@ -36,7 +36,7 @@ class SyftBoxClient(ClientBase):
         return response.json().get("token")
 
     def info(self) -> dict:
-        response = self.conn.get("/info")
+        response = self.conn.get("/info?client=1")
         self.raise_for_status(response)
         return response.json()
 
