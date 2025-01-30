@@ -79,5 +79,4 @@ class VersionCheckMiddleware(BaseHTTPMiddleware):
 
         response = await call_next(request)
         response.headers[HEADER_SYFTBOX_VERSION] = __version__
-        logger.debug("server headers:", response.headers)
         return response

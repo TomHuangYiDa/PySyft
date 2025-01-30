@@ -9,6 +9,7 @@ from pydantic import AnyHttpUrl, BaseModel, Field
 from syftbox import __version__
 from syftbox.client.env import syftbox_env
 from syftbox.lib.client_config import SyftClientConfig
+from syftbox.lib.http import SYFTBOX_HEADERS
 
 
 class ErrorReport(BaseModel):
@@ -34,6 +35,9 @@ def make_error_report(client_config: SyftClientConfig) -> ErrorReport:
 def try_get_server_version(server_url: AnyHttpUrl) -> Response:
     try:
         # do not use the server_client here, as it may not be in bad state
-        return httpx.get(f"{server_url}/info").json()["version"]
+        return httpx.get(
+            f"{server_url}/info?error_report=1",
+            headers=SYFTBOX_HEADERS,
+        ).json()["version"]
     except Exception:
         return None

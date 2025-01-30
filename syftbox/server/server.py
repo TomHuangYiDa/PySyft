@@ -22,7 +22,6 @@ from typing_extensions import Any, AsyncGenerator, Optional, Union
 
 from syftbox import __version__
 from syftbox.lib.http import (
-    HEADER_GEO_COUNTRY,
     HEADER_OS_ARCH,
     HEADER_OS_NAME,
     HEADER_OS_VERSION,
@@ -43,7 +42,6 @@ from syftbox.server.telemetry import (
     OTEL_ATTR_CLIENT_OS_VER,
     OTEL_ATTR_CLIENT_PYTHON,
     OTEL_ATTR_CLIENT_USER,
-    OTEL_ATTR_CLIENT_USER_LOC,
     OTEL_ATTR_CLIENT_VERSION,
     setup_otel_exporter,
 )
@@ -73,7 +71,7 @@ def server_request_hook(span: Span, scope: dict[str, Any]) -> None:
     span.set_attribute(OTEL_ATTR_CLIENT_OS_NAME, headers.get(HEADER_OS_NAME.encode(), ""))
     span.set_attribute(OTEL_ATTR_CLIENT_OS_VER, headers.get(HEADER_OS_VERSION.encode(), ""))
     span.set_attribute(OTEL_ATTR_CLIENT_OS_ARCH, headers.get(HEADER_OS_ARCH.encode(), ""))
-    span.set_attribute(OTEL_ATTR_CLIENT_USER_LOC, headers.get(HEADER_GEO_COUNTRY.encode(), ""))
+    # span.set_attribute(OTEL_ATTR_CLIENT_USER_LOC, headers.get(HEADER_GEO_COUNTRY.encode(), ""))
 
 
 @contextlib.asynccontextmanager
@@ -108,7 +106,11 @@ app.add_middleware(LoguruMiddleware)
 app.add_middleware(RequestSizeLimitMiddleware)
 app.add_middleware(VersionCheckMiddleware)
 
-FastAPIInstrumentor.instrument_app(app, server_request_hook=server_request_hook)
+FastAPIInstrumentor.instrument_app(
+    app,
+    http_capture_headers_server_request=".*",
+    server_request_hook=server_request_hook,
+)
 SQLite3Instrumentor().instrument()
 
 # Define the ASCII art
