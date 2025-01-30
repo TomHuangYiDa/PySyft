@@ -333,9 +333,6 @@ class SyftFuture(Base):
     def resolve(self) -> Optional[SyftResponse]:
         """Attempt to resolve the future to a response.
 
-        Args:
-            silent: If True, suppress waiting messages.
-
         Returns:
             The response if available, None if still pending.
         """
@@ -346,7 +343,7 @@ class SyftFuture(Base):
             return SyftResponse(
                 status_code=SyftStatus.SYFT_403_FORBIDDEN,
                 body=b"Request was rejected by the SyftBox cache server due to permissions issue",
-                url=self.url,
+                url=self._request.url,
                 sender="SYSTEM",
             )
 
@@ -360,7 +357,7 @@ class SyftFuture(Base):
             #! todo what's the possibility that a .req doesn't exist but a .resp does?
             return SyftResponse(
                 status_code=SyftStatus.SYFT_404_NOT_FOUND,
-                url=self.url,
+                url=self._request.url,
                 body=f"Request with {self.id} not found",
                 sender="SYSTEM",
             )
@@ -373,7 +370,7 @@ class SyftFuture(Base):
             return SyftResponse(
                 status_code=SyftStatus.SYFT_419_EXPIRED,
                 body=f"Request with {self.id} expired on {self.expires}",
-                url=self.url,
+                url=self._request.url,
                 sender="SYSTEM",
             )
 
@@ -401,7 +398,7 @@ class SyftFuture(Base):
             return SyftResponse(
                 status_code=SyftStatus.SYFT_500_SERVER_ERROR,
                 body=str(e).encode(),
-                url=self.url,
+                url=self._request.url,
                 sender="SYSTEM",
             )
         finally:
@@ -450,7 +447,7 @@ class SyftBulkFuture(Base):
 
         while pending and time.monotonic() < deadline:
             for future in list(pending):  # Create list to allow set modification
-                if response := future.resolve(silent=True):
+                if response := future.resolve():
                     self.responses.append(response)
                     pending.remove(future)
             time.sleep(poll_interval)
@@ -479,3 +476,8 @@ class SyftBulkFuture(Base):
     def successes(self) -> list[SyftResponse]:
         """Return a list of successful responses."""
         return [r for r in self.responses if r.is_success]
+
+    @property
+    def all_failed(self) -> bool:
+        """Check if all futures have failed."""
+        return len(self.failures) == len(self.futures)
