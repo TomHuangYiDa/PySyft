@@ -108,7 +108,7 @@ app.add_middleware(VersionCheckMiddleware)
 
 FastAPIInstrumentor.instrument_app(
     app,
-    http_capture_headers_server_request=".*",
+    http_capture_headers_server_request=[".*"],
     server_request_hook=server_request_hook,
 )
 SQLite3Instrumentor().instrument()
