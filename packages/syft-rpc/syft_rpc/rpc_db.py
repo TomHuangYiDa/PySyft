@@ -1,6 +1,6 @@
 import sqlite3
-from functools import lru_cache
 from typing import Optional
+import threading
 
 from syft_core.client_shim import Client
 from ulid import ULID
@@ -22,27 +22,32 @@ VALUES (:id, :path, :expires)
 
 DEFAULT_CLIENT = Client.load()
 
+thread_local = threading.local()
 
-@lru_cache(typed=True)
+
 def __get_connection(client: Client) -> sqlite3.Connection:
-    db_dir = client.workspace.plugins
-    db_dir.mkdir(exist_ok=True, parents=True)
-    db_path = db_dir / "rpc.futures.sqlite"
-    conn = sqlite3.connect(str(db_path))
+    if not hasattr(thread_local, "conn"):
+        
+        db_dir = client.workspace.plugins
+        db_dir.mkdir(exist_ok=True, parents=True)
+        db_path = db_dir / "rpc.futures.sqlite"
+        conn = sqlite3.connect(str(db_path))
 
-    # Multi-process optimizations for small writes
-    conn.execute("PRAGMA journal_mode=WAL")  # Better concurrency
-    conn.execute("PRAGMA synchronous=NORMAL")  # Balance between safety and speed
-    conn.execute("PRAGMA cache_size=-2000")  # 2MB cache
-    conn.execute("PRAGMA busy_timeout=5000")  # Wait up to 5s on locks
-    conn.execute("PRAGMA temp_store=MEMORY")
-    conn.execute("PRAGMA foreign_keys=OFF")
+        # Multi-process optimizations for small writes
+        conn.execute("PRAGMA journal_mode=WAL")  # Better concurrency
+        conn.execute("PRAGMA synchronous=NORMAL")  # Balance between safety and speed
+        conn.execute("PRAGMA cache_size=-2000")  # 2MB cache
+        conn.execute("PRAGMA busy_timeout=5000")  # Wait up to 5s on locks
+        conn.execute("PRAGMA temp_store=MEMORY")
+        conn.execute("PRAGMA foreign_keys=OFF")
 
-    conn.row_factory = sqlite3.Row
+        conn.row_factory = sqlite3.Row
 
-    conn.execute(__Q_CREATE_TABLE)
-    conn.commit()
-    return conn
+        conn.execute(__Q_CREATE_TABLE)
+        conn.commit()
+        thread_local.conn = conn
+
+    return thread_local.conn
 
 
 def save_future(future: SyftFuture, client: Client = None) -> str:
