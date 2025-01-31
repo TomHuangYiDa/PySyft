@@ -156,7 +156,7 @@ def broadcast(
         >>> future = broadcast(
         ...     method="GET",
         ...     urls=["syft://user1@domain.com/public/rpc/", "syft://user2@domain.com/public/rpc/"],
-        ...     expiry_secs=300,
+        ...     expiry="1d",
         ... )
         >>> responses = future.gather_completed()  # Wait for all responses
     """
@@ -204,8 +204,6 @@ def reply_to(
             the default client will be loaded.
         status_code: HTTP status code for the response. Should be a SyftStatus enum value.
             Defaults to SyftStatus.SYFT_200_OK.
-        expiry_secs: Number of seconds until the response expires. After this time,
-            the response will be considered stale. Defaults to 10 seconds.
 
     Returns:
         SyftResponse: The created response object containing all response details.
