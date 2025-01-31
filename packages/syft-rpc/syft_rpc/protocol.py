@@ -4,14 +4,13 @@ import time
 from datetime import datetime, timedelta, timezone
 from enum import IntEnum, StrEnum
 from pathlib import Path
-from typing import ClassVar, Optional, TypeAlias
+from uuid import UUID, uuid4
 
 from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, field_validator
 from pydantic import ValidationError as PydanticValidationError
 from syft_core.types import PathLike, to_path
 from syft_core.url import SyftBoxURL
-from typing_extensions import Self
-from ulid import ULID
+from typing_extensions import ClassVar, Optional, Self, TypeAlias
 
 logger = logging.getLogger(__name__)
 
@@ -71,7 +70,6 @@ class Base(BaseModel):
     model_config = ConfigDict(
         arbitrary_types_allowed=True,
         json_encoders={
-            ULID: str,
             datetime: lambda dt: dt.isoformat(),
         },
         ser_json_bytes="base64",
@@ -149,7 +147,7 @@ class SyftMessage(Base):
 
     VERSION: ClassVar[int] = 1
 
-    id: ULID = Field(default_factory=ULID)
+    id: UUID = Field(default_factory=uuid4)
     """Unique identifier of the message."""
 
     sender: str
@@ -188,9 +186,9 @@ class SyftMessage(Base):
     def validate_url(cls, value) -> SyftBoxURL:
         return validate_syftbox_url(value)
 
-    def get_message_id(self) -> ULID:
+    def get_message_id(self) -> UUID:
         """Generate a deterministic ULID from the message contents."""
-        return ULID.from_bytes(self.__msg_hash().digest()[:16])
+        return UUID(bytes=self.__msg_hash().digest()[:16], version=4)
 
     def get_message_hash(self) -> str:
         """Generate a hash of the message contents."""
@@ -233,6 +231,15 @@ class SyftResponse(SyftMessage):
         if self.status_code.is_error:
             raise SyftError(f"Request failed with status code {self.status_code}")
 
+    @classmethod
+    def system_response(self, status_code: SyftStatus, message: str) -> Self:
+        return SyftResponse(
+            status_code=status_code,
+            body=message.encode(),
+            url=SyftBoxURL("syft://system@syftbox.localhost"),
+            sender="system@syftbox.localhost",
+        )
+
 
 class SyftFuture(Base):
     """Represents an asynchronous Syft RPC operation on a file system transport.
@@ -243,7 +250,7 @@ class SyftFuture(Base):
         expires: Timestamp when the request expires.
     """
 
-    id: ULID
+    id: UUID
     """Identifier of the corresponding request and response."""
 
     path: Path
@@ -340,11 +347,9 @@ class SyftFuture(Base):
         if self.is_rejected:
             self.request_path.unlink(missing_ok=True)
             self.rejected_path.unlink(missing_ok=True)
-            return SyftResponse(
+            return SyftResponse.system_response(
                 status_code=SyftStatus.SYFT_403_FORBIDDEN,
-                body=b"Request was rejected by the SyftBox cache server due to permissions issue",
-                url=self._request.url,
-                sender="SYSTEM",
+                message="Request was rejected by the SyftBox cache server due to permissions issue",
             )
 
         # Check for existing response
@@ -354,12 +359,9 @@ class SyftFuture(Base):
         # If both request and response are missing, the request has expired
         # and they got cleaned up by the server.
         if not self.request_path.exists():
-            #! todo what's the possibility that a .req doesn't exist but a .resp does?
-            return SyftResponse(
+            return SyftResponse.system_response(
                 status_code=SyftStatus.SYFT_404_NOT_FOUND,
-                url=self._request.url,
-                body=f"Request with {self.id} not found",
-                sender="SYSTEM",
+                message=f"Request with {self.id} not found",
             )
 
         # Check for expired request
@@ -367,11 +369,9 @@ class SyftFuture(Base):
         if request.is_expired:
             self.request_path.unlink(missing_ok=True)
             self.response_path.unlink(missing_ok=True)
-            return SyftResponse(
+            return SyftResponse.system_response(
                 status_code=SyftStatus.SYFT_419_EXPIRED,
-                body=f"Request with {self.id} expired on {self.expires}",
-                url=self._request.url,
-                sender="SYSTEM",
+                message=f"Request with {self.id} expired on {request.expires}",
             )
 
         # No response yet
@@ -395,11 +395,9 @@ class SyftFuture(Base):
             return response
         except (PydanticValidationError, ValueError, UnicodeDecodeError) as e:
             logger.error(f"Error loading response: {str(e)}")
-            return SyftResponse(
+            return SyftResponse.system_response(
                 status_code=SyftStatus.SYFT_500_SERVER_ERROR,
-                body=str(e).encode(),
-                url=self._request.url,
-                sender="SYSTEM",
+                message=f"Error loading response: {str(e)}",
             )
         finally:
             self.request_path.unlink(missing_ok=True)
@@ -455,7 +453,7 @@ class SyftBulkFuture(Base):
         return self.responses
 
     @property
-    def id(self) -> ULID:
+    def id(self) -> UUID:
         """Generate a deterministic ULID from all future IDs.
 
         Returns:
@@ -465,7 +463,7 @@ class SyftBulkFuture(Base):
         combined = ",".join(str(f.id) for f in self.futures)
         hash_bytes = hashlib.sha256(combined.encode()).digest()[:16]
         # Use first 16 bytes of hash to create a new ULID
-        return ULID.from_bytes(hash_bytes)
+        return UUID(bytes=hash_bytes, version=4)
 
     @property
     def failures(self) -> list[SyftResponse]:

@@ -6,7 +6,6 @@ readme = "README.md"
 requires-python = ">=3.9"
 dependencies = [
     "pydantic>=2.9.2",
-    "python-ulid>=3.0.0",
     "syft-core",
     "typing-extensions>=4.12.2",
 ]

@@ -1,8 +1,8 @@
 import sqlite3
-from typing import Optional
 import threading
 
 from syft_core.client_shim import Client
+from typing_extensions import Optional
 from ulid import ULID
 
 from syft_rpc.protocol import SyftFuture
@@ -11,13 +11,14 @@ __Q_CREATE_TABLE = """
 CREATE TABLE IF NOT EXISTS futures (
     id TEXT PRIMARY KEY,
     path TEXT NOT NULL,
-    expires TIMESTAMP NOT NULL
+    expires TIMESTAMP NOT NULL,
+    namespace TEXT NOT NULL
 ) WITHOUT ROWID
 """
 
 __Q_INSERT_FUTURE = """
-INSERT OR REPLACE INTO futures (id, path, expires)
-VALUES (:id, :path, :expires)
+INSERT OR REPLACE INTO futures (id, path, expires, namespace)
+VALUES (:id, :path, :expires, :namespace)
 """
 
 DEFAULT_CLIENT = Client.load()
@@ -27,10 +28,9 @@ thread_local = threading.local()
 
 def __get_connection(client: Client) -> sqlite3.Connection:
     if not hasattr(thread_local, "conn"):
-        
         db_dir = client.workspace.plugins
         db_dir.mkdir(exist_ok=True, parents=True)
-        db_path = db_dir / "rpc.futures.sqlite"
+        db_path = db_dir / "rpc.futures.db"
         conn = sqlite3.connect(str(db_path))
 
         # Multi-process optimizations for small writes
@@ -50,12 +50,12 @@ def __get_connection(client: Client) -> sqlite3.Connection:
     return thread_local.conn
 
 
-def save_future(future: SyftFuture, client: Client = None) -> str:
+def save_future(future: SyftFuture, namespace: str, client: Client = None) -> str:
     client = client or DEFAULT_CLIENT
     conn = __get_connection(client)
     data = future.model_dump(mode="json")
 
-    conn.execute(__Q_INSERT_FUTURE, data)
+    conn.execute(__Q_INSERT_FUTURE, {**data, "namespace": namespace})
     conn.commit()
 
     return data["id"]
@@ -86,3 +86,16 @@ def cleanup_expired_futures(client: Client = None) -> None:
     conn = __get_connection(client)
     conn.execute("DELETE FROM futures WHERE expires < datetime('now')")
     conn.commit()
+
+
+def list_futures(namespace: str = None, client: Client = None):
+    client = client or Client.load()
+    conn = __get_connection(client)
+    query_all = "SELECT id, path, expires FROM futures"
+    query_app = "SELECT id, path, expires FROM futures WHERE namespace = ?"
+
+    if namespace:
+        rows = conn.execute(query_app, (namespace,)).fetchall()
+    else:
+        rows = conn.execute(query_all).fetchall()
+    return [SyftFuture(**dict(row)) for row in rows]
