@@ -25,7 +25,7 @@ class RpcRequestHandler(PatternMatchingHandler):
         self.handler = handler
 
     def on_any_event(self, event: FileSystemEvent):
-        logger.debug(f"Received event: {event}")
+        logger.debug(f"FSEvent - {event.event_type} - {event.src_path}")
         self.handler(event)
 
 

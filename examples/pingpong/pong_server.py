@@ -1,13 +1,26 @@
+from datetime import UTC, datetime
+
+from loguru import logger
+from pydantic import BaseModel
 from syft_event import SyftEvents
-from syft_event.types import Request
 
 box = SyftEvents("pingpong")
 
 
+class PingRequest(BaseModel):
+    msg: str
+    ts: datetime
+
+
+class PongResponse(BaseModel):
+    msg: str
+    ts: datetime
+
+
 @box.on_request("/ping")
-def pong(req: Request) -> str:
-    print(f"Got ping request {req.id} - {req.sender} - {req.body}")
-    return "PONG !!!"
+def pong(ping: PingRequest) -> PongResponse:
+    logger.info(f"Got ping request - {ping}")
+    return PongResponse(msg=f"Pong from {box.client.email}", ts=datetime.now(UTC))
 
 
 if __name__ == "__main__":

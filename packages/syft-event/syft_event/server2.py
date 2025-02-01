@@ -11,6 +11,7 @@ from syft_rpc.protocol import SyftRequest, SyftStatus
 from watchdog.events import FileCreatedEvent, FileModifiedEvent, FileSystemEvent
 from watchdog.observers import Observer
 
+from syft_event.deps import func_args_from_request
 from syft_event.handlers import AnyPatternHandler, RpcRequestHandler
 from syft_event.schema import generate_schema
 from syft_event.types import Request, Response
@@ -156,31 +157,42 @@ class SyftEvents:
                 )
                 return
 
-            evt_req = Request(
-                id=str(req.id),
-                sender=req.sender,
-                url=req.url,
-                headers=req.headers,
-                body=req.body,
-            )
+            try:
+                evt_req = Request(
+                    id=str(req.id),
+                    sender=req.sender,
+                    url=req.url,
+                    headers=req.headers,
+                    body=req.body,
+                )
+                kwargs = func_args_from_request(func, evt_req)
+            except Exception as e:
+                logger.warning(f"Invalid request body schema {evt_req.url}: {e}")
+                rpc.reply_to(
+                    req,
+                    body=f"Invalid request schema: {str(e)}",
+                    status_code=SyftStatus.SYFT_400_BAD_REQUEST,
+                    client=self.client,
+                )
+                return
+            resp = func(**kwargs)
 
-            resp = func(evt_req)
             resp_headers = {}
             resp_data = None
             resp_code = SyftStatus.SYFT_200_OK
             if resp is None:
                 resp_data = ""
-                resp_headers["Content-Type"] = "text/plain"
+                # resp_headers["Content-Type"] = "text/plain"
             elif isinstance(resp, Response):
-                resp_data = resp.body
-                resp_code = resp.code
+                resp_data = resp.content
+                resp_code = resp.status_code
                 resp_headers = resp.headers
             elif isinstance(resp, BaseModel):
                 resp_data = resp.model_dump_json()
-                resp_headers["Content-Type"] = "application/json"
+                # resp_headers["Content-Type"] = "application/json"
             else:
                 resp_data = json.dumps(resp)
-                resp_headers["Content-Type"] = "application/json"
+                # resp_headers["Content-Type"] = "application/json"
 
             rpc.reply_to(
                 req,

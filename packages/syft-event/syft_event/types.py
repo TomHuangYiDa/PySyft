@@ -7,7 +7,7 @@ class Request(BaseModel):
     sender: str
     url: str
     headers: dict = Field(default_factory=dict)
-    body: Any = Field(default=None)
+    body: bytes
 
 
 class Response(BaseModel):
