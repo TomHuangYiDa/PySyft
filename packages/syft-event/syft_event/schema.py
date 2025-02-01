@@ -4,6 +4,8 @@ from typing import Any, Callable, Dict, Union, get_type_hints
 
 from pydantic import BaseModel
 
+from syft_event.types import Request, Response
+
 
 def get_type_schema(type_hint: Any) -> Union[str, Dict[str, Any]]:
     """Get a schema representation of a type."""
@@ -45,13 +47,22 @@ def generate_schema(func: Callable) -> Dict[str, Any]:
     # Process parameters
     params = {}
     for name, param in sig.parameters.items():
+        ptype = hints.get(name, Any)
+        if inspect.isclass(ptype) and ptype is Request:
+            continue
         params[name] = {
-            "type": get_type_schema(hints.get(name, Any)),
+            "type": get_type_schema(ptype),
             "required": param.default is param.empty,
         }
+
+    # Process return type
+    ret_ptype = hints.get("return", Any)
+    if inspect.isclass(ret_ptype) and ret_ptype is Response:
+        # could be anything what the dev wants
+        ret_ptype = Any
 
     return {
         "description": inspect.getdoc(func),
         "args": params,
-        "returns": get_type_schema(hints.get("return", Any)),
+        "returns": get_type_schema(ret_ptype),
     }
