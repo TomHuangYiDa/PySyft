@@ -33,7 +33,6 @@ def pong(ping: PingRequest, ctx: Request) -> PongResponse:
 if __name__ == "__main__":
     try:
         print("Running rpc server for", box.app_rpc_dir)
-        box.publish_schema()
         box.run_forever()
     except Exception as e:
         print(e)

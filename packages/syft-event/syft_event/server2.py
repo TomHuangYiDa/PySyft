@@ -32,8 +32,14 @@ PERMS = """
 
 
 class SyftEvents:
-    def __init__(self, app_name: str, client: Client = None):
+    def __init__(
+        self,
+        app_name: str,
+        publish_schema: bool = True,
+        client: Client = None,
+    ):
         self.app_name = app_name
+        self.schema = publish_schema
         self.client = client or Client.load()
         self.app_dir = self.client.api_data(self.app_name)
         self.app_rpc_dir = self.app_dir / "rpc"
@@ -46,6 +52,7 @@ class SyftEvents:
         self.app_rpc_dir.mkdir(exist_ok=True, parents=True)
         perms = self.app_rpc_dir / "syftperm.yaml"
         perms.write_text(PERMS)
+        self.schema and self.publish_schema()
         try:
             self.process_pending_requests()
         except Exception as e:
