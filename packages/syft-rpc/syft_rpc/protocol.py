@@ -227,7 +227,7 @@ class SyftResponse(SyftMessage):
         """Check if the response indicates success."""
         return self.status_code.is_success
 
-    def raise_for_status(self) -> SyftError:
+    def raise_for_status(self):
         if self.status_code.is_error:
             raise SyftError(f"Request failed with status code {self.status_code}")
 
