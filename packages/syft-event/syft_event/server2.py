@@ -18,16 +18,24 @@ from syft_event.types import Request, Response
 
 DEFAULT_WATCH_EVENTS = [FileCreatedEvent, FileModifiedEvent]
 PERMS = """
+- path: 'syftperm.yaml'
+  user: '*'
+  permissions:
+    - read
+- path: 'rpc.schema.json'
+  user: '*'
+  permissions:
+    - read
 - path: '**/*.request'
-  permissions:
-    - read
-    - write
   user: '*'
+  permissions:
+    - write
+    - read
 - path: '**/*.response'
-  permissions:
-    - read
-    - write
   user: '*'
+  permissions:
+    - write
+    - read
 """
 
 
@@ -90,10 +98,14 @@ class SyftEvents:
                 self._stop_event.wait(timeout=5)
         except KeyboardInterrupt:
             pass
+        except Exception as e:
+            logger.error(f"Error in event loop: {e}")
+            raise
         finally:
             self.stop()
 
     def stop(self) -> None:
+        logger.debug("Stopping event loop")
         self._stop_event.set()
         self.obs.stop()
         self.obs.join()

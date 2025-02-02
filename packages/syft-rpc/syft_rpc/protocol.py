@@ -229,7 +229,9 @@ class SyftResponse(SyftMessage):
 
     def raise_for_status(self):
         if self.status_code.is_error:
-            raise SyftError(f"Request failed with status code {self.status_code}")
+            raise SyftError(
+                f"Request failed with status code {self.status_code}. Reason: {self.body}"
+            )
 
     @classmethod
     def system_response(self, status_code: SyftStatus, message: str) -> Self:
