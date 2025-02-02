@@ -29,13 +29,11 @@ PERMS = """
 - path: '**/*.request'
   user: '*'
   permissions:
-    - write
-    - read
+    - admin
 - path: '**/*.response'
   user: '*'
   permissions:
-    - write
-    - read
+    - admin
 """
 
 
