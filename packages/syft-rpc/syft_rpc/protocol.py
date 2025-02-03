@@ -187,7 +187,7 @@ class SyftMessage(Base):
         return validate_syftbox_url(value)
 
     def get_message_id(self) -> UUID:
-        """Generate a deterministic ULID from the message contents."""
+        """Generate a deterministic UUID from the message contents."""
         return UUID(bytes=self.__msg_hash().digest()[:16], version=4)
 
     def get_message_hash(self) -> str:
@@ -456,15 +456,15 @@ class SyftBulkFuture(Base):
 
     @property
     def id(self) -> UUID:
-        """Generate a deterministic ULID from all future IDs.
+        """Generate a deterministic UUID from all future IDs.
 
         Returns:
-            A single ULID derived from hashing all future IDs.
+            A single UUID derived from hashing all future IDs.
         """
-        # Combine all ULIDs and hash them
+        # Combine all UUIDs and hash them
         combined = ",".join(str(f.id) for f in self.futures)
         hash_bytes = hashlib.sha256(combined.encode()).digest()[:16]
-        # Use first 16 bytes of hash to create a new ULID
+        # Use first 16 bytes of hash to create a new UUID
         return UUID(bytes=hash_bytes, version=4)
 
     @property
