@@ -201,7 +201,7 @@ class SyftMessage(Base):
 
     def __msg_hash(self):
         """Generate a hash of the message contents."""
-        m = self.model_dump_json(include=["url", "method", "sender", "headers", "body"])
+        m = self.model_dump_json(include={"url", "method", "sender", "headers", "body"})
         return hashlib.sha256(m.encode())
 
     def text(self, encoding: str = "utf-8") -> str:
@@ -216,9 +216,11 @@ class SyftMessage(Base):
         Raises:
             UnicodeDecodeError: If bytes cannot be decoded with specified encoding
         """
+        if not self.body:
+            return ""
         return self.body.decode(encoding=encoding)
 
-    def json(self, encoding: str = "utf-8") -> JSONValue:
+    def json(self, encoding: str = "utf-8", **kwargs) -> JSONValue:
         """Parse bytes body into JSON data.
 
         Args:
@@ -284,8 +286,8 @@ class SyftResponse(SyftMessage):
             )
 
     @classmethod
-    def system_response(self, status_code: SyftStatus, message: str) -> Self:
-        return SyftResponse(
+    def system_response(cls, status_code: SyftStatus, message: str) -> Self:
+        return cls(
             status_code=status_code,
             body=message.encode(),
             url=SyftBoxURL("syft://system@syftbox.localhost"),
@@ -311,7 +313,7 @@ class SyftFuture(Base):
     expires: datetime
     """Timestamp when the request expires"""
 
-    _request: Optional[SyftRequest] = PrivateAttr(init=True)
+    _request: Optional[SyftRequest] = PrivateAttr()
 
     def __init__(self, **data):
         super().__init__(**data)
