@@ -1,13 +1,16 @@
+from __future__ import annotations
+
 from loguru import logger
 from pathspec import PathSpec
-from pathspec.patterns import GitWildMatchPattern
+from pathspec.patterns.gitwildmatch import GitWildMatchPattern
+from typing_extensions import List
 from watchdog.events import FileSystemEvent, FileSystemEventHandler
 
 __all__ = ["RpcRequestHandler", "AnyPatternHandler"]
 
 
 class PatternMatchingHandler(FileSystemEventHandler):
-    def __init__(self, patterns: list[str], ignore_directory: bool = True):
+    def __init__(self, patterns: List[str], ignore_directory: bool = True):
         self.spec = PathSpec.from_lines(GitWildMatchPattern, patterns)
         self.patterns = patterns
         self.ignore_directory = ignore_directory

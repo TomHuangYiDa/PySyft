@@ -1,9 +1,11 @@
+from __future__ import annotations
+
 import sqlite3
 import threading
 from uuid import UUID
 
 from syft_core.client_shim import Client
-from typing_extensions import Optional
+from typing_extensions import Optional, Union
 
 from syft_rpc.protocol import SyftFuture
 
@@ -50,7 +52,9 @@ def __get_connection(client: Client) -> sqlite3.Connection:
     return thread_local.conn
 
 
-def save_future(future: SyftFuture, namespace: str, client: Optional[Client] = None) -> str:
+def save_future(
+    future: SyftFuture, namespace: str, client: Optional[Client] = None
+) -> str:
     client = client or DEFAULT_CLIENT
     conn = __get_connection(client)
     data = future.model_dump(mode="json")
@@ -61,7 +65,9 @@ def save_future(future: SyftFuture, namespace: str, client: Optional[Client] = N
     return data["id"]
 
 
-def get_future(future_id: str | UUID, client: Optional[Client] = None) -> Optional[SyftFuture]:
+def get_future(
+    future_id: Union[UUID, str], client: Optional[Client] = None
+) -> Optional[SyftFuture]:
     client = client or DEFAULT_CLIENT
     conn = __get_connection(client)
     row = conn.execute(
@@ -74,7 +80,7 @@ def get_future(future_id: str | UUID, client: Optional[Client] = None) -> Option
     return SyftFuture(**dict(row))
 
 
-def delete_future(future_id: str | UUID, client: Optional[Client] = None) -> None:
+def delete_future(future_id: Union[UUID, str], client: Optional[Client] = None) -> None:
     client = client or DEFAULT_CLIENT
     conn = __get_connection(client)
     conn.execute("DELETE FROM futures WHERE id = ?", (str(future_id),))

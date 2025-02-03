@@ -1,7 +1,8 @@
-import json
+from __future__ import annotations
+
 import time
-from dataclasses import asdict, dataclass, field
-from datetime import UTC, datetime
+from dataclasses import dataclass, field
+from datetime import datetime, timezone
 
 from loguru import logger
 from pydantic import BaseModel
@@ -12,7 +13,7 @@ from syft_rpc import rpc
 @dataclass
 class PingRequest:
     msg: str
-    ts: datetime = field(default_factory=lambda: datetime.now(UTC).isoformat())
+    ts: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class PongResponse(BaseModel):
@@ -22,12 +23,10 @@ class PongResponse(BaseModel):
 
 def send_ping():
     client = Client.load()
-    msg_bytes = json.dumps(asdict(PingRequest(msg="hello!")))
-
     start = time.time()
     future = rpc.send(
         url=f"syft://{client.email}/api_data/pingpong/rpc/ping",
-        body=msg_bytes,
+        body=PingRequest(msg="hello!"),
         expiry="5m",
         cache=True,
     )

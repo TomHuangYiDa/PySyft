@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import json
 from dataclasses import asdict, is_dataclass
 from datetime import datetime, timezone
@@ -7,7 +9,7 @@ from uuid import UUID
 from pydantic import BaseModel
 from syft_core.client_shim import Client
 from syft_core.url import SyftBoxURL
-from typing_extensions import Any, Optional
+from typing_extensions import Any, Dict, Optional, Union
 
 from syft_rpc.protocol import (
     SyftBulkFuture,
@@ -22,6 +24,9 @@ from syft_rpc.util import parse_duration
 
 DEFAULT_EXPIRY = "15m"
 
+BodyType = Union[str, bytes, dict, list, tuple, float, int, BaseModel, None]
+HeaderType = Optional[Dict[str, str]]
+
 
 def make_url(datasite: str, app_name: str, endpoint: str) -> SyftBoxURL:
     """Create a Syft Box URL from a datasite, app name, and RPC endpoint."""
@@ -34,10 +39,10 @@ def make_url(datasite: str, app_name: str, endpoint: str) -> SyftBoxURL:
 def serialize(obj: Any) -> Optional[bytes]:
     if obj is None:
         return None
-    if isinstance(obj, BaseModel):
+    elif isinstance(obj, BaseModel):
         return obj.model_dump_json().encode()
     elif is_dataclass(obj) and not isinstance(obj, type):
-        return json.dumps(asdict(obj)).encode()
+        return json.dumps(asdict(obj), default=str).encode()
     elif isinstance(obj, str):
         return obj.encode()
     else:
@@ -46,9 +51,9 @@ def serialize(obj: Any) -> Optional[bytes]:
 
 
 def send(
-    url: SyftBoxURL | str,
-    body: Optional[Any] = None,
-    headers: dict[str, str] | None = None,
+    url: Union[SyftBoxURL, str],
+    body: Optional[BodyType] = None,
+    headers: Optional[HeaderType] = None,
     expiry: str = DEFAULT_EXPIRY,
     cache: bool = False,
     client: Optional[Client] = None,
@@ -136,10 +141,9 @@ def send(
 
 
 def broadcast(
-    urls: list[SyftBoxURL | str],
-    method: SyftMethod | str = SyftMethod.GET,
-    headers: dict[str, str] | None = None,
-    body: Optional[Any] = None,
+    urls: Union[SyftBoxURL, str],
+    body: Optional[BodyType] = None,
+    headers: Optional[HeaderType] = None,
     expiry: str = DEFAULT_EXPIRY,
     cache: bool = False,
     client: Optional[Client] = None,
@@ -198,8 +202,8 @@ def broadcast(
 
 def reply_to(
     request: SyftRequest,
-    body: Optional[Any] = None,
-    headers: dict[str, str] | None = None,
+    body: Optional[BodyType] = None,
+    headers: Optional[HeaderType] = None,
     status_code: SyftStatus = SyftStatus.SYFT_200_OK,
     client: Optional[Client] = None,
 ) -> SyftResponse:
@@ -254,9 +258,9 @@ def reply_to(
 
 
 def write_response(
-    request_path: str | Path,
-    body: Optional[Any] = None,
-    headers: dict[str, str] | None = None,
+    request_path: Union[Path, str],
+    body: Optional[BodyType] = None,
+    headers: Optional[HeaderType] = None,
     status_code: SyftStatus = SyftStatus.SYFT_200_OK,
     client: Optional[Client] = None,
 ):

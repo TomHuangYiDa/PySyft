@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import inspect
 import json
 from dataclasses import is_dataclass
@@ -32,7 +34,8 @@ def func_args_from_request(func: Callable, request: SyftRequest) -> dict:
         elif inspect.isclass(ptype) and issubclass(ptype, BaseModel):
             kwargs[pname] = request.model(ptype)
         elif ptype is dict:
-            kwargs[pname] = json.loads(request.body.decode())
+            val = json.loads(request.body.decode()) if request.body else None
+            kwargs[pname] = val
         elif ptype is str:
             # Default to injecting body for unknown types
             kwargs[pname] = request.text()

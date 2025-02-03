@@ -1,9 +1,11 @@
+from __future__ import annotations
+
 import hashlib
 import json
 import logging
 import time
 from datetime import datetime, timedelta, timezone
-from enum import IntEnum, StrEnum
+from enum import IntEnum, Enum
 from pathlib import Path
 from uuid import UUID, uuid4
 
@@ -11,16 +13,26 @@ from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, field_validator
 from pydantic import ValidationError as PydanticValidationError
 from syft_core.types import PathLike, to_path
 from syft_core.url import SyftBoxURL
-from typing_extensions import ClassVar, Optional, Self, Type, TypeAlias, TypeVar
+from typing_extensions import (
+    ClassVar,
+    Dict,
+    List,
+    Optional,
+    Self,
+    Type,
+    TypeAlias,
+    TypeVar,
+    Union,
+)
 
 logger = logging.getLogger(__name__)
 
 # Type aliases for better readability
-JSONPrimitive: TypeAlias = str | int | float | bool | None
-JSONValue: TypeAlias = dict[str, "JSONValue"] | list["JSONValue"] | JSONPrimitive
-JSON: TypeAlias = str | bytes | bytearray
+JSONPrimitive: TypeAlias = Union[str, int, float, bool, None]
+JSONValue: TypeAlias = Union[Dict[str, "JSONValue"], List["JSONValue"], JSONPrimitive]
+JSON: TypeAlias = Union[str, bytes, bytearray]
 Headers: TypeAlias = dict[str, str]
-PYDANTIC = TypeVar("T", bound=BaseModel)
+PYDANTIC = TypeVar("PYDANTIC", bound=BaseModel)
 
 
 # Constants
@@ -29,7 +41,7 @@ DEFAULT_POLL_INTERVAL: float = 0.1
 DEFAULT_TIMEOUT: float = 300  # 5 minutes in seconds
 
 
-def validate_syftbox_url(url: SyftBoxURL | str) -> SyftBoxURL:
+def validate_syftbox_url(url: Union[SyftBoxURL, str]) -> SyftBoxURL:
     if isinstance(url, str):
         return SyftBoxURL(url)
     if isinstance(url, SyftBoxURL):
@@ -37,7 +49,7 @@ def validate_syftbox_url(url: SyftBoxURL | str) -> SyftBoxURL:
     raise ValueError(f"Invalid type for url: {type(url)}. Expected str or SyftBoxURL.")
 
 
-class SyftMethod(StrEnum):
+class SyftMethod(str, Enum):
     """HTTP methods supported by the Syft protocol."""
 
     GET = "GET"
@@ -467,14 +479,14 @@ class SyftFuture(Base):
 
 
 class SyftBulkFuture(Base):
-    futures: list[SyftFuture]
-    responses: list[SyftResponse] = []
+    futures: List[SyftFuture]
+    responses: List[SyftResponse] = []
 
     def gather_completed(
         self,
         timeout: float = DEFAULT_TIMEOUT,
         poll_interval: float = DEFAULT_POLL_INTERVAL,
-    ) -> list[SyftResponse]:
+    ) -> List[SyftResponse]:
         """Wait for all futures to complete and return a list of responses.
 
         Returns a list of responses in the order of the futures list. If a future
@@ -524,12 +536,12 @@ class SyftBulkFuture(Base):
         return UUID(bytes=hash_bytes, version=4)
 
     @property
-    def failures(self) -> list[SyftResponse]:
+    def failures(self) -> List[SyftResponse]:
         """Return a list of failed responses."""
         return [r for r in self.responses if not r.is_success]
 
     @property
-    def successes(self) -> list[SyftResponse]:
+    def successes(self) -> List[SyftResponse]:
         """Return a list of successful responses."""
         return [r for r in self.responses if r.is_success]
 

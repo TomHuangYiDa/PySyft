@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 from pydantic import BaseModel, Field
-from typing_extensions import Any, Mapping
+from typing_extensions import Any, Dict, Optional
 
 
 class Request(BaseModel):
@@ -7,10 +9,10 @@ class Request(BaseModel):
     sender: str
     url: str
     headers: dict = Field(default_factory=dict)
-    body: bytes
+    body: Optional[bytes]
 
 
 class Response(BaseModel):
     body: Any = None
     status_code: int = 200
-    headers: Mapping[str, str] | None = None
+    headers: Optional[Dict[str, str]] = None

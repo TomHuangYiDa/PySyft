@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import json
 from pathlib import Path
 from threading import Event
@@ -8,6 +10,7 @@ from pydantic import BaseModel
 from syft_core import Client
 from syft_rpc import rpc
 from syft_rpc.protocol import SyftRequest, SyftStatus
+from typing_extensions import List, Optional, Type, Union
 from watchdog.events import FileCreatedEvent, FileModifiedEvent, FileSystemEvent
 from watchdog.observers import Observer
 
@@ -42,7 +45,7 @@ class SyftEvents:
         self,
         app_name: str,
         publish_schema: bool = True,
-        client: Client = None,
+        client: Optional[Client] = None,
     ):
         self.app_name = app_name
         self.schema = publish_schema
@@ -54,16 +57,26 @@ class SyftEvents:
         self._stop_event = Event()
 
     def start(self) -> None:
+        # setup dirs
         self.app_dir.mkdir(exist_ok=True, parents=True)
         self.app_rpc_dir.mkdir(exist_ok=True, parents=True)
+
+        # write perms
         perms = self.app_rpc_dir / "syftperm.yaml"
         perms.write_text(PERMS)
-        self.schema and self.publish_schema()
+
+        # publish schema
+        if self.schema:
+            self.publish_schema()
+
+        # process pending requests
         try:
             self.process_pending_requests()
         except Exception as e:
             print("Error processing pending requests", e)
             raise
+
+        # start Observer
         self.obs.start()
 
     def publish_schema(self) -> None:
@@ -121,8 +134,8 @@ class SyftEvents:
 
     def watch(
         self,
-        glob_path: str | list[str],
-        event_filter: list[type[FileSystemEvent]] = DEFAULT_WATCH_EVENTS,
+        glob_path: Union[str, List[str]],
+        event_filter: List[Type[FileSystemEvent]] = DEFAULT_WATCH_EVENTS,
     ):
         """Invoke the handler if any file changes in the glob path"""
 
@@ -138,7 +151,7 @@ class SyftEvents:
             self.obs.schedule(
                 # use raw path for glob which will be convert to path/*.request
                 AnyPatternHandler(globs, watch_cb),
-                path=self.client.datasites,
+                path=str(self.client.datasites),
                 recursive=True,
                 event_filter=event_filter,
             )
@@ -196,7 +209,7 @@ class SyftEvents:
                 # resp_headers["Content-Type"] = "text/plain"
             elif isinstance(resp, Response):
                 resp_data = resp.body
-                resp_code = resp.status_code
+                resp_code = SyftStatus(resp.status_code)
                 resp_headers = resp.headers
             elif isinstance(resp, BaseModel):
                 resp_data = resp.model_dump_json()
@@ -222,7 +235,7 @@ class SyftEvents:
 
         self.obs.schedule(
             RpcRequestHandler(rpc_callback),
-            path=endpoint,
+            path=str(endpoint),
             recursive=True,
             event_filter=[FileCreatedEvent],
         )
