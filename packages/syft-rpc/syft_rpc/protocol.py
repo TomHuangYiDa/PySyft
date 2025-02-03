@@ -5,7 +5,7 @@ import json
 import logging
 import time
 from datetime import datetime, timedelta, timezone
-from enum import IntEnum, Enum
+from enum import Enum, IntEnum
 from pathlib import Path
 from uuid import UUID, uuid4
 
