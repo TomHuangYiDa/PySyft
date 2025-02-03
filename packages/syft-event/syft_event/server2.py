@@ -3,14 +3,13 @@ from __future__ import annotations
 import json
 from pathlib import Path
 from threading import Event
-from typing import Callable
 
 from loguru import logger
 from pydantic import BaseModel
 from syft_core import Client
 from syft_rpc import rpc
 from syft_rpc.protocol import SyftRequest, SyftStatus
-from typing_extensions import List, Optional, Type, Union
+from typing_extensions import Callable, List, Optional, Type, Union
 from watchdog.events import FileCreatedEvent, FileModifiedEvent, FileSystemEvent
 from watchdog.observers import Observer
 
@@ -19,7 +18,10 @@ from syft_event.handlers import AnyPatternHandler, RpcRequestHandler
 from syft_event.schema import generate_schema
 from syft_event.types import Response
 
-DEFAULT_WATCH_EVENTS = [FileCreatedEvent, FileModifiedEvent]
+DEFAULT_WATCH_EVENTS: List[Type[FileSystemEvent]] = [
+    FileCreatedEvent,
+    FileModifiedEvent,
+]
 PERMS = """
 - path: 'syftperm.yaml'
   user: '*'

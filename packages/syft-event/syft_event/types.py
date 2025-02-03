@@ -8,7 +8,7 @@ class Request(BaseModel):
     id: str
     sender: str
     url: str
-    headers: dict = Field(default_factory=dict)
+    headers: Dict[str, str] = Field(default_factory=dict)
     body: Optional[bytes]
 
 

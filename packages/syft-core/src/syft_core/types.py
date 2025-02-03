@@ -1,4 +1,3 @@
-import os
 from pathlib import Path
 from typing import Iterable, Union
 
@@ -6,7 +5,7 @@ from typing_extensions import TypeAlias
 
 __all__ = ["PathLike", "UserLike", "to_path"]
 
-PathLike: TypeAlias = Union[str, os.PathLike, Path]
+PathLike: TypeAlias = Union[str, Path]
 UserLike: TypeAlias = Union[str, Iterable[str]]
 
 
