@@ -26,6 +26,7 @@ PYDANTIC = TypeVar("T", bound=BaseModel)
 # Constants
 DEFAULT_MESSAGE_EXPIRY: int = 60 * 60 * 24  # 1 days in seconds
 DEFAULT_POLL_INTERVAL: float = 0.1
+DEFAULT_TIMEOUT: float = 300  # 5 minutes in seconds
 
 
 def validate_syftbox_url(url: SyftBoxURL | str) -> SyftBoxURL:
@@ -351,7 +352,7 @@ class SyftFuture(Base):
 
     def wait(
         self,
-        timeout: Optional[float] = None,
+        timeout: float = DEFAULT_TIMEOUT,
         poll_interval: float = DEFAULT_POLL_INTERVAL,
     ) -> SyftResponse:
         """Wait for the future to complete and return the Response.
@@ -469,7 +470,7 @@ class SyftBulkFuture(Base):
 
     def gather_completed(
         self,
-        timeout: Optional[float] = None,
+        timeout: float = DEFAULT_TIMEOUT,
         poll_interval: float = DEFAULT_POLL_INTERVAL,
     ) -> list[SyftResponse]:
         """Wait for all futures to complete and return a list of responses.
