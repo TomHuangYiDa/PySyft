@@ -185,6 +185,7 @@ class SyftEvents:
                     client=self.client,
                 )
                 return
+
             resp = func(**kwargs)
 
             resp_headers = {}
@@ -194,7 +195,7 @@ class SyftEvents:
                 resp_data = ""
                 # resp_headers["Content-Type"] = "text/plain"
             elif isinstance(resp, Response):
-                resp_data = resp.content
+                resp_data = resp.body
                 resp_code = resp.status_code
                 resp_headers = resp.headers
             elif isinstance(resp, BaseModel):

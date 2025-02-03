@@ -232,7 +232,7 @@ class SyftMessage(Base):
         """
         return json.loads(self.text(encoding=encoding))
 
-    def to_model(self, model_cls: Type[PYDANTIC]) -> PYDANTIC:
+    def model(self, model_cls: Type[PYDANTIC]) -> PYDANTIC:
         """Parse JSON body into a Pydantic model instance.
 
         Args:

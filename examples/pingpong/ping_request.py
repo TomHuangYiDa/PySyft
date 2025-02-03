@@ -36,7 +36,7 @@ def send_ping():
     try:
         response = future.wait(timeout=300)
         response.raise_for_status()
-        pong_response = response.to_model(PongResponse)
+        pong_response = response.model(PongResponse)
         logger.info(f"Response: {pong_response}. Time taken: {time.time() - start}")
     except Exception as e:
         logger.error(f"Error: {e}")

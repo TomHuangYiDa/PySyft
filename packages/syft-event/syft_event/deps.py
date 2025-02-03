@@ -30,7 +30,7 @@ def func_args_from_request(func: Callable, request: SyftRequest) -> dict:
         elif is_dataclass(ptype):
             kwargs[pname] = ptype(**request.json())
         elif inspect.isclass(ptype) and issubclass(ptype, BaseModel):
-            kwargs[pname] = request.to_model(ptype)
+            kwargs[pname] = request.model(ptype)
         elif ptype is dict:
             kwargs[pname] = json.loads(request.body.decode())
         elif ptype is str:
