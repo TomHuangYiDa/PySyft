@@ -12,7 +12,6 @@ from syftbox.client.plugins.sync.local_state import LocalState
 from syftbox.client.plugins.sync.producer import SyncProducer
 from syftbox.client.plugins.sync.queue import SyncQueue, SyncQueueItem
 from syftbox.client.plugins.sync.types import FileChangeInfo
-from syftbox.lib.profiling import FakeThread, pyspy
 
 
 class SyncManager:

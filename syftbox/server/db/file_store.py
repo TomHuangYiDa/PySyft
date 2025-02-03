@@ -193,8 +193,9 @@ class FileStore:
 
     def list_for_user(
         self,
+        *,
         email: str,
-        path: RelativePath = None,
+        path: Optional[RelativePath] = None,
     ) -> list[FileMetadata]:
         with get_db(self.db_path) as conn:
             return db.get_filemetadata_with_read_access(conn, email, path)

@@ -1,8 +1,7 @@
 import base64
-from collections import defaultdict
 import hashlib
 import sqlite3
-import traceback
+from collections import defaultdict
 from typing import Iterator, List
 
 import msgpack
@@ -70,29 +69,17 @@ def get_diff(
 
 @router.post("/datasite_states", response_model=dict[str, list[FileMetadata]])
 def get_datasite_states(
-    conn: sqlite3.Connection = Depends(get_db_connection),
     file_store: FileStore = Depends(get_file_store),
-    server_settings: ServerSettings = Depends(get_server_settings),
     email: str = Depends(get_current_user),
 ) -> dict[str, list[FileMetadata]]:
-    all_datasites = get_all_datasites(conn)
-    datasite_states: dict[str, list[FileMetadata]] = {}
-    # for datasite in all_datasites:
-    #     try:
-    file_metadata = file_store.list_for_user(None, email)
-    # except Exception as e:
-    #     logger.error(f"Failed to get dir state for {datasite}: {e} {traceback.format_exc()}")
-    #     continue
-    # datasite_states[datasite] = datasite_state
+    file_metadata = file_store.list_for_user(email=email)
 
-    # dict of datasite -> list of files
     datasite_states = defaultdict(list)
     for metadata in file_metadata:
-        user_email = metadata.path.root
+        user_email = metadata.path.parts[0]
         datasite_states[user_email].append(metadata)
 
-    datasite_states = dict(datasite_states)
-    return datasite_states
+    return dict(datasite_states)
 
 
 @router.post("/dir_state", response_model=list[FileMetadata])
@@ -102,7 +89,7 @@ def dir_state(
     server_settings: ServerSettings = Depends(get_server_settings),
     email: str = Depends(get_current_user),
 ) -> list[FileMetadata]:
-    return file_store.list_for_user(dir, email)
+    return file_store.list_for_user(email=email, path=dir)
 
 
 @router.post("/get_metadata", response_model=FileMetadata)
