@@ -36,8 +36,8 @@ def send_ping():
     try:
         response = future.wait(timeout=300)
         response.raise_for_status()
-        response = PongResponse.model_validate_json(response.body)
-        logger.info(f"Response: {response}. Time taken: {time.time() - start}")
+        pong_response = response.to_model(PongResponse)
+        logger.info(f"Response: {pong_response}. Time taken: {time.time() - start}")
     except Exception as e:
         logger.error(f"Error: {e}")
         raise
