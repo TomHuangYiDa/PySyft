@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Optional
 import httpx
 from packaging import version
 from rich import print as rprint
-from typing_extensions import Protocol
+from typing_extensions import Protocol, Self
 
 from syftbox import __version__
 from syftbox.client.exceptions import SyftAuthenticationError, SyftPermissionError, SyftServerError, SyftServerTooOld
@@ -104,8 +104,10 @@ class ClientBase:
             upper_bound_version = version_range[1]
 
             if len(upper_bound_version) > 0 and version.parse(upper_bound_version) < version.parse(__version__):
-                raise SyftServerTooOld(f"Server version is {server_version} and can only work with clients between \
-                                        {lower_bound_version} and {upper_bound_version}. Your client has version {__version__}.")
+                raise SyftServerTooOld(
+                    f"Server version is {server_version} and can only work with clients between \
+                                        {lower_bound_version} and {upper_bound_version}. Your client has version {__version__}."
+                )
 
     @staticmethod
     def _make_headers(config: SyftClientConfig) -> dict:
@@ -120,8 +122,16 @@ class ClientBase:
         return headers
 
     @classmethod
-    def from_config(cls, config: SyftClientConfig) -> "ClientBase":
+    def from_config(
+        cls,
+        config: SyftClientConfig,
+        transport: Optional[httpx.BaseTransport] = None,
+    ) -> Self:
         conn = httpx.Client(
-            base_url=str(config.server_url), follow_redirects=True, headers=cls._make_headers(config), timeout=10
+            base_url=str(config.server_url),
+            follow_redirects=True,
+            headers=cls._make_headers(config),
+            timeout=10,
+            transport=transport,
         )
         return cls(conn)

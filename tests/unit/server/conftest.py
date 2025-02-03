@@ -8,7 +8,7 @@ from syftbox.client.server_client import SyncClient
 from syftbox.lib.constants import PERM_FILE
 from syftbox.lib.http import HEADER_SYFTBOX_VERSION
 from syftbox.server.migrations import run_migrations
-from syftbox.server.server import app
+from syftbox.server.server import create_server
 from syftbox.server.settings import ServerSettings
 
 TEST_DATASITE_NAME = "test_datasite@openmined.org"
@@ -71,8 +71,9 @@ def client(monkeypatch, tmp_path):
     permfile.touch()
     permfile.write_text(json.dumps(PERMFILE_DICT))
 
+    server_app = create_server(settings)
     run_migrations(settings)
-    with TestClient(app) as client:
+    with TestClient(server_app) as client:
         client.headers[HEADER_SYFTBOX_VERSION] = __version__
         access_token = get_access_token(client, TEST_DATASITE_NAME)
         client.headers["Authorization"] = f"Bearer {access_token}"
@@ -109,8 +110,9 @@ def client_without_perms(monkeypatch, tmp_path):
     permfile.touch()
     permfile.write_text("")
 
+    server_app = create_server(settings)
     run_migrations(settings)
-    with TestClient(app) as client:
+    with TestClient(server_app) as client:
         client.headers[HEADER_SYFTBOX_VERSION] = __version__
         access_token = get_access_token(client, TEST_DATASITE_NAME)
         client.headers["Authorization"] = f"Bearer {access_token}"
