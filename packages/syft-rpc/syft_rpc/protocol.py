@@ -499,6 +499,10 @@ class SyftBulkFuture(Base):
                 if response := future.resolve():
                     self.responses.append(response)
                     pending.remove(future)
+
+            if len(self.responses) == len(self.futures):
+                logger.debug("All futures have resolved")
+                break
             time.sleep(poll_interval)
 
         return self.responses

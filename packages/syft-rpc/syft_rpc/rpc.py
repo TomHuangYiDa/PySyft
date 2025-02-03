@@ -121,7 +121,6 @@ def send(
 
     # Create new request file if needed
     if not req_path.exists():
-        print(f"Creating a new request at: {req_path}")
         try:
             syft_request.dump(req_path)
         except OSError as e:
