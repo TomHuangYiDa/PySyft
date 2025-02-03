@@ -1,8 +1,12 @@
+import json
+from dataclasses import asdict, is_dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
+from pydantic import BaseModel
 from syft_core.client_shim import Client
 from syft_core.url import SyftBoxURL
+from typing_extensions import Any
 
 from syft_rpc.protocol import (
     SyftBulkFuture,
@@ -15,7 +19,7 @@ from syft_rpc.protocol import (
 )
 from syft_rpc.util import parse_duration
 
-DEFAULT_EXPIRY = "24h"
+DEFAULT_EXPIRY = "15m"
 
 
 def make_url(datasite: str, app_name: str, endpoint: str) -> SyftBoxURL:
@@ -24,6 +28,18 @@ def make_url(datasite: str, app_name: str, endpoint: str) -> SyftBoxURL:
     return SyftBoxURL(
         f"syft://{datasite}/api_data/{app_name}/rpc/" + endpoint.lstrip("/")
     )
+
+
+def serialize(obj: Any) -> bytes:
+    if isinstance(obj, BaseModel):
+        return obj.model_dump_json().encode()
+    elif is_dataclass(obj):
+        return json.dumps(asdict(obj)).encode()
+    elif isinstance(obj, str):
+        return obj.encode()
+    else:
+        # dataclass, dict, list, tuple, float, int
+        return json.dumps(obj).encode()
 
 
 def send(
@@ -75,7 +91,7 @@ def send(
         method=method.upper() if isinstance(method, str) else method,
         url=url if isinstance(url, SyftBoxURL) else SyftBoxURL(url),
         headers=headers or {},
-        body=body.encode() if isinstance(body, str) else body,
+        body=serialize(body),
         expires=datetime.now(timezone.utc) + parse_duration(expiry),
     )
     local_path = syft_request.url.to_local_path(client.workspace.datasites)
