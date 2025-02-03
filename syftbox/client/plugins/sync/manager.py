@@ -47,7 +47,6 @@ class SyncManager:
             self.thread.join()
 
     def start(self) -> None:
-        @pyspy()
         def _start(manager: SyncManager) -> None:
             while not manager.is_stop_requested:
                 try:
@@ -62,7 +61,7 @@ class SyncManager:
                     logger.error(f"Syncing encountered an error: {e}. Retrying in {manager.sync_interval} seconds.")
 
         self.is_stop_requested = False
-        t = FakeThread(target=_start, args=(self,), daemon=True)
+        t = Thread(target=_start, args=(self,), daemon=True)
         t.start()
         logger.info(f"Sync started, syncing every {self.sync_interval} seconds")
         self.thread = t
