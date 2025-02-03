@@ -1,4 +1,5 @@
 import hashlib
+import json
 import logging
 import time
 from datetime import datetime, timedelta, timezone
@@ -10,13 +11,16 @@ from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, field_validator
 from pydantic import ValidationError as PydanticValidationError
 from syft_core.types import PathLike, to_path
 from syft_core.url import SyftBoxURL
-from typing_extensions import ClassVar, Optional, Self, TypeAlias
+from typing_extensions import ClassVar, Optional, Self, Type, TypeAlias, TypeVar
 
 logger = logging.getLogger(__name__)
 
 # Type aliases for better readability
+JSONPrimitive: TypeAlias = str | int | float | bool | None
+JSONValue: TypeAlias = dict[str, "JSONValue"] | list["JSONValue"] | JSONPrimitive
 JSON: TypeAlias = str | bytes | bytearray
 Headers: TypeAlias = dict[str, str]
+PYDANTIC = TypeVar("T", bound=BaseModel)
 
 
 # Constants
@@ -195,8 +199,53 @@ class SyftMessage(Base):
         return self.__msg_hash().hexdigest()
 
     def __msg_hash(self):
+        """Generate a hash of the message contents."""
         m = self.model_dump_json(include=["url", "method", "sender", "headers", "body"])
         return hashlib.sha256(m.encode())
+
+    def text(self, encoding: str = "utf-8") -> str:
+        """Decode the body as a string.
+
+        Args:
+            encoding: Character encoding to use for decoding bytes. Defaults to "utf-8".
+
+        Returns:
+            Decoded string representation of the body.
+
+        Raises:
+            UnicodeDecodeError: If bytes cannot be decoded with specified encoding
+        """
+        return self.body.decode(encoding=encoding)
+
+    def json(self, encoding: str = "utf-8") -> JSONValue:
+        """Parse bytes body into JSON data.
+
+        Args:
+            encoding: Character encoding to use for decoding bytes. Defaults to "utf-8".
+
+        Returns:
+            Parsed JSON data as dict, list, or primitive value.
+
+        Raises:
+            json.JSONDecodeError: If body contains invalid JSON
+            UnicodeDecodeError: If bytes cannot be decoded with specified encoding
+        """
+        return json.loads(self.text(encoding=encoding))
+
+    def to_model(self, model_cls: Type[PYDANTIC]) -> PYDANTIC:
+        """Parse JSON body into a Pydantic model instance.
+
+        Args:
+            model_cls: A Pydantic model class to parse the JSON into
+
+        Returns:
+            An instance of the provided model class
+
+        Raises:
+            ValidationError: If JSON data doesn't match model schema
+        """
+
+        return model_cls.model_validate_json(self.body)
 
 
 class SyftError(Exception):

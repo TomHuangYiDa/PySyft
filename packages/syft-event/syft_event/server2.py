@@ -14,7 +14,7 @@ from watchdog.observers import Observer
 from syft_event.deps import func_args_from_request
 from syft_event.handlers import AnyPatternHandler, RpcRequestHandler
 from syft_event.schema import generate_schema
-from syft_event.types import Request, Response
+from syft_event.types import Response
 
 DEFAULT_WATCH_EVENTS = [FileCreatedEvent, FileModifiedEvent]
 PERMS = """
@@ -175,16 +175,9 @@ class SyftEvents:
                 return
 
             try:
-                evt_req = Request(
-                    id=str(req.id),
-                    sender=req.sender,
-                    url=req.url,
-                    headers=req.headers,
-                    body=req.body,
-                )
-                kwargs = func_args_from_request(func, evt_req)
+                kwargs = func_args_from_request(func, req)
             except Exception as e:
-                logger.warning(f"Invalid request body schema {evt_req.url}: {e}")
+                logger.warning(f"Invalid request body schema {req.url}: {e}")
                 rpc.reply_to(
                     req,
                     body=f"Invalid request schema: {str(e)}",
