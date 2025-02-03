@@ -1,3 +1,6 @@
+import os
+from pathlib import Path
+
 import yaml
 from loguru import logger
 from packaging import version
@@ -8,8 +11,13 @@ from syftbox.lib.hash import collect_files, hash_files
 from syftbox.lib.permissions import SyftPermission, migrate_permissions
 from syftbox.server.db import db
 from syftbox.server.db.schema import get_db
-from syftbox.server.server import create_folders
 from syftbox.server.settings import ServerSettings
+
+
+def create_folders(folders: list[Path]) -> None:
+    for folder in folders:
+        if not os.path.exists(folder):
+            os.makedirs(folder, exist_ok=True)
 
 
 def run_migrations(settings: ServerSettings) -> None:
