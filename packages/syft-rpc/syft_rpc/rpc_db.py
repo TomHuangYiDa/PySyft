@@ -3,8 +3,7 @@ import threading
 
 from syft_core.client_shim import Client
 from typing_extensions import Optional
-from ulid import ULID
-
+from uuid import UUID
 from syft_rpc.protocol import SyftFuture
 
 __Q_CREATE_TABLE = """
@@ -61,7 +60,7 @@ def save_future(future: SyftFuture, namespace: str, client: Client = None) -> st
     return data["id"]
 
 
-def get_future(future_id: str | ULID, client: Client = None) -> Optional[SyftFuture]:
+def get_future(future_id: str | UUID, client: Client = None) -> Optional[SyftFuture]:
     client = client or DEFAULT_CLIENT
     conn = __get_connection(client)
     row = conn.execute(
@@ -74,7 +73,7 @@ def get_future(future_id: str | ULID, client: Client = None) -> Optional[SyftFut
     return SyftFuture(**dict(row))
 
 
-def delete_future(future_id: str | ULID, client: Client = None) -> None:
+def delete_future(future_id: str | UUID, client: Client = None) -> None:
     client = client or DEFAULT_CLIENT
     conn = __get_connection(client)
     conn.execute("DELETE FROM futures WHERE id = ?", (str(future_id),))
