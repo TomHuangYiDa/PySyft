@@ -48,10 +48,11 @@ def pyspy() -> Iterator[subprocess.Popen]:
         print(f"Error: {e}")
 
 
-# ... existing code ...
-
-
 class FakeThread:
+    """Convenience class for profiling code that should be run in a thread.
+    Easy to swap with Thread when profiling is not needed and we want to run in the main thread.
+    """
+
     def __init__(self, target, args=(), daemon=True):
         self.target = target
         self.args = args

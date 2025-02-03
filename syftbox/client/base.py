@@ -106,6 +106,8 @@ class ClientBase:
     @classmethod
     def from_config(cls, config: SyftClientConfig) -> "ClientBase":
         conn = httpx.Client(
-            base_url=str(config.server_url), follow_redirects=True, headers=cls._make_headers(config), timeout=10.0
+            base_url=str(config.server_url),
+            follow_redirects=True,
+            headers=cls._make_headers(config),
         )
         return cls(conn)
