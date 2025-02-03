@@ -242,7 +242,7 @@ def reply_to(
         method=request.method,
         url=request.url,
         headers=headers or {},
-        body=body.encode() if isinstance(body, str) else body,
+        body=serialize(body),
         expires=request.expires,
         status_code=status_code,
     )
@@ -272,7 +272,7 @@ def write_response(
         method="GET",
         url=client.to_syft_url(request_path.parent),
         headers=headers or {},
-        body=body.encode() if isinstance(body, str) else body,
+        body=serialize(body),
         status_code=status_code,
     )
     response.dump(request_path.with_suffix(".response"))

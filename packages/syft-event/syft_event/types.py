@@ -11,6 +11,6 @@ class Request(BaseModel):
 
 
 class Response(BaseModel):
-    content: Any = None
+    body: Any = None
     status_code: int = 200
     headers: Mapping[str, str] | None = None
