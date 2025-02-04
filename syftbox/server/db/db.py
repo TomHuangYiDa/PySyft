@@ -255,8 +255,7 @@ def get_read_permissions_for_user(
 
     query = """
     -- First get all rules that apply to this user, including wildcards and email matches
-
-    WITH RECURSIVE
+    WITH
     user_matching_rules AS (
         SELECT r.*, rf.file_id, rf.match_for_email
         FROM rules r
@@ -264,41 +263,48 @@ def get_read_permissions_for_user(
             ON r.permfile_path = rf.permfile_path
             AND r.priority = rf.priority
         WHERE r.user = ? -- Direct user match
-           OR r.user = '*' -- Wildcard match
-           OR rf.match_for_email = ? -- Email pattern match
+        OR r.user = '*' -- Wildcard match
+        OR rf.match_for_email = ? -- Email pattern match
     ),
 
     -- Then calculate effective permissions by taking the highest priority rule
     -- Higher depth * 1000 + priority means more specific rules take precedence
+    -- Caveat: using 1000 means we can't have more than 1000 rules in the same permission file
     permission_priorities AS (
         SELECT
             file_id,
-            MAX(CASE WHEN can_read AND NOT disallow THEN permfile_depth * 1000 + priority ELSE 0 END) as allow_priority,
-            MAX(CASE WHEN can_read AND disallow THEN permfile_depth * 1000 + priority ELSE 0 END) as deny_priority,
-            MAX(CASE WHEN admin AND NOT disallow THEN permfile_depth * 1000 + priority ELSE 0 END) as admin_allow_priority,
-            MAX(CASE WHEN admin AND disallow THEN permfile_depth * 1000 + priority ELSE 0 END) as admin_deny_priority
+            MAX(CASE WHEN can_read AND NOT disallow THEN permfile_depth * 1000 + priority ELSE 0 END) as read_allow_prio,
+            MAX(CASE WHEN can_read AND disallow THEN permfile_depth * 1000 + priority ELSE 0 END) as read_deny_prio,
+            MAX(CASE WHEN admin AND NOT disallow THEN permfile_depth * 1000 + priority ELSE 0 END) as admin_allow_prio,
+            MAX(CASE WHEN admin AND disallow THEN permfile_depth * 1000 + priority ELSE 0 END) as admin_deny_prio
         FROM user_matching_rules
         GROUP BY file_id
+    ),
+
+    final_permissions AS (
+        SELECT
+            file_id,
+            (read_allow_prio > read_deny_prio) as can_read,
+            (admin_allow_prio > admin_deny_prio) as is_admin
+        FROM permission_priorities
     )
 
-    -- Finally join with files and determine if user has read access
+    -- User has access if any of the following are true:
+    --  1. They have an allowing rule that overrides any denying rules `can_read`
+    --  2. They have admin access that overrides admin denials `is_admin`
+    --  3. They own the datasite `f.datasite = user`
     SELECT
         f.path,
         f.hash,
         f.signature,
         f.file_size,
         f.last_modified,
-        -- User has access if:
-        -- 1. They have an allowing rule that overrides any denying rules OR
-        -- 2. They have admin access that overrides admin denials OR
-        -- 3. They own the datasite
         COALESCE(
-            pp.allow_priority > pp.deny_priority OR
-            pp.admin_allow_priority > pp.admin_deny_priority,
+            can_read OR is_admin,
             FALSE
         ) OR f.datasite = ? AS read_permission
     FROM file_metadata f
-    LEFT JOIN permission_priorities pp ON f.id = pp.file_id
+    LEFT JOIN final_permissions fp ON f.id = fp.file_id
     WHERE 1=1 {path_condition}
     """.format(path_condition=path_condition)
 
