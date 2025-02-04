@@ -62,6 +62,9 @@ class SyftClientConfig(BaseModel):
     path: Path = Field(exclude=True, description="Path to the config file")
     """Path to the config file"""
 
+    client_timeout: float = Field(default=5, description="Timeout used by the client connection to the SyftBox server")
+    """Timeout used by the client connection to the SyftBox server"""
+
     @field_validator("client_url", mode="before")
     def port_to_url(cls, val: Union[int, str]) -> Optional[str]:
         if isinstance(val, int):

@@ -131,7 +131,7 @@ class ClientBase:
             base_url=str(config.server_url),
             follow_redirects=True,
             headers=cls._make_headers(config),
-            timeout=10,
+            timeout=config.client_timeout,
             transport=transport,
         )
         return cls(conn)
