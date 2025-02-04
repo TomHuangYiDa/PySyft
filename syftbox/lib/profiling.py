@@ -5,7 +5,7 @@ import signal
 import subprocess  # nosec
 import tempfile
 import time
-from typing import Iterator
+from typing import Callable, Iterator
 
 
 @contextlib.contextmanager
@@ -53,18 +53,18 @@ class FakeThread:
     Easy to swap with Thread when profiling is not needed and we want to run in the main thread.
     """
 
-    def __init__(self, target, args=(), daemon=True):
+    def __init__(self, target: Callable, args: tuple = (), daemon: bool = True) -> None:
         self.target = target
         self.args = args
         self.daemon = daemon
         self.is_alive_flag = False
 
-    def start(self):
+    def start(self) -> None:
         self.is_alive_flag = True
         self.target(*self.args)
 
-    def is_alive(self):
+    def is_alive(self) -> bool:
         return self.is_alive_flag
 
-    def join(self):
+    def join(self) -> None:
         pass
