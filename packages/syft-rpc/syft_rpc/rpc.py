@@ -9,7 +9,7 @@ from uuid import UUID
 from pydantic import BaseModel
 from syft_core.client_shim import Client
 from syft_core.url import SyftBoxURL
-from typing_extensions import Any, Dict, Optional, Union
+from typing_extensions import Any, Dict, List, Optional, Union
 
 from syft_rpc.protocol import (
     SyftBulkFuture,
@@ -141,7 +141,7 @@ def send(
 
 
 def broadcast(
-    urls: Union[SyftBoxURL, str],
+    urls: Union[List[SyftBoxURL], List[str]],
     body: Optional[BodyType] = None,
     headers: Optional[HeaderType] = None,
     expiry: str = DEFAULT_EXPIRY,
