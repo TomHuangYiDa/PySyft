@@ -4,7 +4,6 @@ SyftBox CLI - Setup scripts
 
 import json
 import shutil
-import time
 from pathlib import Path
 
 import httpx
@@ -125,7 +124,7 @@ def setup_config_interactive(
             **SYFTBOX_HEADERS,
             HEADER_SYFTBOX_USER: conf.email,
         },
-        transport=httpx.HTTPTransport(retries=5),
+        transport=httpx.HTTPTransport(retries=10),
     )
     if not skip_verify_install:
         verify_installation(conf, login_client)
@@ -171,12 +170,8 @@ def prompt_email() -> str:
 
 def verify_installation(conf: SyftClientConfig, client: httpx.Client) -> None:
     try:
-        try:
-            response = client.get("/info?verify_installation=1")
-        except httpx.ConnectError:
-            # try one more time, server may be starting (dev mode)
-            time.sleep(5)
-            response = client.get("/info?verify_installation=1")
+        response = client.get("/info?verify_installation=1")
+
         response.raise_for_status()
 
     except (httpx.HTTPError, KeyError):
