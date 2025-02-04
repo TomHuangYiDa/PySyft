@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import TYPE_CHECKING, Optional
 
@@ -14,6 +15,8 @@ from syftbox.lib.client_config import SyftClientConfig
 from syftbox.lib.http import HEADER_SYFTBOX_USER, HEADER_SYFTBOX_VERSION, SYFTBOX_HEADERS
 from syftbox.lib.version_utils import get_range_for_version
 from syftbox.lib.workspace import SyftWorkspace
+
+SYFT_CLIENT_TIMEOUT = os.environ.get("SYFT_CLIENT_TIMEOUT", 5)
 
 
 class PluginManagerInterface(Protocol):
@@ -131,7 +134,7 @@ class ClientBase:
             base_url=str(config.server_url),
             follow_redirects=True,
             headers=cls._make_headers(config),
-            timeout=10,
+            timeout=SYFT_CLIENT_TIMEOUT,
             transport=transport,
         )
         return cls(conn)
