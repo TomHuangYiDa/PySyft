@@ -1,11 +1,11 @@
 [project]
 name = "syftbox"
-version = "0.2.11"
+version = "0.3.4"
 description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.9"
 dependencies = [
-    "fastapi==0.115.6",
+    "fastapi==0.115.7",
     "uvicorn==0.34.0",
     "gunicorn==23.0.0",
     "jinja2==3.1.5",
@@ -22,7 +22,7 @@ dependencies = [
     "croniter==6.0.0",
     "typer==0.15.1",
     "pid==3.0.4",
-    "pydantic[email]==2.10.5",
+    "pydantic[email]==2.10.6",
     "pyjwt==2.10.1",
     "wcmatch==10.0",
     "curl-cffi>=0.7.4",
@@ -61,7 +61,7 @@ exclude = ["syftbox/assets/icon/*"]
 # this will be completely ignored in the built wheel
 dev-dependencies = [
     "bump2version>=1.0.1",
-    "faker>=30.3.0",
+    "faker>=30.3.4",
     "ipykernel>=6.29.5",
     "locust>=2.32.0",
     "pre-commit>=4.0.1",
@@ -90,3 +90,9 @@ extend-select = ["I"]
 
 [tool.coverage.report]
 skip_empty = true
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.package-data]
+'syftbox' = ['syftbox/server2client_version.json']

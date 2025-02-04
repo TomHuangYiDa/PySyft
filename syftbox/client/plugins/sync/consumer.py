@@ -74,7 +74,9 @@ class SyncConsumer:
                     path=Path(file_path),
                     state=state,
                     action=SyncActionType.CREATE_LOCAL,
+                    save=False,
                 )
+            self.local_state.save()
         except FatalSyncError as e:
             raise e
         except Exception as e:

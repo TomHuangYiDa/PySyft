@@ -1,20 +1,20 @@
 from collections.abc import Generator
-from functools import partial
 from pathlib import Path
 
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+from syftbox import __version__
 from syftbox.client.base import PluginManagerInterface, SyftBoxContextInterface
 from syftbox.client.core import SyftBoxContext
 from syftbox.client.server_client import SyftBoxClient
 from syftbox.lib.client_config import SyftClientConfig
 from syftbox.lib.datasite import create_datasite
+from syftbox.lib.http import HEADER_SYFTBOX_VERSION
 from syftbox.lib.workspace import SyftWorkspace
 from syftbox.server.migrations import run_migrations
-from syftbox.server.server import app as server_app
-from syftbox.server.server import lifespan as server_lifespan
+from syftbox.server.server import create_server
 from syftbox.server.settings import ServerSettings
 from tests.unit.server.conftest import get_access_token
 
@@ -23,6 +23,7 @@ def authenticate_testclient(client: TestClient, email: str) -> None:
     access_token = get_access_token(client, email)
     client.headers["email"] = email
     client.headers["Authorization"] = f"Bearer {access_token}"
+    client.headers[HEADER_SYFTBOX_VERSION] = __version__
 
 
 class MockPluginManager(PluginManagerInterface):
@@ -54,7 +55,7 @@ def setup_datasite(tmp_path: Path, server_client: TestClient, email: str) -> Syf
 
 
 @pytest.fixture(scope="function")
-def server_app_with_lifespan(tmp_path: Path) -> FastAPI:
+def server_app(tmp_path: Path) -> FastAPI:
     """
     NOTE we are spawning a new server thread for each datasite,
     this is not ideal but it is the same as using multiple uvicorn workers
@@ -64,27 +65,29 @@ def server_app_with_lifespan(tmp_path: Path) -> FastAPI:
     settings = ServerSettings.from_data_folder(path)
     settings.auth_enabled = False
     settings.otel_enabled = False
-    lifespan_with_settings = partial(server_lifespan, settings=settings)
-    server_app.router.lifespan_context = lifespan_with_settings
+    server_app = create_server(settings)
     run_migrations(settings)
     return server_app
 
 
 @pytest.fixture()
-def datasite_1(tmp_path: Path, server_app_with_lifespan: FastAPI) -> SyftBoxContextInterface:
+def datasite_1(tmp_path: Path, server_app: FastAPI) -> SyftBoxContextInterface:
     email = "user_1@openmined.org"
-    with TestClient(server_app_with_lifespan) as client:
+    with TestClient(server_app) as client:
+        client.headers[HEADER_SYFTBOX_VERSION] = __version__
         return setup_datasite(tmp_path, client, email)
 
 
 @pytest.fixture()
-def datasite_2(tmp_path: Path, server_app_with_lifespan: FastAPI) -> SyftBoxContextInterface:
+def datasite_2(tmp_path: Path, server_app: FastAPI) -> SyftBoxContextInterface:
     email = "user_2@openmined.org"
-    with TestClient(server_app_with_lifespan) as client:
+    with TestClient(server_app) as client:
+        client.headers[HEADER_SYFTBOX_VERSION] = __version__
         return setup_datasite(tmp_path, client, email)
 
 
 @pytest.fixture(scope="function")
-def server_client(server_app_with_lifespan: FastAPI) -> Generator[TestClient, None, None]:
-    with TestClient(server_app_with_lifespan) as client:
+def server_client(server_app: FastAPI) -> Generator[TestClient, None, None]:
+    with TestClient(server_app) as client:
+        client.headers[HEADER_SYFTBOX_VERSION] = __version__
         yield client

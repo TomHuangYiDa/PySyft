@@ -1,5 +1,9 @@
+import os
+from pathlib import Path
+
 import yaml
 from loguru import logger
+from packaging import version
 
 from syftbox import __version__
 from syftbox.lib.constants import PERM_FILE
@@ -7,8 +11,13 @@ from syftbox.lib.hash import collect_files, hash_files
 from syftbox.lib.permissions import SyftPermission, migrate_permissions
 from syftbox.server.db import db
 from syftbox.server.db.schema import get_db
-from syftbox.server.server import create_folders
 from syftbox.server.settings import ServerSettings
+
+
+def create_folders(folders: list[Path]) -> None:
+    for folder in folders:
+        if not os.path.exists(folder):
+            os.makedirs(folder, exist_ok=True)
 
 
 def run_migrations(settings: ServerSettings) -> None:
@@ -20,7 +29,7 @@ def run_migrations(settings: ServerSettings) -> None:
 
 def init_db(settings: ServerSettings) -> None:
     # remove this after the upcoming release
-    if __version__ in ["0.2.11", "0.2.12"]:
+    if version.parse(__version__) > version.parse("0.2.10"):
         # Delete existing DB to avoid conflicts
         db_path = settings.file_db_path.absolute()
         if db_path.exists():

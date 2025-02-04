@@ -19,7 +19,7 @@ from syftbox.client.core import METADATA_FILENAME
 from syftbox.lib.client_config import SyftClientConfig
 from syftbox.lib.constants import DEFAULT_DATA_DIR
 from syftbox.lib.exceptions import ClientConfigException
-from syftbox.lib.http import SYFTBOX_HEADERS
+from syftbox.lib.http import HEADER_SYFTBOX_USER, SYFTBOX_HEADERS
 from syftbox.lib.validators import DIR_NOT_EMPTY, is_valid_dir, is_valid_email
 from syftbox.lib.workspace import SyftWorkspace
 
@@ -120,7 +120,12 @@ def setup_config_interactive(
 
     # Short-lived client for all pre-authentication requests
     login_client = httpx.Client(
-        base_url=str(conf.server_url), headers=SYFTBOX_HEADERS, transport=httpx.HTTPTransport(retries=5)
+        base_url=str(conf.server_url),
+        headers={
+            **SYFTBOX_HEADERS,
+            HEADER_SYFTBOX_USER: conf.email,
+        },
+        transport=httpx.HTTPTransport(retries=5),
     )
     if not skip_verify_install:
         verify_installation(conf, login_client)
@@ -167,26 +172,12 @@ def prompt_email() -> str:
 def verify_installation(conf: SyftClientConfig, client: httpx.Client) -> None:
     try:
         try:
-            response = client.get("/info")
+            response = client.get("/info?verify_installation=1")
         except httpx.ConnectError:
             # try one more time, server may be starting (dev mode)
-            response = client.get("/info")
+            time.sleep(5)
+            response = client.get("/info?verify_installation=1")
         response.raise_for_status()
-        server_info = response.json()
-        server_version = server_info["version"]
-        local_version = __version__
-
-        if server_version == local_version:
-            return
-
-        should_continue = Confirm.ask(
-            f"\n[yellow]Server version ({server_version}) does not match your client version ({local_version}).\n"
-            f"[bold](recommended)[/bold] To update, run:\n\n"
-            f"[bold]curl -LsSf https://syftbox.openmined.org/install.sh | sh[/bold][/yellow]\n\n"
-            f"Continue without updating?"
-        )
-        if not should_continue:
-            raise typer.Exit()
 
     except (httpx.HTTPError, KeyError):
         should_continue = Confirm.ask(

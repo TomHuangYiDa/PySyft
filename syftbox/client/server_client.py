@@ -36,7 +36,7 @@ class SyftBoxClient(ClientBase):
         return response.json().get("token")
 
     def info(self) -> dict:
-        response = self.conn.get("/info")
+        response = self.conn.get("/info?client=1")
         self.raise_for_status(response)
         return response.json()
 
@@ -71,19 +71,13 @@ class SyncClient(ClientBase):
         return result
 
     def get_remote_state(self, relative_path: Path) -> list[FileMetadata]:
-        response = self.conn.post(
-            "/sync/dir_state",
-            params={"dir": relative_path.as_posix()},
-        )
+        response = self.conn.post("/sync/dir_state", params={"dir": relative_path.as_posix()})
         self.raise_for_status(response)
         data = response.json()
         return [FileMetadata(**item) for item in data]
 
     def get_metadata(self, path: Path) -> FileMetadata:
-        response = self.conn.post(
-            "/sync/get_metadata",
-            json={"path": path.as_posix()},
-        )
+        response = self.conn.post("/sync/get_metadata", json={"path": path.as_posix()})
         self.raise_for_status(response)
         return FileMetadata(**response.json())
 
@@ -138,10 +132,7 @@ class SyncClient(ClientBase):
         return ApplyDiffResponse(**response.json())
 
     def delete(self, relative_path: Path) -> None:
-        response = self.conn.post(
-            "/sync/delete",
-            json={"path": relative_path.as_posix()},
-        )
+        response = self.conn.post("/sync/delete", json={"path": relative_path.as_posix()})
         self.raise_for_status(response)
 
     def create(self, relative_path: Path, data: bytes) -> None:
@@ -152,10 +143,7 @@ class SyncClient(ClientBase):
         self.raise_for_status(response)
 
     def download(self, relative_path: Path) -> bytes:
-        response = self.conn.post(
-            "/sync/download",
-            json={"path": relative_path.as_posix()},
-        )
+        response = self.conn.post("/sync/download", json={"path": relative_path.as_posix()})
         self.raise_for_status(response)
         return response.content
 

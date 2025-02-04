@@ -3,7 +3,14 @@ from typing import Callable
 
 from fastapi import Request, Response, status
 from loguru import logger
+from packaging import version
 from starlette.middleware.base import BaseHTTPMiddleware
+
+from syftbox import __version__
+from syftbox.lib.http import (
+    HEADER_SYFTBOX_VERSION,
+)
+from syftbox.lib.version_utils import get_range_for_version
 
 
 class LoguruMiddleware(BaseHTTPMiddleware):
@@ -42,4 +49,34 @@ class RequestSizeLimitMiddleware(BaseHTTPMiddleware):
             )
 
         response = await call_next(request)
+        return response
+
+
+class VersionCheckMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next: Callable) -> Response:
+        user_agent = request.headers.get("User-Agent")
+        if user_agent.startswith("SyftBox"):
+            client_version = request.headers.get(HEADER_SYFTBOX_VERSION)
+
+            if not client_version:
+                return Response(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    content="Client version not provided. Please include the 'Version' header.",
+                )
+
+            version_range = get_range_for_version(client_version)
+
+            if isinstance(version_range, str):
+                logger.info(version_range)
+            else:
+                lower_bound_version = version_range[0]
+
+                if version.parse(client_version) < version.parse(lower_bound_version):
+                    return Response(
+                        status_code=status.HTTP_426_UPGRADE_REQUIRED,
+                        content=f"Client version is too old. Minimum version required is {lower_bound_version}",
+                    )
+
+        response = await call_next(request)
+        response.headers[HEADER_SYFTBOX_VERSION] = __version__
         return response

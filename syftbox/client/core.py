@@ -4,9 +4,9 @@ import platform
 import shutil
 from pathlib import Path
 from types import TracebackType
-from typing import cast
 
 import uvicorn
+from httpx import BaseTransport
 from loguru import logger
 from pid import PidFile, PidFileAlreadyLockedError, PidFileAlreadyRunningError
 from typing_extensions import Optional, Type
@@ -49,13 +49,19 @@ class SyftBoxRunner:
         Exception: If the client fails to start due to any reason
     """
 
-    def __init__(self, config: SyftClientConfig, log_level: str = "INFO", **kwargs: dict) -> None:
+    def __init__(
+        self,
+        config: SyftClientConfig,
+        log_level: str = "INFO",
+        server_transport: Optional[BaseTransport] = None,
+        **kwargs: dict,
+    ) -> None:
         self.config = config
         self.log_level = log_level
 
         self.workspace = SyftWorkspace(self.config.data_dir)
         self.pid = PidFile(pidname="syftbox.pid", piddir=self.workspace.data_dir)
-        self.client: SyftBoxClient = cast(SyftBoxClient, SyftBoxClient.from_config(self.config))
+        self.client = SyftBoxClient.from_config(self.config, transport=server_transport)
 
         # create a single client context shared across components
         self.__ctx = SyftBoxContext(
@@ -283,7 +289,10 @@ def run_migration(config: SyftClientConfig, migrate_datasite: bool = True) -> No
 
 
 def run_syftbox(
-    client_config: SyftClientConfig, open_dir: bool = False, log_level: str = "INFO", migrate_datasite: bool = True
+    client_config: SyftClientConfig,
+    open_dir: bool = False,
+    log_level: str = "INFO",
+    migrate_datasite: bool = True,
 ) -> int:
     """Run the SyftBox client"""
     syftbox_instance = None
