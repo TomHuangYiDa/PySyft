@@ -240,62 +240,78 @@ def get_read_permissions_for_user(
 
     These bits are combined with a final OR operation.
     """
+
     cursor = connection.cursor()
 
-    params: tuple = (user, user, user)
-    like_clause = ""
+    params: list = []
+    path_condition = ""
     if path_like:
         if "%" in path_like:
             raise ValueError("we don't support % in paths")
         path_like = path_like + "%"
         escaped_path = path_like.replace("_", "\\_")
-        like_clause += " WHERE path LIKE ? ESCAPE '\\' "
-        params = (user, user, user, escaped_path)
+        path_condition = "AND f.path LIKE ? ESCAPE '\\'"
+        params.append(escaped_path)
 
     query = """
-    SELECT path, hash, signature, file_size, last_modified,
-    (
-        SELECT COALESCE(
-            max(
-                CASE
-                    WHEN can_read AND NOT disallow THEN rule_prio
-                    ELSE 0
-                END
-            ) >
-            max(
-                CASE
-                    WHEN can_read AND disallow THEN rule_prio
-                    ELSE 0
-                END
-        ), 0)
-        or
-        COALESCE(
-            max(
-                CASE
-                    WHEN admin AND NOT disallow THEN rule_prio
-                    ELSE 0
-                END
-            ) >
-            max(
-                CASE
-                    WHEN admin AND disallow THEN rule_prio
-                    ELSE 0
-                END
-        ), 0)
-        FROM (
-            SELECT can_read, admin, disallow,
-                row_number() OVER (ORDER BY rules.permfile_depth, rules.priority ASC) AS rule_prio
-            FROM rule_files
-            JOIN rules ON rule_files.permfile_path = rules.permfile_path and rule_files.priority = rules.priority
-            WHERE rule_files.file_id = f.id and (rules.user = ? or rules.user = "*" or rule_files.match_for_email = ?)
-        )
-    ) OR datasite = ? AS read_permission
-    FROM file_metadata f
-    {}
-    """.format(like_clause)
-    res = cursor.execute(query, params)
+    -- First get all rules that apply to this user, including wildcards and email matches
+    WITH
+    user_matching_rules AS (
+        SELECT r.*, rf.file_id, rf.match_for_email
+        FROM rules r
+        JOIN rule_files rf
+            ON r.permfile_path = rf.permfile_path
+            AND r.priority = rf.priority
+        WHERE r.user = ? -- Direct user match
+        OR r.user = '*' -- Wildcard match
+        OR rf.match_for_email = ? -- Email pattern match
+    ),
 
-    return res.fetchall()
+    -- Then calculate effective permissions by taking the highest priority rule
+    -- Higher depth * 1000 + priority means more specific rules take precedence
+    -- Caveat: using 1000 means we can't have more than 1000 rules in the same permission file
+    permission_priorities AS (
+        SELECT
+            file_id,
+            MAX(CASE WHEN can_read AND NOT disallow THEN permfile_depth * 1000 + priority ELSE 0 END) as read_allow_prio,
+            MAX(CASE WHEN can_read AND disallow THEN permfile_depth * 1000 + priority ELSE 0 END) as read_deny_prio,
+            MAX(CASE WHEN admin AND NOT disallow THEN permfile_depth * 1000 + priority ELSE 0 END) as admin_allow_prio,
+            MAX(CASE WHEN admin AND disallow THEN permfile_depth * 1000 + priority ELSE 0 END) as admin_deny_prio
+        FROM user_matching_rules
+        GROUP BY file_id
+    ),
+
+    final_permissions AS (
+        SELECT
+            file_id,
+            (read_allow_prio > read_deny_prio) as can_read,
+            (admin_allow_prio > admin_deny_prio) as is_admin
+        FROM permission_priorities
+    )
+
+    -- User has access if any of the following are true:
+    --  1. They have an allowing rule that overrides any denying rules `can_read`
+    --  2. They have admin access that overrides admin denials `is_admin`
+    --  3. They own the datasite `f.datasite = user`
+    SELECT
+        f.path,
+        f.hash,
+        f.signature,
+        f.file_size,
+        f.last_modified,
+        COALESCE(
+            can_read OR is_admin,
+            FALSE
+        ) OR f.datasite = ? AS read_permission
+    FROM file_metadata f
+    LEFT JOIN final_permissions fp ON f.id = fp.file_id
+    WHERE 1=1 {path_condition}
+    """.format(path_condition=path_condition)
+
+    # Add parameters in order: 2 user checks + 1 datasite check + optional path
+    query_params = [user, user, user] + params
+
+    return cursor.execute(query, query_params).fetchall()
 
 
 def print_table(connection: sqlite3.Connection, table: str) -> None:
@@ -312,6 +328,7 @@ def print_table(connection: sqlite3.Connection, table: str) -> None:
 def get_filemetadata_with_read_access(
     connection: sqlite3.Connection, user: str, path: Optional[RelativePath] = None
 ) -> list[FileMetadata]:
-    rows = get_read_permissions_for_user(connection, user, str(path))
+    string_path = str(path) if path else None
+    rows = get_read_permissions_for_user(connection, user, string_path)
     res = [FileMetadata.from_row(row) for row in rows if row["read_permission"]]
     return res
