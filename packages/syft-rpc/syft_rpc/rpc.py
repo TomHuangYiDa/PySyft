@@ -1,12 +1,15 @@
+from __future__ import annotations
+
 import json
 from dataclasses import asdict, is_dataclass
 from datetime import datetime, timezone
 from pathlib import Path
+from uuid import UUID
 
 from pydantic import BaseModel
 from syft_core.client_shim import Client
 from syft_core.url import SyftBoxURL
-from typing_extensions import Any
+from typing_extensions import Any, Dict, List, Optional, Union
 
 from syft_rpc.protocol import (
     SyftBulkFuture,
@@ -21,6 +24,9 @@ from syft_rpc.util import parse_duration
 
 DEFAULT_EXPIRY = "15m"
 
+BodyType = Union[str, bytes, dict, list, tuple, float, int, BaseModel, None]
+HeaderType = Optional[Dict[str, str]]
+
 
 def make_url(datasite: str, app_name: str, endpoint: str) -> SyftBoxURL:
     """Create a Syft Box URL from a datasite, app name, and RPC endpoint."""
@@ -30,11 +36,13 @@ def make_url(datasite: str, app_name: str, endpoint: str) -> SyftBoxURL:
     )
 
 
-def serialize(obj: Any) -> bytes:
-    if isinstance(obj, BaseModel):
+def serialize(obj: Any) -> Optional[bytes]:
+    if obj is None:
+        return None
+    elif isinstance(obj, BaseModel):
         return obj.model_dump_json().encode()
-    elif is_dataclass(obj):
-        return json.dumps(asdict(obj)).encode()
+    elif is_dataclass(obj) and not isinstance(obj, type):
+        return json.dumps(asdict(obj), default=str).encode()
     elif isinstance(obj, str):
         return obj.encode()
     else:
@@ -43,13 +51,12 @@ def serialize(obj: Any) -> bytes:
 
 
 def send(
-    url: SyftBoxURL | str,
-    body: str | bytes | None = None,
-    headers: dict[str, str] | None = None,
-    method: SyftMethod | str = SyftMethod.GET,
+    url: Union[SyftBoxURL, str],
+    body: Optional[BodyType] = None,
+    headers: Optional[HeaderType] = None,
     expiry: str = DEFAULT_EXPIRY,
     cache: bool = False,
-    client: Client | None = None,
+    client: Optional[Client] = None,
 ) -> SyftFuture:
     """Send an asynchronous request to a Syft Box endpoint and return a future for tracking the response.
 
@@ -76,9 +83,8 @@ def send(
 
     Example:
         >>> future = send(
-        ...     method="GET",
         ...     url="syft://data@domain.com/dataset1",
-        ...     expiry_secs=30
+        ...     expiry_secs="30s"
         ... )
         >>> response = future.result()  # Wait for response
     """
@@ -88,7 +94,7 @@ def send(
 
     syft_request = SyftRequest(
         sender=client.email,
-        method=method.upper() if isinstance(method, str) else method,
+        method=SyftMethod.GET,
         url=url if isinstance(url, SyftBoxURL) else SyftBoxURL(url),
         headers=headers or {},
         body=serialize(body),
@@ -135,13 +141,12 @@ def send(
 
 
 def broadcast(
-    urls: list[SyftBoxURL | str],
-    method: SyftMethod | str = SyftMethod.GET,
-    headers: dict[str, str] | None = None,
-    body: str | bytes | None = None,
+    urls: Union[List[SyftBoxURL], List[str]],
+    body: Optional[BodyType] = None,
+    headers: Optional[HeaderType] = None,
     expiry: str = DEFAULT_EXPIRY,
     cache: bool = False,
-    client: Client | None = None,
+    client: Optional[Client] = None,
 ) -> SyftBulkFuture:
     """Broadcast an asynchronous request to multiple Syft Box endpoints and return a bulk future.
 
@@ -169,8 +174,8 @@ def broadcast(
 
     Example:
         >>> future = broadcast(
-        ...     method="GET",
-        ...     urls=["syft://user1@domain.com/public/rpc/", "syft://user2@domain.com/public/rpc/"],
+        ...     urls=["syft://user1@domain.com/api_data/app_name/rpc/endpoint",
+        ...           "syft://user2@domain.com/api_data/app_name/rpc/endpoint"],
         ...     expiry="1d",
         ... )
         >>> responses = future.gather_completed()  # Wait for all responses
@@ -182,7 +187,6 @@ def broadcast(
     bulk_future = SyftBulkFuture(
         futures=[
             send(
-                method=method,
                 url=url,
                 headers=headers,
                 body=body,
@@ -198,10 +202,10 @@ def broadcast(
 
 def reply_to(
     request: SyftRequest,
-    body: str | bytes | None = None,
-    headers: dict[str, str] | None = None,
+    body: Optional[BodyType] = None,
+    headers: Optional[HeaderType] = None,
     status_code: SyftStatus = SyftStatus.SYFT_200_OK,
-    client: Client | None = None,
+    client: Optional[Client] = None,
 ) -> SyftResponse:
     """Create and store a response to a Syft request.
 
@@ -238,7 +242,6 @@ def reply_to(
     response = SyftResponse(
         id=request.id,
         sender=client.email,
-        method=request.method,
         url=request.url,
         headers=headers or {},
         body=serialize(body),
@@ -255,20 +258,23 @@ def reply_to(
 
 
 def write_response(
-    request_path: str | Path,
-    body: str | bytes | None = None,
-    headers: dict[str, str] | None = None,
+    request_path: Union[Path, str],
+    body: Optional[BodyType] = None,
+    headers: Optional[HeaderType] = None,
     status_code: SyftStatus = SyftStatus.SYFT_200_OK,
-    client: Client | None = None,
+    client: Optional[Client] = None,
 ):
     """Write a response to a request file on the local filesystem.
     Useful when request could not be parsed."""
 
+    request_path = Path(request_path)
+
+    client = client or Client.load()
+
     _id = request_path.stem
     response = SyftResponse(
-        id=_id,
+        id=UUID(_id),
         sender=client.email,
-        method="GET",
         url=client.to_syft_url(request_path.parent),
         headers=headers or {},
         body=serialize(body),

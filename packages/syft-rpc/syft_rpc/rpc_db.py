@@ -1,5 +1,8 @@
+from __future__ import annotations
+
 import sqlite3
 import threading
+from functools import cache
 from uuid import UUID
 
 from syft_core.client_shim import Client
@@ -22,10 +25,12 @@ INSERT OR REPLACE INTO futures (id, path, expires, namespace, bid)
 VALUES (:id, :path, :expires, :namespace, :bid)
 """
 
+
 thread_local = threading.local()
 
 
-def __default_client() -> Client:
+@cache
+def get_default_client():
     return Client.load()
 
 
@@ -59,7 +64,7 @@ def save_future(
     client: Optional[Client] = None,
     bulk_id: Optional[str] = None,
 ) -> str:
-    client = client or __default_client()
+    client = client or get_default_client()
     conn = __get_connection(client)
     data = future.model_dump(mode="json")
 
@@ -70,9 +75,9 @@ def save_future(
 
 
 def get_future(
-    future_id: Union[str, UUID], client: Optional[Client] = None
+    future_id: Union[UUID, str], client: Optional[Client] = None
 ) -> Optional[SyftFuture]:
-    client = client or __default_client()
+    client = client or get_default_client()
     conn = __get_connection(client)
     row = conn.execute(
         "SELECT id, path, expires FROM futures WHERE id = ?", (str(future_id),)
@@ -84,8 +89,8 @@ def get_future(
     return SyftFuture(**dict(row))
 
 
-def delete_future(future_id: Union[str, UUID], client: Optional[Client] = None) -> None:
-    client = client or __default_client()
+def delete_future(future_id: Union[UUID, str], client: Optional[Client] = None) -> None:
+    client = client or get_default_client()
     conn = __get_connection(client)
     conn.execute("DELETE FROM futures WHERE id = ?", (str(future_id),))
     conn.commit()
@@ -125,7 +130,7 @@ def save_bulk_future(
 def get_bulk_future(
     bulk_id: Union[str, UUID], client: Optional[Client] = None
 ) -> Optional[SyftBulkFuture]:
-    client = client or Client.load()
+    client = client or get_default_client()
     conn = __get_connection(client)
     rows = conn.execute(
         "SELECT id, path, expires FROM futures WHERE bid = ? ORDER BY expires",
@@ -142,7 +147,7 @@ def get_bulk_future(
 def delete_bulk_future(
     bulk_id: Union[str, UUID], client: Optional[Client] = None
 ) -> None:
-    client = client or Client.load()
+    client = client or get_default_client()
     conn = __get_connection(client)
     conn.execute("DELETE FROM futures WHERE bid = ?", (str(bulk_id),))
     conn.commit()
