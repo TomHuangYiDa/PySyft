@@ -284,8 +284,8 @@ class SyftResponse(SyftMessage):
             )
 
     @classmethod
-    def system_response(self, status_code: SyftStatus, message: str) -> Self:
-        return SyftResponse(
+    def system_response(cls, status_code: SyftStatus, message: str) -> Self:
+        return cls(
             status_code=status_code,
             body=message.encode(),
             url=SyftBoxURL("syft://system@syftbox.localhost"),
@@ -311,11 +311,13 @@ class SyftFuture(Base):
     expires: datetime
     """Timestamp when the request expires"""
 
-    _request: Optional[SyftRequest] = PrivateAttr(init=True)
+    _request: Optional[SyftRequest] = PrivateAttr()
 
     def __init__(self, **data):
         super().__init__(**data)
         self._request = data.get("request")
+        if not self._request:
+            self._request = SyftRequest.load(self.request_path)
 
     @property
     def request_path(self) -> Path:
@@ -395,6 +397,7 @@ class SyftFuture(Base):
         Returns:
             The response if available, None if still pending.
         """
+
         # Check for rejection first
         if self.is_rejected:
             self.request_path.unlink(missing_ok=True)
