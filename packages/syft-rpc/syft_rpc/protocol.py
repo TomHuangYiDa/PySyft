@@ -468,6 +468,12 @@ class SyftBulkFuture(Base):
     futures: list[SyftFuture]
     responses: list[SyftResponse] = []
 
+    def resolve(self) -> None:
+        """Resolve all futures and store the responses."""
+        for future in self.pending:
+            if response := future.resolve():
+                self.responses.append(response)
+
     def gather_completed(
         self,
         timeout: float = DEFAULT_TIMEOUT,
@@ -492,16 +498,11 @@ class SyftBulkFuture(Base):
         if poll_interval <= 0:
             raise ValueError("Poll interval must be greater than 0")
 
-        pending = set(self.futures)
         deadline = time.monotonic() + (timeout or float("inf"))
 
-        while pending and time.monotonic() < deadline:
-            for future in list(pending):  # Create list to allow set modification
-                if response := future.resolve():
-                    self.responses.append(response)
-                    pending.remove(future)
-
-            if len(self.responses) == len(self.futures):
+        while time.monotonic() < deadline:
+            self.resolve()
+            if not self.pending:
                 logger.debug("All futures have resolved")
                 break
             time.sleep(poll_interval)
@@ -520,6 +521,12 @@ class SyftBulkFuture(Base):
         hash_bytes = hashlib.sha256(combined.encode()).digest()[:16]
         # Use first 16 bytes of hash to create a new UUID
         return UUID(bytes=hash_bytes, version=4)
+
+    @property
+    def pending(self) -> list[SyftFuture]:
+        """Return a list of futures that have not yet resolved."""
+        completed = {r.id for r in self.responses}
+        return [f for f in self.futures if f.id not in completed]
 
     @property
     def failures(self) -> list[SyftResponse]:
