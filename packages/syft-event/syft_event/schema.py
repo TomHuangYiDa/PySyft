@@ -1,8 +1,10 @@
+from __future__ import annotations
+
 import inspect
 from inspect import signature
-from typing import Any, Callable, Dict, Union, get_type_hints
 
 from pydantic import BaseModel
+from typing_extensions import Any, Callable, Dict, Union, get_type_hints
 
 from syft_event.types import Request, Response
 

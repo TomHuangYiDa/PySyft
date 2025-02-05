@@ -1,9 +1,12 @@
+from __future__ import annotations
+
 import sqlite3
 import threading
+from uuid import UUID
 
 from syft_core.client_shim import Client
-from typing_extensions import Optional
-from uuid import UUID
+from typing_extensions import Optional, Union
+
 from syft_rpc.protocol import SyftFuture
 
 __Q_CREATE_TABLE = """
@@ -49,7 +52,9 @@ def __get_connection(client: Client) -> sqlite3.Connection:
     return thread_local.conn
 
 
-def save_future(future: SyftFuture, namespace: str, client: Client = None) -> str:
+def save_future(
+    future: SyftFuture, namespace: str, client: Optional[Client] = None
+) -> str:
     client = client or DEFAULT_CLIENT
     conn = __get_connection(client)
     data = future.model_dump(mode="json")
@@ -60,7 +65,9 @@ def save_future(future: SyftFuture, namespace: str, client: Client = None) -> st
     return data["id"]
 
 
-def get_future(future_id: str | UUID, client: Client = None) -> Optional[SyftFuture]:
+def get_future(
+    future_id: Union[UUID, str], client: Optional[Client] = None
+) -> Optional[SyftFuture]:
     client = client or DEFAULT_CLIENT
     conn = __get_connection(client)
     row = conn.execute(
@@ -73,21 +80,21 @@ def get_future(future_id: str | UUID, client: Client = None) -> Optional[SyftFut
     return SyftFuture(**dict(row))
 
 
-def delete_future(future_id: str | UUID, client: Client = None) -> None:
+def delete_future(future_id: Union[UUID, str], client: Optional[Client] = None) -> None:
     client = client or DEFAULT_CLIENT
     conn = __get_connection(client)
     conn.execute("DELETE FROM futures WHERE id = ?", (str(future_id),))
     conn.commit()
 
 
-def cleanup_expired_futures(client: Client = None) -> None:
+def cleanup_expired_futures(client: Optional[Client] = None) -> None:
     client = client or Client.load()
     conn = __get_connection(client)
     conn.execute("DELETE FROM futures WHERE expires < datetime('now')")
     conn.commit()
 
 
-def list_futures(namespace: str = None, client: Client = None):
+def list_futures(namespace: Optional[str] = None, client: Optional[Client] = None):
     client = client or Client.load()
     conn = __get_connection(client)
     query_all = "SELECT id, path, expires FROM futures"

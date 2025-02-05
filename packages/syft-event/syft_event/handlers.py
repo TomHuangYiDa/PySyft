@@ -1,13 +1,16 @@
+from __future__ import annotations
+
 from loguru import logger
 from pathspec import PathSpec
-from pathspec.patterns import GitWildMatchPattern
+from pathspec.patterns.gitwildmatch import GitWildMatchPattern
+from typing_extensions import Callable, List
 from watchdog.events import FileSystemEvent, FileSystemEventHandler
 
 __all__ = ["RpcRequestHandler", "AnyPatternHandler"]
 
 
 class PatternMatchingHandler(FileSystemEventHandler):
-    def __init__(self, patterns: list[str], ignore_directory: bool = True):
+    def __init__(self, patterns: List[str], ignore_directory: bool = True):
         self.spec = PathSpec.from_lines(GitWildMatchPattern, patterns)
         self.patterns = patterns
         self.ignore_directory = ignore_directory
@@ -20,7 +23,7 @@ class PatternMatchingHandler(FileSystemEventHandler):
 
 
 class RpcRequestHandler(PatternMatchingHandler):
-    def __init__(self, handler):
+    def __init__(self, handler: Callable[[FileSystemEvent], None]):
         super().__init__(patterns=["**/*.request"])
         self.handler = handler
 
@@ -30,7 +33,7 @@ class RpcRequestHandler(PatternMatchingHandler):
 
 
 class AnyPatternHandler(PatternMatchingHandler):
-    def __init__(self, patterns, handler):
+    def __init__(self, patterns: List[str], handler: Callable[[FileSystemEvent], None]):
         super().__init__(patterns)
         self.handler = handler
 

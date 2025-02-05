@@ -1,4 +1,6 @@
-from datetime import UTC, datetime
+from __future__ import annotations
+
+from datetime import datetime, timezone
 
 from loguru import logger
 from pydantic import BaseModel, Field
@@ -27,7 +29,10 @@ def pong(ping: PingRequest, ctx: Request) -> PongResponse:
     """Respond to a ping request."""
 
     logger.info(f"Got ping request - {ping}")
-    return PongResponse(msg=f"Pong from {box.client.email}", ts=datetime.now(UTC))
+    return PongResponse(
+        msg=f"Pong from {box.client.email}",
+        ts=datetime.now(timezone.utc),
+    )
 
 
 if __name__ == "__main__":
