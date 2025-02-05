@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import sqlite3
 import threading
+from functools import cache
 from uuid import UUID
 
 from syft_core.client_shim import Client
@@ -23,9 +24,13 @@ INSERT OR REPLACE INTO futures (id, path, expires, namespace)
 VALUES (:id, :path, :expires, :namespace)
 """
 
-DEFAULT_CLIENT = Client.load()
 
 thread_local = threading.local()
+
+
+@cache
+def get_default_client():
+    return Client.load()
 
 
 def __get_connection(client: Client) -> sqlite3.Connection:
@@ -55,7 +60,7 @@ def __get_connection(client: Client) -> sqlite3.Connection:
 def save_future(
     future: SyftFuture, namespace: str, client: Optional[Client] = None
 ) -> str:
-    client = client or DEFAULT_CLIENT
+    client = client or get_default_client()
     conn = __get_connection(client)
     data = future.model_dump(mode="json")
 
@@ -68,7 +73,7 @@ def save_future(
 def get_future(
     future_id: Union[UUID, str], client: Optional[Client] = None
 ) -> Optional[SyftFuture]:
-    client = client or DEFAULT_CLIENT
+    client = client or get_default_client()
     conn = __get_connection(client)
     row = conn.execute(
         "SELECT * FROM futures WHERE id = ?", (str(future_id),)
@@ -81,7 +86,7 @@ def get_future(
 
 
 def delete_future(future_id: Union[UUID, str], client: Optional[Client] = None) -> None:
-    client = client or DEFAULT_CLIENT
+    client = client or get_default_client()
     conn = __get_connection(client)
     conn.execute("DELETE FROM futures WHERE id = ?", (str(future_id),))
     conn.commit()
