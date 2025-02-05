@@ -3,7 +3,7 @@ import threading
 from uuid import UUID
 
 from syft_core.client_shim import Client
-from typing_extensions import Optional
+from typing_extensions import Optional, Union
 
 from syft_rpc.protocol import SyftBulkFuture, SyftFuture
 
@@ -22,9 +22,11 @@ INSERT OR REPLACE INTO futures (id, path, expires, namespace, bid)
 VALUES (:id, :path, :expires, :namespace, :bid)
 """
 
-DEFAULT_CLIENT = Client.load()
-
 thread_local = threading.local()
+
+
+def __default_client() -> Client:
+    return Client.load()
 
 
 def __get_connection(client: Client) -> sqlite3.Connection:
@@ -57,7 +59,7 @@ def save_future(
     client: Optional[Client] = None,
     bulk_id: Optional[str] = None,
 ) -> str:
-    client = client or DEFAULT_CLIENT
+    client = client or __default_client()
     conn = __get_connection(client)
     data = future.model_dump(mode="json")
 
@@ -67,11 +69,13 @@ def save_future(
     return data["id"]
 
 
-def get_future(future_id: str | UUID, client: Client = None) -> Optional[SyftFuture]:
-    client = client or DEFAULT_CLIENT
+def get_future(
+    future_id: Union[str, UUID], client: Optional[Client] = None
+) -> Optional[SyftFuture]:
+    client = client or __default_client()
     conn = __get_connection(client)
     row = conn.execute(
-        "SELECT * FROM futures WHERE id = ?", (str(future_id),)
+        "SELECT id, path, expires FROM futures WHERE id = ?", (str(future_id),)
     ).fetchone()
 
     if not row:
@@ -80,21 +84,21 @@ def get_future(future_id: str | UUID, client: Client = None) -> Optional[SyftFut
     return SyftFuture(**dict(row))
 
 
-def delete_future(future_id: str | UUID, client: Client = None) -> None:
-    client = client or DEFAULT_CLIENT
+def delete_future(future_id: Union[str, UUID], client: Optional[Client] = None) -> None:
+    client = client or __default_client()
     conn = __get_connection(client)
     conn.execute("DELETE FROM futures WHERE id = ?", (str(future_id),))
     conn.commit()
 
 
-def cleanup_expired_futures(client: Client = None) -> None:
+def cleanup_expired_futures(client: Optional[Client] = None) -> None:
     client = client or Client.load()
     conn = __get_connection(client)
     conn.execute("DELETE FROM futures WHERE expires < datetime('now')")
     conn.commit()
 
 
-def list_futures(namespace: str = None, client: Client = None):
+def list_futures(namespace: Optional[str] = None, client: Optional[Client] = None):
     client = client or Client.load()
     conn = __get_connection(client)
     query_all = "SELECT id, path, expires FROM futures"
@@ -108,7 +112,9 @@ def list_futures(namespace: str = None, client: Client = None):
 
 
 def save_bulk_future(
-    bulk_future: SyftBulkFuture, namespace: str, client: Client = None
+    bulk_future: SyftBulkFuture,
+    namespace: str,
+    client: Optional[Client] = None,
 ) -> str:
     bid = str(bulk_future.id)
     for future in bulk_future.futures:
@@ -117,12 +123,13 @@ def save_bulk_future(
 
 
 def get_bulk_future(
-    bulk_id: str | UUID, client: Client = None
+    bulk_id: Union[str, UUID], client: Optional[Client] = None
 ) -> Optional[SyftBulkFuture]:
     client = client or Client.load()
     conn = __get_connection(client)
     rows = conn.execute(
-        "SELECT id, path, expires FROM futures WHERE bid = ?", (str(bulk_id),)
+        "SELECT id, path, expires FROM futures WHERE bid = ? ORDER BY expires",
+        (str(bulk_id),),
     ).fetchall()
 
     if not rows:
@@ -132,7 +139,9 @@ def get_bulk_future(
     return SyftBulkFuture(futures=futures)
 
 
-def delete_bulk_future(bulk_id: str | UUID, client: Client = None) -> None:
+def delete_bulk_future(
+    bulk_id: Union[str, UUID], client: Optional[Client] = None
+) -> None:
     client = client or Client.load()
     conn = __get_connection(client)
     conn.execute("DELETE FROM futures WHERE bid = ?", (str(bulk_id),))
