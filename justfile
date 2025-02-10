@@ -39,3 +39,9 @@ run-jupyter jupyter_args="":
 
     uv run --frozen --with "jupyterlab" \
         jupyter lab {{ jupyter_args }}
+
+start-proxy:
+    uv sync
+    rm -rf certs
+    sudo uv run syft_proxy bootstrap
+    uv run syft_proxy start

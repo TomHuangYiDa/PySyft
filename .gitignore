@@ -168,3 +168,5 @@ Thumbs.db
 
 # JS dependency
 node_modules/
+
+**/certs
