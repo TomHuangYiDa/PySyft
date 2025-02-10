@@ -12,8 +12,6 @@ members = [
     "syft-core",
     "syft-event",
     "syft-extras",
-    "syft-files",
-    "syft-requests",
     "syft-rpc",
 ]
 
@@ -268,12 +266,10 @@ requires-dist = [
 [[package]]
 name = "syft-extras"
 version = "0.1.0"
-source = { editable = "." }
+source = { virtual = "." }
 dependencies = [
     { name = "syft-core" },
     { name = "syft-event" },
-    { name = "syft-files" },
-    { name = "syft-requests" },
     { name = "syft-rpc" },
 ]
 
@@ -286,29 +282,11 @@ dev = [
 requires-dist = [
     { name = "syft-core", editable = "packages/syft-core" },
     { name = "syft-event", editable = "packages/syft-event" },
-    { name = "syft-files", editable = "packages/syft-files" },
-    { name = "syft-requests", editable = "packages/syft-requests" },
     { name = "syft-rpc", editable = "packages/syft-rpc" },
 ]
 
 [package.metadata.requires-dev]
 dev = [{ name = "ruff", specifier = ">=0.9.3" }]
-
-[[package]]
-name = "syft-files"
-version = "0.1.0"
-source = { editable = "packages/syft-files" }
-
-[[package]]
-name = "syft-requests"
-version = "0.1.0"
-source = { editable = "packages/syft-requests" }
-dependencies = [
-    { name = "syft-rpc" },
-]
-
-[package.metadata]
-requires-dist = [{ name = "syft-rpc", editable = "packages/syft-rpc" }]
 
 [[package]]
 name = "syft-rpc"
