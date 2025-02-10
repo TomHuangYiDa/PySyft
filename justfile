@@ -45,3 +45,11 @@ start-proxy:
     rm -rf certs
     sudo uv run syft_proxy bootstrap
     uv run syft_proxy start
+
+run-pong:
+    uv sync
+    uv run examples/pingpong/pong_server.py
+
+run-ping:
+    uv sync
+    uv run examples/pingpong/ping_request.py
