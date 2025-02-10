@@ -2,7 +2,6 @@
 name = "syft-proxy"
 version = "0.1.0"
 description = "A local HTTP proxy for executing Syft RPC methods, facilitating seamless communication and computation in distributed machine learning environments."
-readme = "README.md"
 requires-python = ">=3.9" # same with SyftBox
 dependencies = [
     "fastapi>=0.115.8",
