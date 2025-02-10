@@ -159,6 +159,7 @@ async def rpc_status(id: str):
     else:
         logger.info(f"RPC future {id}: COMPLETED")
         rpc_db.delete_future(id)
+        logger.debug(result.json())
         return JSONResponse(
             status_code=int(result.status_code),
             headers=result.headers,

@@ -22,7 +22,7 @@ app = typer.Typer(
 
 
 @app.command()
-def start() -> None:
+def start(reload: bool = False) -> None:
     """Start the Syft Proxy Server."""
 
     cert_path, key_path = setup_https_certs()
@@ -37,6 +37,7 @@ def start() -> None:
         timeout_graceful_shutdown=5,
         timeout_keep_alive=10,
         workers=1,
+        reload=reload,
     )
 
 
