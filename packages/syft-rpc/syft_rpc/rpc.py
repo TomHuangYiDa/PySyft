@@ -42,12 +42,12 @@ def serialize(obj: Any) -> Optional[bytes]:
     elif isinstance(obj, BaseModel):
         return obj.model_dump_json().encode()
     elif is_dataclass(obj) and not isinstance(obj, type):
-        return json.dumps(asdict(obj), default=str).encode()
+        return json.dumps(asdict(obj), default=str, ensure_ascii=False).encode()
     elif isinstance(obj, str):
         return obj.encode()
     else:
-        # dataclass, dict, list, tuple, float, int
-        return json.dumps(obj).encode()
+        # dict, list, tuple, float, int, str
+        return json.dumps(obj, ensure_ascii=False).encode()
 
 
 def send(

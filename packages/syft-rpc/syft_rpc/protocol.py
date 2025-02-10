@@ -216,7 +216,7 @@ class SyftMessage(Base):
         m = self.model_dump_json(include={"url", "method", "sender", "headers", "body"})
         return hashlib.sha256(m.encode())
 
-    def text(self, encoding: str = "utf-8") -> str:
+    def text(self) -> str:
         """Decode the body as a string.
 
         Args:
@@ -230,9 +230,9 @@ class SyftMessage(Base):
         """
         if not self.body:
             return ""
-        return self.body.decode(encoding=encoding)
+        return self.body.decode()
 
-    def json(self, encoding: str = "utf-8", **kwargs) -> JSONValue:
+    def json(self, **kwargs) -> JSONValue:
         """Parse bytes body into JSON data.
 
         Args:
@@ -245,7 +245,7 @@ class SyftMessage(Base):
             json.JSONDecodeError: If body contains invalid JSON
             UnicodeDecodeError: If bytes cannot be decoded with specified encoding
         """
-        return json.loads(self.text(encoding=encoding))
+        return json.loads(self.text())
 
     def model(self, model_cls: Type[PYDANTIC]) -> PYDANTIC:
         """Parse JSON body into a Pydantic model instance.
