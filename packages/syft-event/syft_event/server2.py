@@ -201,24 +201,17 @@ class SyftEvents:
                 )
                 return
 
+            # call the function
             resp = func(**kwargs)
 
-            resp_headers = {}
-            resp_data = None
-            resp_code = SyftStatus.SYFT_200_OK
-            if resp is None:
-                resp_data = ""
-                # resp_headers["Content-Type"] = "text/plain"
-            elif isinstance(resp, Response):
+            if isinstance(resp, Response):
                 resp_data = resp.body
                 resp_code = SyftStatus(resp.status_code)
                 resp_headers = resp.headers
-            elif isinstance(resp, BaseModel):
-                resp_data = resp.model_dump_json()
-                # resp_headers["Content-Type"] = "application/json"
             else:
-                resp_data = json.dumps(resp)
-                # resp_headers["Content-Type"] = "application/json"
+                resp_data = resp
+                resp_code = SyftStatus.SYFT_200_OK
+                resp_headers = {}
 
             rpc.reply_to(
                 req,
