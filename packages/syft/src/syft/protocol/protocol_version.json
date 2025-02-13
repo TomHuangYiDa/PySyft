@@ -8,8 +8,7 @@
   "3": {
     "release_name": "0.9.3.json"
   },
-  "dev": {
-    "object_versions": {}
+  "4": {
+    "release_name": "0.9.5.json"
   }
-
 }
