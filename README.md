@@ -1,297 +1,172 @@
-<div align="left"> <a href="https://pypi.org/project/syft/"><img src="https://pepy.tech/badge/syft" /></a> <a href="https://pypi.org/project/syft/"><img src="https://badge.fury.io/py/syft.svg" /></a> <a href="https://hub.docker.com/u/openmined"><img src="https://img.shields.io/badge/docker-images-blue?logo=docker" /></a> <a href="https://github.com/OpenMined/PySyft/actions/workflows/nightlies.yml"><img src="https://github.com/OpenMined/PySyft/actions/workflows/nightlies.yml/badge.svg?branch=dev" /></a> <a href="https://slack.openmined.org/"><img src="https://img.shields.io/badge/chat-on%20slack-purple?logo=slack" /></a> <a href="https://openmined.github.io/PySyft/"><img src="https://img.shields.io/badge/read-docs-yellow?logo=mdbook" /></a>
+<div align="left"> <a href="https://pypi.org/project/syft/"><img src="https://static.pepy.tech/badge/pysyft" /></a> <a href="https://pypi.org/project/syft/"><img src="https://badge.fury.io/py/syft.svg" /></a> <a href="https://hub.docker.com/u/openmined"><img src="https://img.shields.io/badge/docker-images-blue?logo=docker" /></a> <a href="https://github.com/OpenMined/PySyft/actions/workflows/nightlies.yml"><img src="https://github.com/OpenMined/PySyft/actions/workflows/nightlies.yml/badge.svg?branch=dev" /></a> <a href="https://join.slack.com/t/openmined/shared_invite/zt-2hxwk07i9-HO7u5C7XOgou4Z62VU78zA/"><img src="https://img.shields.io/badge/chat-on%20slack-purple?logo=slack" /></a> <a href="https://docs.openmined.org/en/latest/index.html"><img src="https://img.shields.io/badge/read-docs-yellow?logo=mdbook" /></a>
 <br /><br /></div>
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/img/title_syft_dark.png">
-  <img alt="Syft Logo" src="docs/img/title_syft_light.png" width="200px" />
+  <source media="(prefers-color-scheme: dark)" srcset="docs/img/Syft-Logo-Light.svg">
+  <img alt="Syft Logo" src="docs/img/Syft-Logo.svg" width="200px" />
 </picture>
 
-Perform `numpy`-like analysis on `data` that remains in `someone else's` server
+<h3> Data Science on data you are not allowed to see</h3>
+
+PySyft enables a new way to do data science, where you can use non-public information, without seeing nor obtaining a copy of the data itself. All you need is to connect to a <a href="https://docs.openmined.org/en/latest/components/datasite-server.html">Datasite</a>!
+
+Datasites are like websites, but for data. Designed with the principles of <a href="https://arxiv.org/abs/2012.08347">structured transparency</a>, they enable data owners to control how their data is protected and data scientists to use data without obtaining a copy.
+
+PySyft supports any statistical analysis or machine learning, offering support for directly running Python code - even using third-party Python libraries.
+
+<h4> Supported on:</h4>
+
+✅ Linux
+✅ macOS
+✅ Windows
+✅ Docker
+✅ Kubernetes
 
 # Quickstart
 
-✅ `Linux` ✅ `macOS`\* ✅ `Windows`†‡
+Try out your <a href="https://docs.openmined.org/en/latest/index.html">first query against a live demo Datasite! </a>
 
-## Install syft on Python 3.9 - 3.10
-
-```bash
-$ pip install -U syft -f https://whls.blob.core.windows.net/unstable/index.html
-```
-
-## Launch a python dev Domain
-
-```python
-# from Jupyter / Python
-import syft as sy
-sy.requires(">=0.8,<0.8.1")
-node = sy.orchestra.launch(name="my-domain", port=8080, dev_mode=True, reset=True)
-```
+## Install Client
 
 ```bash
-# or from the command line
-$ syft launch --name=my-domain --port=8080 --reset=True
-
-Starting syft-node server on 0.0.0.0:8080
+pip install -U "syft[data_science]"
 ```
 
-## Connect with our Python Client
+More instructions are available <a href="https://docs.openmined.org/en/latest/quick-install.html">here</a>.
+
+## Launch Server
+
+Launch <a href="https://docs.openmined.org/en/latest/deployment/deployment-doc-1-2-intro-req.html">a development server </a> directly in your Jupyter Notebook:
 
 ```python
 import syft as sy
-sy.requires(">=0.8,<0.8.1")
-domain_client = sy.login(port=8080, email="info@openmined.org", password="changethis")
+
+sy.requires(">=0.9.5,<0.9.6")
+
+server = sy.orchestra.launch(
+    name="my-datasite",
+    port=8080,
+    create_producer=True,
+    n_consumers=1,
+    dev_mode=False,
+    reset=True, # resets database
+)
 ```
 
-## Deploy to a Container Engine or Cloud
+or from the command line:
 
-1. Install our handy 🛵 cli tool which makes deploying a Domain or Gateway server a one-liner:  
-   `pip install -U hagrid`
+```bash
+$ syft launch --name=my-datasite --port=8080 --reset=True
 
-2. Then run our interactive jupyter Install 🧙🏽‍♂️ Wizard<sup>BETA</sup>:  
-   `hagrid quickstart`
+Starting syft-datasite server on 0.0.0.0:8080
+```
 
-3. In the tutorial you will learn how to install and deploy:  
-   `PySyft` = our `numpy`-like 🐍 Python library for computing on `private data` in someone else's `Domain`
+Datasite servers can be deployed as a single container using Docker or directly in Kubernetes. Check out our <a href="https://docs.openmined.org/en/latest/deployment/deployment-doc-1-2-intro-req.html">deployment guide.</a>
 
-   `PyGrid` = our 🐳 `docker` / 🐧 `vm` `Domain` & `Gateway` Servers where `private data` lives
+## Launch Client
 
-4. During quickstart we will deploy `PyGrid` to localhost with 🐳 `docker`, however 🛵 HAGrid can deploy to `podman` or a 🐧 `ubuntu` VM on `azure` / `gcp` / `ANY_IP_ADDRESS` by using 🔨 `ansible`†
+Main way to use a Datasite is via our Syft client, in a Jupyter Notebook. Check out our <a href="https://docs.openmined.org/en/latest/components/syft-client.html"> PySyft client guide</a>:
 
-## Docs and Support
+```python
+import syft as sy
 
-- 📝 <a href="/notebooks/api">API Example Notebooks</a>
-- 📚 <a href="https://openmined.github.io/PySyft/">Docs</a>
-- `#support` on <a href="https://slack.openmined.org/">Slack</a>
+sy.requires(">=0.9.5,<0.9.6")
 
-# Install Notes
+datasite_client = sy.login(
+    port=8080,
+    email="info@openmined.org",
+    password="changethis"
+)
+```
 
-- HAGrid 0.3 Requires: 🐍 `python` 🐙 `git` - Run: `pip install -U hagrid`
-- Interactive Install 🧙🏽‍♂️ Wizard<sup>BETA</sup> Requires 🛵 `hagrid`: - Run: `hagrid quickstart`  
-  †`Windows` does not support `ansible`, preventing some remote deployment targets
-- PySyft 0.8 Requires: 🐍 `python 3.9 - 3.10` - Run: `pip install -U syft`  
-  \*`macOS` Apple Silicon users might need cmake: `brew install cmake`  
-  ‡`Windows` users must run this first: `pip install jaxlib==0.3.14 -f https://whls.blob.core.windows.net/unstable/index.html`
-- PyGrid Requires: 🐳 `docker` or 🐧 `ubuntu` VM - Run: `hagrid launch ...`
+## PySyft - Getting started 📝
 
-# Versions
+Learn about PySyft via our getting started guide:
 
-`0.8.1` (Beta) - `dev` branch 👈🏽 <a href="/notebooks/api/0.8">API</a>  
-`0.8.0` (Stable) - <a href="/notebooks/api/0.8">API</a>
+- <a href="https://docs.openmined.org/en/latest/getting-started/introduction.html">PySyft from the ground up</a>
+- <a href="https://docs.openmined.org/en/latest/getting-started/part1-dataset-and-assets.html"> Part 1: Datasets & Assets</a>
+- <a href="https://docs.openmined.org/en/latest/getting-started/part2-datasite-access.html"> Part 2: Client and Datasite Access</a>
+- <a href="https://docs.openmined.org/en/latest/getting-started/part3-research-study.html"> Part 3: Propose the research study</a>
+- <a href="https://docs.openmined.org/en/latest/getting-started/part4-review-code-request.html"> Part 4: Review Code Requests</a>
+- <a href="https://docs.openmined.org/en/latest/getting-started/part5-retrieving-results.html"> Part 5: Retrieving Results</a>
 
-Deprecated:
+# PySyft In-depth
 
-- `0.7.0` - <a href="https://github.com/OpenMined/courses/tree/introduction-to-remote-data-science-dev">Course 3 Updated</a>
-- `0.6.0` - <a href="https://github.com/OpenMined/courses/tree/introduction-to-remote-data-science">Course 3</a>
-- `0.5.1` - <a href="https://github.com/OpenMined/courses/tree/foundations-of-private-computation">Course 2</a> + M1 Hotfix
-- `0.2.0` - `0.5.0`
+📚 Check out <a href="https://docs.openmined.org/en/latest/index.html">our docs website</a>.
 
-PySyft and PyGrid use the same `version` and its best to match them up where possible. We release weekly betas which can be used in each context:
+Quick PySyft components links:
 
-PySyft (Stable): `pip install -U syft`  
-PyGrid (Stable) `hagrid launch ... tag=latest`
+- <a href="https://docs.openmined.org/en/latest/components/datasite-server.html">DataSite Server</a>
 
-PySyft (Beta): `pip install -U syft --pre`  
-PyGrid (Beta): `hagrid launch ... tag=beta`
+- <a href="https://docs.openmined.org/en/latest//components/syft-client.html">Syft Client</a>
 
-HAGrid is a cli / deployment tool so the latest version of `hagrid` is usually the best.
+- <a href="https://docs.openmined.org/en/latest/components/datasets.html">Datasets API (`.datasets`)</a>
 
-# What is Syft?
+- <a href="https://docs.openmined.org/en/latest/components/users-api.html">Users API (`.users`)</a>
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/img/logo_big_dark.png">
-  <img align="right" src="docs/img/logo_big.png" alt="Syft" height="250" style="padding-left:30px;">
-</picture>
+<!-- - <a href="https://docs.openmined.org/en/latest/components/projects-api.html">Projects API (`.projects`)</a> -->
 
-`Syft` is OpenMined's `open source` stack that provides `secure` and `private` Data Science in Python. Syft decouples `private data` from model training, using techniques like [Federated Learning](https://ai.googleblog.com/2017/04/federated-learning-collaborative.html), [Differential Privacy](https://en.wikipedia.org/wiki/Differential_privacy), and [Encrypted Computation](https://en.wikipedia.org/wiki/Homomorphic_encryption). This is done with a `numpy`-like interface and integration with `Deep Learning` frameworks, so that you as a `Data Scientist` can maintain your current workflow while using these new `privacy-enhancing techniques`.
+- <a href="https://docs.openmined.org/en/latest/components/requests-api.html">Request API (`.requests`)</a>
 
-### Why should I use Syft?
+- <a href="https://docs.openmined.org/en/latest/components/code-api.html">Code API (`.code`)</a>
 
-`Syft` allows a `Data Scientist` to ask `questions` about a `dataset` and, within `privacy limits` set by the `data owner`, get `answers` to those `questions`, all without obtaining a `copy` of the data itself. We call this process `Remote Data Science`. It means in a wide variety of `domains` across society, the current `risks` of sharing information (`copying` data) with someone such as, privacy invasion, IP theft and blackmail will no longer prevent the vast `benefits` such as innovation, insights and scientific discovery which secure access will provide.
+- <a href="https://docs.openmined.org/en/latest/components/syft-policies.html">Syft Policies API (`.policy`)</a>
 
-No more cold calls to get `access` to a dataset. No more weeks of `wait times` to get a `result` on your `query`. It also means `1000x more data` in every domain. PySyft opens the doors to a streamlined Data Scientist `workflow`, all with the individual's `privacy` at its heart.
+- <a href="https://docs.openmined.org/en/latest/components/settings-api.html">Settings API (`.settings`)</a>
 
-# Tutorials
+- <a href="https://docs.openmined.org/en/latest/components/notifications.html">Notifications API (`.notifications`)</a>
 
-<table border="5" bordercolor="grey">
-<tr>
-<th align="center">
-<img width="441" height="1">
-<div align="center">
-<img src="docs/img/personas_image/dataowner.png" alt="" width="100" height="100" align="center">
-<p>Data Owner</p></div>
-</th>
-<th align="center">
-<img width="441" height="1">
-<div align="center"><img src="docs/img/personas_image/datascientist.png" alt="" width="100" height="100" align="center">
-<p>Data Scientist</p></div>
+- <a href="https://docs.openmined.org/en/latest/components/syncing-api.html">Sync API (`.sync`)</a>
 
-</th>
-<th align="center">
-<img width="441" height="1">
-<div align="center">
-<img src="docs/img/personas_image/dataengineer.png" alt="" width="100" height="100" align="center">
-<p>Data Engineer</p>
-</div>
-</th>
-</tr>
-<tr>
-<td valign="top">
+## Why use PySyft?
 
-- <a href="/notebooks/quickstart/data-owner/00-deploy-domain.ipynb">Deploy a Domain Server</a>
-- <a href="/notebooks/quickstart/data-owner/01-upload-data.ipynb">Upload Private Data</a>
-- <a href="/notebooks/quickstart/data-owner/02-create-account-configure-pb.ipynb">Create Accounts</a>
-- Manage Privacy Budget</a>
-- <a href="/notebooks/quickstart/data-owner/03-join-network.ipynb">Join a Network</a>
-- Learn how PETs streamline Data Policies
+In a variety of domains across society, data owners have **valid concerns about the risks associated with sharing their data**, such as legal risks, privacy invasion (_misuing the data_), or intellectual property (_copying and redistributing it_).
 
-</td>
-<td valign="top">
+Datasites enable data scientists to **answer questions** without even seeing or acquiring a copy of the data, **within the data owners's definition of acceptable use**. We call this process <b> Remote Data Science</b>.
 
-- Install Syft</a>
-- Connect to a Domain</a>
-- Search for Datasets</a>
-- Train Models
-- Retrieve Secure Results
-- Learn Differential Privacy
+This means that the **current risks** of sharing information with someone will **no longer prevent** the vast benefits such as innovation, insights and scientific discovery. With each Datasite, data owners are able to enable `1000x more accesible data` in each scientific field and lead, together with data scientists, breakthrough innovation.
 
-</td>
-<td valign="top">
+Learn more about our work on <a href="https://openmined.org/">our website</a>.
 
-- Setup Dev Mode</a>
-- Deploy to Azure
-- Deploy to GCP
-- Deploy to Kubernetes
-- Customize Networking
-- Modify PyGrid UI
-</td>
-</tr>
-</table>
+## Support
 
-# Terminology
+For questions about PySyft, reach out via `#support` on <a href="https://slack.openmined.org/">Slack</a>.
 
-<table border="5" bordercolor="grey">
-<tr>
-<th align="center">
-<img width="441" height="1">
-<p>👨🏻‍💼 Data Owners</p>
-</th>
-<th align="center">
-<img width="441" height="1">
-<p>👩🏽‍🔬 Data Scientists</p>
-</th>
-</tr>
-<tr>
-<td valign="top">
-<!-- REMOVE THE BACKSLASHES -->
+## Syft Versions
 
-Provide `datasets` which they would like to make available for `study` by an `outside party` they may or may not `fully trust` has good intentions.
+:exclamation: PySyft and Syft Server must use the same `version`.
 
-</td>
-<td valign="top">
-<!-- REMOVE THE BACKSLASHES -->
+**Latest Stable**
 
-Are end `users` who desire to perform `computations` or `answer` a specific `question` using one or more data owners' `datasets`.
+- `0.9.5` (Stable) - <a href="https://docs.openmined.org/en/latest/index.html">Docs</a>
+- Install PySyft (Stable): `pip install -U syft`
 
-</td>
-</tr>
-<tr>
-<th align="center">
-<img width="441" height="1">
-<p>🏰 Domain Server</p>
-</th>
-<th align="center">
-<img width="441" height="1">
-<p>🔗 Gateway Server</p>
-</th>
-</tr>
-<tr>
-<td valign="top">
-<!-- REMOVE THE BACKSLASHES -->
 
-Manages the `remote study` of the data by a `Data Scientist` and allows the `Data Owner` to manage the `data` and control the `privacy guarantees` of the subjects under study. It also acts as a `gatekeeper` for the `Data Scientist's` access to the data to compute and experiment with the results.
-
-</td>
-<td valign="top">
-<!-- REMOVE THE BACKSLASHES -->
-
-Provides services to a group of `Data Owners` and `Data Scientists`, such as dataset `search` and bulk `project approval` (legal / technical) to participate in a project. A gateway server acts as a bridge between it's members (`Domains`) and their subscribers (`Data Scientists`) and can provide access to a collection of `domains` at once.</td>
-
-</tr>
-<tr>
-</table>
+Find more about previous <a href="./releases.md">releases here</a>.
 
 # Community
 
-<table border="5" bordercolor="grey">
-<tr>
-<th align="center" valign="top">
-<img width="441" height="1">
-<div align="center">
+Supported by the OpenMined Foundation, the OpenMined Community is an online network of over 17,000 technologists, researchers, and industry professionals keen to _unlock 1000x more data in every scientific field and industry_.
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/img/panel_slack_title_dark.png">
-  <img src="docs/img/panel_slack_title_light.png" alt="" width="100%" align="center" />
-</picture>
-
-<a href="https://slack.openmined.org/"><img src="docs/img/panel_slack.png" alt="" width="100%" align="center" /></a>
-
-</div>
-</th>
-<th align="center" valign="top">
-<img width="441" height="1">
-<div align="center">
-
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/img/panel_title_videos_papers.png">
-  <img src="docs/img/panel_title_videos_papers_light.png" alt="" width="100%" align="center" />
-</picture>
-
-<p align="left"><sub><sup>
-🎥 <a href="https://www.youtube.com/watch?v=qVf0tPBzr2k">PETs: Remote Data Science Unleashed - R gov 2021</a><br />
-🎥 <a href="https://youtu.be/sCoDWKTbh3s?list=PL_lsbAsL_o2BQKXG7mkGFA8LSApCnhljL">Introduction to Remote Data Science - PyTorch 2021</a><br />
-🎥 <a href="https://youtu.be/kzLeTz_vIeQ?list=PL_lsbAsL_o2BtOz6KUfUI_Zla6Rg5dmyc">The Future of AI Tools - PyTorch 2020</a><br />
-🎥 <a href="https://www.youtube.com/watch?v=4zrU54VIK6k&t=1s">Privacy Preserving AI - MIT Deep Learning Series</a><br />
-🎥 <a href="https://www.youtube.com/watch?v=Pr4erdusiW0">Privacy-Preserving Data Science - TWiML Talk #241</a><br />
-🎥 <a href="https://www.youtube.com/watch?v=NJBBE_SN90A">Privacy Preserving AI - PyTorch Devcon 2019</a><br />
-📖 <a href="https://arxiv.org/pdf/2110.01315.pdf">Towards general-purpose infrastructure for protect...</a><br />
-📖 <a href="https://arxiv.org/pdf/2104.12385.pdf">Syft 0.5: A platform for universally deployable ...</a><br />
-📖 <a href="https://arxiv.org/pdf/1811.04017.pdf">A generic framework for privacy preserving deep ...</a>
-</sup></sup></p>
-</div>
-</th>
-<th align="center" valign="top">
-<img width="441" height="1">
-<div align="center">
-
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/img/panel_padawan_title_dark.png">
-  <img src="docs/img/panel_padawan_title_light.png" alt="" width="100%" align="center" />
-</picture>
-
-<a href="https://blog.openmined.org/work-on-ais-most-exciting-frontier-no-phd-required/"><img src="docs/img/panel_padawan.png" alt="" width="100%" align="center"></a>
-
-</div>
-</th>
-</tr>
-</table>
+<a href="https://join.slack.com/t/openmined/shared_invite/zt-2hxwk07i9-HO7u5C7XOgou4Z62VU78zA"><img width=150px src="https://img.shields.io/badge/Join_us-%20slack-purple?logo=slack" /></a>
 
 # Courses
 
 <table border="5" bordercolor="grey">
 <tr>
 <th align="center">
-<img width="441" height="1">
+<img width="200" height="1">
 <div align="center">
 <a href="https://courses.openmined.org/courses/our-privacy-opportunity"><img src="docs/img/course_privacy.png" alt="" width="100%" align="center" /></a>
 </th>
 <th align="center">
-<img width="441" height="1">
+<img width="200" height="1">
 <div align="center">
 <a href="https://courses.openmined.org/courses/foundations-of-private-computation"><img src="docs/img/course_foundations.png" alt="" width="100%" align="center" /></a>
 </div>
 </th>
 <th align="center">
-<img width="441" height="1">
+<img width="200" height="1">
 <div align="center">
 <a href="https://courses.openmined.org/courses/introduction-to-remote-data-science"><img src="docs/img/course_introduction.png" alt="" width="100%" align="center"></a>
 </div>
@@ -301,12 +176,19 @@ Provides services to a group of `Data Owners` and `Data Scientists`, such as dat
 
 # Contributors
 
-OpenMined and Syft appreciates all contributors, if you would like to fix a bug or suggest a new feature, please see our [guidelines](https://openmined.github.io/PySyft/developer_guide/index.html).<br />
+OpenMined and Syft appreciates all contributors, if you would like to fix a bug or suggest a new feature, please reach out via <a href="https://github.com/OpenMined/PySyft/issues">Github</a> or <a href="https://join.slack.com/t/openmined/shared_invite/zt-2hxwk07i9-HO7u5C7XOgou4Z62VU78zA/">Slack</a>!
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/img/contributors_dark.jpg">
   <img src="docs/img/contributors_light.jpg" alt="Contributors" width="100%" />
 </picture>
+
+# About OpenMined
+
+OpenMined is a non-profit foundation creating technology infrastructure that helps researchers get answers from data without needing a copy or direct access. Our community of technologists is building Syft.
+
+<a href="https://donate.stripe.com/fZe03H0aLdAO59e9AA
+"><img width=200px src="https://img.shields.io/badge/Donate_to-OpenMined-yellow?logo=stripe" /></a>
 
 # Supporters
 
@@ -322,46 +204,48 @@ OpenMined and Syft appreciates all contributors, if you would like to fix a bug 
 <a href="https://pytorch.org/"><img src="docs/img/logo_torch.png" /></a>
 </th>
 <th align="center">
+<a href="https://www.dpmc.govt.nz/">
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/img/logo_nz_dark.png">
+  <img src="docs/img/logo_nz_light.png" />
+</picture>
+</a>
+</th>
+<th align="center">
+<a href="https://twitter.com/"><img src="docs/img/logo_twitter.png" /></a>
+</th>
+<th align="center">
+<a href="https://google.com/"><img src="docs/img/logo_google.png" /></a>
+</th>
+<th align="center">
+<a href="https://microsoft.com/"><img src="docs/img/logo_microsoft.png" /></a>
+</th>
+<th align="center">
+<a href="https://omidyar.com/"><img src="docs/img/logo_on.png" /></a>
+</th>
+<th align="center">
 <a href="https://www.udacity.com/"><img src="docs/img/logo_udacity.png" /></a>
 </th>
 <th align="center">
-<a href="https://summerofcode.withgoogle.com/"><img src="docs/img/logo_gsoc.png" /></a>
-</th>
-<th align="center">
-<a href="https://developers.google.com/season-of-docs"><img src="docs/img/logo_gsod.png" /></a>
-</th>
-<th align="center">
+<a href="https://www.centerfordigitalhealthinnovation.org/">
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/img/logo_cdhi_dark.png">
+  <img src="docs/img/logo_cdhi_light.png" />
+</picture>
+
+</a>
+</th>
+<th align="center">
+<a href="https://arkhn.org/">
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/img/logo_arkhn.png">
   <img src="docs/img/logo_arkhn_light.png" />
 </picture>
-
-</th>
-<th align="center">
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/img/logo_cape.png">
-  <img src="docs/img/logo_cape_light.png" />
-</picture>
-</th>
-<th align="center">
-<a href="https://begin.ai/"><img src="docs/img/logo_begin.png" /></a>
+</a>
 </th>
 </tr>
 </table>
-
-# Open Collective
-
-`OpenMined` is a fiscally sponsored `501(c)(3)` in the USA. We are funded by our generous supporters on <a href="https://opencollective.com/openmined">Open Collective</a>. <br /><br />
-
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/img/opencollective_dark.png">
-  <img src="docs/img/opencollective_light.png" alt="Contributors" width="100%" />
-</picture>
-
-# Disclaimer
-
-Syft is under active development and is not yet ready for pilots on private data without our assistance. As early access participants, please contact us via [Slack](https://slack.openmined.org/) or email if you would like to ask a question or have a use case that you would like to discuss.
 
 # License
 

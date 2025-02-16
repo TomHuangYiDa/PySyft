@@ -121,7 +121,7 @@
             </div>
           </div>
           <div class="space-y-3" style="padding-bottom: 5%;">
-            <span class="font-bold ">AUTHENTICATION</span>
+            <span class="font-bold">AUTHENTICATION</span>
             <div class="space-y-1" style="display:flex;flex-direction:column">
               <span class="font-bold small">Email</span>
               <span class="font-roboto small">{user_info.email}</span>
@@ -296,8 +296,8 @@
     </div>
     <h2>
       When you delete your user account all information relating to you will be deleted as well as
-      any permissions and requests. If you are the domain owner the domain node will be deleted as
-      well and will be closed to all users. To transfer ownership of a domain node before deleting
+      any permissions and requests. If you are the datasite owner the datasite server will be deleted as
+      well and will be closed to all users. To transfer ownership of a datasite server before deleting
       your account you can follow the instructions here.
     </h2>
     <div class="space-x-3" style="display:flex;justify-content:center">
