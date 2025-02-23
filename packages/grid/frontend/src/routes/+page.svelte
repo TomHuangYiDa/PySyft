@@ -1,19 +1,19 @@
-<script>
-  import { goto } from '$app/navigation';
+<script lang="ts">
+  import { goto } from "$app/navigation"
+  import { onMount } from "svelte"
+  import type { PageData } from "./$types"
 
-  async function lazyLoad() {
-    if (typeof window === 'undefined') return;
+  export let data: PageData
 
-    if (!window.localStorage.getItem('key')) {
-      goto('/login');
+  onMount(() => {
+    if (data?.current_user && data.current_user?.email) {
+      goto("/users")
     } else {
-      goto('/datasets');
+      goto("/login")
     }
-  }
+  })
 </script>
 
 <main>
-  {#await lazyLoad()}
-    <title>PyGrid</title>
-  {/await}
+  <title>Syft UI</title>
 </main>
